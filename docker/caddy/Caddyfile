@@ -1,0 +1,20 @@
+{$SIGNALO_HOST} {
+    # Static files
+    handle /static/* {
+        root * /static_volume
+        uri strip_prefix /static
+        file_server
+    }
+
+    # Media files
+    handle /media/* {
+        root * /media_volume
+        uri strip_prefix /media
+        file_server
+    }
+
+    # Django
+    handle {
+        reverse_proxy django:8000
+    }
+}
