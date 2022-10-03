@@ -20,7 +20,7 @@ COPY ./requirements.txt .
 RUN pip install -r requirements.txt
 
 # copy project
-COPY /src /usr/src/app
+COPY /signalo /usr/src/app
 
 # setup entrypoint
 COPY ./docker/django/entrypoint.sh /entrypoint.sh
