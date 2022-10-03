@@ -1,7 +1,7 @@
 repos:
   # Fix end of files
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v3.2.0
+    rev: v4.3.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -11,7 +11,7 @@ repos:
 
   # Remove unused imports/variables
   - repo: https://github.com/myint/autoflake
-    rev: v1.4
+    rev: v1.6.1
     hooks:
       - id: autoflake
         args:
@@ -21,14 +21,14 @@ repos:
 
   # Sort imports
   - repo: https://github.com/pycqa/isort
-    rev: "5.7.0"
+    rev: "5.10.1"
     hooks:
       - id: isort
         args: ["--profile", "black"]
 
   # Black formatting
   - repo: https://github.com/psf/black
-    rev: 21.6b0
+    rev: 22.8.0
     hooks:
       - id: black
 
