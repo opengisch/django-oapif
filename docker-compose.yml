@@ -13,6 +13,7 @@ services:
     restart: unless-stopped
     environment:
       SIGNALO_HOST: ${SIGNALO_HOST:?}
+    network_mode: bridge
     ports:
       - 80:80
       - 443:443
@@ -45,7 +46,6 @@ services:
     ## UNCOMMENT IF YOU NEED THE POSTGIS DATABASE TO BE ACCESSIBLE
     # ports:
     # - 5432:5432
-
 
 volumes:
   static_volume:
