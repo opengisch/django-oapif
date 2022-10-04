@@ -10,8 +10,8 @@ class CustomPagination(pagination.LimitOffsetPagination):
                     "next": self.get_next_link(),
                     "previous": self.get_previous_link(),
                 },
-                "numberReturned": self.page.paginator.count,
-                "numberMatched": len(data),
+                "numberReturned": len(data["features"]),
+                "numberMatched": self.count,
                 **data,
             }
         )

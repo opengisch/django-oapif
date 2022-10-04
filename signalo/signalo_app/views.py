@@ -38,7 +38,6 @@ class SignViewset(WFS3DescribeModelViewSetMixin, viewsets.ModelViewSet):
 
 
 class PoleViewset(WFS3DescribeModelViewSetMixin, viewsets.ModelViewSet):
-    queryset = Pole.objects.all()
     serializer_class = PoleSerializer
     wfs3_title = "PoleWFS3Model"
     wfs3_description = "PoleWFS3Model layer"
@@ -48,3 +47,15 @@ class PoleViewset(WFS3DescribeModelViewSetMixin, viewsets.ModelViewSet):
     wfs3_srid = (
         settings.SRID
     )  # (one day this will be retrieved automatically from the DB field)
+
+    def get_queryset(self):
+        if self.request.GET.get("bbox"):
+            coords = self.request.GET["bbox"].split(",")
+
+            from django.contrib.gis.geos import Polygon
+
+            my_bbox_polygon = Polygon.from_bbox(coords)  # [xmin, ymin, xmax, ymax]
+
+            return Pole.objects.filter(geom__intersects=my_bbox_polygon)
+
+        return Pole.objects.all()

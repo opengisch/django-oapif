@@ -147,7 +147,7 @@ REST_FRAMEWORK = {
     # "rest_framework.authentication.SessionAuthentication",
     # "geocity.auth.InternalTokenAuthentication",
     # ),
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.LimitOffsetPagination",
+    "DEFAULT_PAGINATION_CLASS": "django_wfs3.pagination.CustomPagination",
     # "DEFAULT_THROTTLE_CLASSES": [
     #     "rest_framework.throttling.ScopedRateThrottle",
     # ],
