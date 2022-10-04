@@ -1,7 +1,7 @@
+from django.conf import settings
 from django.contrib.gis.db.models import Extent
-from rest_framework.response import Response
-
 from django_wfs3.urls import wfs3_router
+from rest_framework.response import Response
 
 
 class WFS3DescribeModelViewSetMixin:
@@ -22,7 +22,7 @@ class WFS3DescribeModelViewSetMixin:
         # retrieve wfs3 config defined on the viewset
         title = getattr(self, "wfs3_title", f"Layer {key}")
         description = getattr(self, "wfs3_description", "No description")
-        srid = getattr(self, "wfs3_srid", 4326)
+        srid = getattr(self, "wfs3_srid", settings.SRID)
         extents = self.get_queryset().aggregate(e=Extent(self.wfs3_geom_lookup))["e"]
 
         # return the wfs3 layer description as an object

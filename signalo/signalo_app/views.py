@@ -1,8 +1,9 @@
+from django.conf import settings
 from django.http import HttpResponse
 from django_wfs3.mixins import WFS3DescribeModelViewSetMixin
 from rest_framework import viewsets
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
-from signalo_app.models import Sign, Pole
+from signalo_app.models import Pole, Sign
 
 
 def index(request):
@@ -31,7 +32,9 @@ class SignViewset(WFS3DescribeModelViewSetMixin, viewsets.ModelViewSet):
     wfs3_geom_lookup = (
         "geom"  # (one day this will be retrieved automatically from the serializer)
     )
-    wfs3_srid = 2056  # (one day this will be retrieved automatically from the DB field)
+    wfs3_srid = (
+        settings.SRID
+    )  # (one day this will be retrieved automatically from the DB field)
 
 
 class PoleViewset(WFS3DescribeModelViewSetMixin, viewsets.ModelViewSet):
@@ -42,4 +45,6 @@ class PoleViewset(WFS3DescribeModelViewSetMixin, viewsets.ModelViewSet):
     wfs3_geom_lookup = (
         "geom"  # (one day this will be retrieved automatically from the serializer)
     )
-    wfs3_srid = 2056  # (one day this will be retrieved automatically from the DB field)
+    wfs3_srid = (
+        settings.SRID
+    )  # (one day this will be retrieved automatically from the DB field)

@@ -21,7 +21,7 @@ if __name__ == "__main__":
             x = x_start + dx * step
             y = y_start + dy * step
             pole_pk = f"00000000-0000-0000-0002-{dx:06d}{dy:06d}"
-            geom = f"Point({x} {y})"
+            geom = f"Point({x:4f} {y:4f})"
             name = f"{dx}-{dy}"
 
             poles.append(
