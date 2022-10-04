@@ -13,7 +13,7 @@ services:
     restart: unless-stopped
     environment:
       SIGNALO_HOST: ${SIGNALO_HOST:?}
-    network_mode: bridge
+    # network_mode: bridge
     ports:
       - 80:80
       - 443:443

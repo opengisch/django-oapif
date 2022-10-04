@@ -1,3 +1,4 @@
 django>=4
 psycopg2
 transifex-client
+djangorestframework
