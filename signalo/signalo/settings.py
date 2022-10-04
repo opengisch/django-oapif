@@ -138,25 +138,25 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Django REST Framework
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": (
-        "oauth2_provider.contrib.rest_framework.OAuth2Authentication",
-        "rest_framework.authentication.SessionAuthentication",
-        # "geocity.auth.InternalTokenAuthentication",
-    ),
+    # "DEFAULT_AUTHENTICATION_CLASSES": (
+    # "oauth2_provider.contrib.rest_framework.OAuth2Authentication",
+    # "rest_framework.authentication.SessionAuthentication",
+    # "geocity.auth.InternalTokenAuthentication",
+    # ),
     "DEFAULT_PAGINATION_CLASS": "django_wfs3.pagination.CustomPagination",
-    "DEFAULT_THROTTLE_CLASSES": [
-        "rest_framework.throttling.ScopedRateThrottle",
-    ],
-    "DEFAULT_THROTTLE_RATES": {
-        # Full API for permits
-        "permits": os.getenv("DRF_THROTTLE_RATE_PERMITS_API"),
-        # Full API for permits_details
-        "permits_details": os.getenv("DRF_THROTTLE_RATE_PERMITS_DETAILS_API"),
-        # Limited pulic API used mainly by Geocalendar front app
-        "events": os.getenv("DRF_THROTTLE_RATE_EVENTS_API"),
-        # Full API for search
-        "search": os.getenv("DRF_THROTTLE_RATE_SEARCH_API"),
-    },
+    # "DEFAULT_THROTTLE_CLASSES": [
+    #     "rest_framework.throttling.ScopedRateThrottle",
+    # ],
+    # "DEFAULT_THROTTLE_RATES": {
+    #     # Full API for permits
+    #     "permits": os.getenv("DRF_THROTTLE_RATE_PERMITS_API"),
+    #     # Full API for permits_details
+    #     "permits_details": os.getenv("DRF_THROTTLE_RATE_PERMITS_DETAILS_API"),
+    #     # Limited pulic API used mainly by Geocalendar front app
+    #     "events": os.getenv("DRF_THROTTLE_RATE_EVENTS_API"),
+    #     # Full API for search
+    #     "search": os.getenv("DRF_THROTTLE_RATE_SEARCH_API"),
+    # },
 }
 
 WFS3_TITLE = "SIGNALO_ROADSIGNS_WFS3"
