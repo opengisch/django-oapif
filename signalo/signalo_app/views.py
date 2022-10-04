@@ -1,7 +1,7 @@
 from django.http import HttpResponse
 from django_wfs3.mixins import WFS3DescribeModelViewSetMixin
 from rest_framework import viewsets
-from rest_framework_gis.serializers import GeoFeatureModelSErializer
+from rest_framework_gis.serializers import GeoFeatureModelSerializer
 from signalo_app.models import Sign, Pole
 
 
