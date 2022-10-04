@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.http import HttpResponse
-from django_wfs3.mixins import WFS3DescribeModelViewSetMixin
+from django_oapif.mixins import OAPIFDescribeModelViewSetMixin
 from rest_framework import viewsets
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 from signalo_app.models import Pole, Sign
@@ -24,27 +24,27 @@ class SignSerializer(GeoFeatureModelSerializer):
         geo_field = "geom"
 
 
-class SignViewset(WFS3DescribeModelViewSetMixin, viewsets.ModelViewSet):
+class SignViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
     queryset = Sign.objects.all()
     serializer_class = SignSerializer
-    wfs3_title = "RoadSignWFS3Model"
-    wfs3_description = "RoadSignWFS3Model layer"
-    wfs3_geom_lookup = (
+    oapif_title = "RoadSignOAPIFModel"
+    oapif_description = "RoadSignOAPIFModel layer"
+    oapif_geom_lookup = (
         "geom"  # (one day this will be retrieved automatically from the serializer)
     )
-    wfs3_srid = (
+    oapif_srid = (
         settings.SRID
     )  # (one day this will be retrieved automatically from the DB field)
 
 
-class PoleViewset(WFS3DescribeModelViewSetMixin, viewsets.ModelViewSet):
+class PoleViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
     serializer_class = PoleSerializer
-    wfs3_title = "PoleWFS3Model"
-    wfs3_description = "PoleWFS3Model layer"
-    wfs3_geom_lookup = (
+    oapif_title = "PoleOAPIFModel"
+    oapif_description = "PoleOAPIFModel layer"
+    oapif_geom_lookup = (
         "geom"  # (one day this will be retrieved automatically from the serializer)
     )
-    wfs3_srid = (
+    oapif_srid = (
         settings.SRID
     )  # (one day this will be retrieved automatically from the DB field)
 

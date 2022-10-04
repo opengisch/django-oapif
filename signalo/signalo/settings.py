@@ -147,7 +147,7 @@ REST_FRAMEWORK = {
     # "rest_framework.authentication.SessionAuthentication",
     # "geocity.auth.InternalTokenAuthentication",
     # ),
-    "DEFAULT_PAGINATION_CLASS": "django_wfs3.pagination.CustomPagination",
+    "DEFAULT_PAGINATION_CLASS": "django_oapif.pagination.CustomPagination",
     # "DEFAULT_THROTTLE_CLASSES": [
     #     "rest_framework.throttling.ScopedRateThrottle",
     # ],
@@ -163,5 +163,5 @@ REST_FRAMEWORK = {
     # },
 }
 
-WFS3_TITLE = "SIGNALO_ROADSIGNS_WFS3"
-WFS3_DESCRIPTION = "SIGNALO_ROADSIGNS_WFS3"
+OAPIF_TITLE = "SIGNALO_ROADSIGNS_OAPIF"
+OAPIF_DESCRIPTION = "SIGNALO_ROADSIGNS_OAPIF"

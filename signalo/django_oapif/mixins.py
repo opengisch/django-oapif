@@ -1,31 +1,31 @@
 from django.conf import settings
 from django.contrib.gis.db.models import Extent
-from django_wfs3.urls import wfs3_router
+from django_oapif.urls import oapif_router
 from rest_framework.response import Response
 
 
-class WFS3DescribeModelViewSetMixin:
+class OAPIFDescribeModelViewSetMixin:
     """
-    Adds describe endpoint used by WFS3 routers
+    Adds describe endpoint used by OAPIF routers
     """
 
     def _describe(self, request, base_url):
-        # retrieve the key under which this viewset was registered in the wfs3 router
+        # retrieve the key under which this viewset was registered in the oapif router
         key = None
-        for prefix, viewset, basename in wfs3_router.registry:
+        for prefix, viewset, basename in oapif_router.registry:
             if viewset is self.__class__:
                 key = prefix
                 break
         else:
-            raise Exception(f"Did not find {self} in {wfs3_router.registry}")
+            raise Exception(f"Did not find {self} in {oapif_router.registry}")
 
-        # retrieve wfs3 config defined on the viewset
-        title = getattr(self, "wfs3_title", f"Layer {key}")
-        description = getattr(self, "wfs3_description", "No description")
-        srid = getattr(self, "wfs3_srid", settings.SRID)
-        extents = self.get_queryset().aggregate(e=Extent(self.wfs3_geom_lookup))["e"]
+        # retrieve oapif config defined on the viewset
+        title = getattr(self, "oapif_title", f"Layer {key}")
+        description = getattr(self, "oapif_description", "No description")
+        srid = getattr(self, "oapif_srid", settings.SRID)
+        extents = self.get_queryset().aggregate(e=Extent(self.oapif_geom_lookup))["e"]
 
-        # return the wfs3 layer description as an object
+        # return the oapif layer description as an object
         return {
             "id": key,
             "title": title,

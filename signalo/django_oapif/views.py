@@ -5,7 +5,7 @@ from rest_framework.reverse import reverse
 
 
 class RootView(views.APIView):
-    """WFS3 index view.
+    """OAPIF index view.
 
     This is currently more or less static
     """
@@ -63,7 +63,6 @@ class CollectionsView(routers.APIRootView):
         collections = []
         namespace = request.resolver_match.namespace
         for prefix, Viewset, basename in self.registry:
-            key = prefix
             url_name = f"{basename}-list"
             if namespace:
                 url_name = namespace + ":" + url_name

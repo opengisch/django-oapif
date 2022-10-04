@@ -15,10 +15,10 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import include, path
-from django_wfs3.urls import wfs3_router
+from django_oapif.urls import oapif_router
 
 urlpatterns = [
     path("signalo_app/", include("signalo_app.urls")),
     path("admin/", admin.site.urls),
-    path("wfs3/", include(wfs3_router.urls)),  # Django-rest urls
+    path("oapif/", include(oapif_router.urls)),  # Django-rest urls
 ]

@@ -1,6 +1,6 @@
-# Django WFS3
+# Django OAPIF
 
-This Django app implements an OGC Services API (a.k.a. WFS3) for Django.
+This Django app implements an OGC Services API (a.k.a. OAPIF) for Django.
 
 It provides a Django Rest Framework (DRF) specific router to which you can
 regsiter your Viewsets, and thus benefit from all DRF's features (permissions,
@@ -28,7 +28,7 @@ Add this to your `urls.py` :
 
 ```python
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
-from geocity.apps.django_wfs3.urls import wfs3_router
+from geocity.apps.django_oapif.urls import oapif_router
 
 class MyModelSerializer(gis_serializers.GeoFeatureModelSerializer):
     class Meta:
@@ -36,35 +36,35 @@ class MyModelSerializer(gis_serializers.GeoFeatureModelSerializer):
         fields = "__all__"
         geo_field = "geom"
 
-class MyModelViewset(WFS3DescribeModelViewSetMixin, viewsets.ModelViewSet):
+class MyModelViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
     queryset = MyModel.objects.all()
     serializer_class = MyModelSerializer
 
-    wfs3_title = "layer title"
-    wfs3_description = "layer_description"
-    wfs3_geom_lookup = 'geom'  # (one day this will be retrieved automatically from the serializer)
-    wfs3_srid = 2056  # (one day this will be retrieved automatically from the DB field)
+    oapif_title = "layer title"
+    oapif_description = "layer_description"
+    oapif_geom_lookup = 'geom'  # (one day this will be retrieved automatically from the serializer)
+    oapif_srid = 2056  # (one day this will be retrieved automatically from the DB field)
 ```
 
-2. Register the routers against the `wfs3 router` (suggestion: do this in `{your_project}.urls.py`):
+2. Register the routers against the `oapif router` (suggestion: do this in `{your_project}.urls.py`):
 
 ```python
-wfs3_router.register(r"permits", MyModelViewSe`, "permits")
+oapif_router.register(r"permits", MyModelViewSe`, "permits")
 ```
 
 3. In the same file, include the router:
 
 ```python
 urlpatterns += [
-    path("wfs3/", include(django_wfs3.urls))
+    path("oapif/", include(django_oapif.urls))
 ]
 ```
 
 Optionally specify your endpoint's metadata in `settings.py`:
 
 ```python
-WFS3_TITLE = "My Endpoint"
-WFS3_DESCRIPTION = "Description"
+OAPIF_TITLE = "My Endpoint"
+OAPIF_DESCRIPTION = "Description"
 ```
 
 ## Roadmap / status

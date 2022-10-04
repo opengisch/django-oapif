@@ -8,13 +8,13 @@ from rest_framework.urlpatterns import format_suffix_patterns
 from .views import CollectionsView, RootView
 
 
-class WFS3Router(routers.SimpleRouter):
-    """Router to explose a WFS3 Endpoint.
+class OAPIFRouter(routers.SimpleRouter):
+    """Router to explose a OAPIF Endpoint.
 
     This works just like a regular DRF router, where you need
     to register your viewsets using `router.register(...)`.
 
-    It will take care of creating the standard WFS3 routes according
+    It will take care of creating the standard OAPIF routes according
     to https://app.swaggerhub.com/apis/cportele/ogcapi-features-1-example2/1.0.0#/Capabilities/getCollections
     """
 
@@ -72,11 +72,11 @@ class WFS3Router(routers.SimpleRouter):
         return self.urls
 
     def get_urls(self):
-        """Return all WFS3 routes"""
+        """Return all OAPIF routes"""
         urls = super().get_urls()
 
-        title = getattr(settings, "WFS3_TITLE", "Django OGC Api Services Endpoint")
-        description = getattr(settings, "WFS3_DESCRIPTION", "No description")
+        title = getattr(settings, "OAPIF_TITLE", "Django OGC Api Services Endpoint")
+        description = getattr(settings, "OAPIF_DESCRIPTION", "No description")
 
         # Root URL
         root_view = RootView.as_view(
