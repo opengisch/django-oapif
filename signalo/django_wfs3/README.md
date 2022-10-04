@@ -10,9 +10,22 @@ serialization, authentication, etc.).
 
 > NOTE : these snippets are not tested and may require fixing/adaptations.
 
+0. In `settings.py` make sure that rest_framework is installed:
+
+```python
+INSTALLED_APPS = [
+    ...,
+    "rest_framework",
+    "rest_framework_gis",
+    ...,
+]
+
+```
+
 Add this to your `urls.py` :
 
-Register your viewset in the wfs3 router
+1. Define your viewset:
+
 ```python
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 from geocity.apps.django_wfs3.urls import wfs3_router
@@ -31,11 +44,15 @@ class MyModelViewset(WFS3DescribeModelViewSetMixin, viewsets.ModelViewSet):
     wfs3_description = "layer_description"
     wfs3_geom_lookup = 'geom'  # (one day this will be retrieved automatically from the serializer)
     wfs3_srid = 2056  # (one day this will be retrieved automatically from the DB field)
-
-wfs3_router.register(r"permits", MyModelViewSet, "permits")
 ```
 
-Add the router to your `urls.py`:
+2. Register the routers against the `wfs3 router` (suggestion: do this in `{your_project}.urls.py`):
+
+```python
+wfs3_router.register(r"permits", MyModelViewSe`, "permits")
+```
+
+3. In the same file, include the router:
 
 ```python
 urlpatterns += [
