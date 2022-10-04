@@ -19,7 +19,7 @@ class Sign(ComputedFieldsModel):
     order = models.IntegerField(default=1)
 
     @computed(
-        models.PointField(srid=2056, verbose_name=_("Geometry")),
+        models.PointField(srid=2056, verbose_name=_("Geometry"), null=True),
         depends=[("self", ["pole"]), ("pole", ["geom"])],
     )
     def computed_geom(self):
