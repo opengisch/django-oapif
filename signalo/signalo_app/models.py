@@ -4,10 +4,12 @@ from computedfields.models import ComputedFieldsModel, computed
 from django.contrib.gis.db import models
 from django.utils.translation import gettext as _
 
+SRID = 4326
+
 
 class Pole(ComputedFieldsModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    geom = models.PointField(srid=2056, verbose_name=_("Geometry"))
+    geom = models.PointField(srid=SRID, verbose_name=_("Geometry"))
     name = models.CharField(max_length=255, verbose_name=_("Name"))
 
 
@@ -19,7 +21,7 @@ class Sign(ComputedFieldsModel):
     order = models.IntegerField(default=1)
 
     @computed(
-        models.PointField(srid=2056, verbose_name=_("Geometry"), null=True),
+        models.PointField(srid=SRID, verbose_name=_("Geometry"), null=True),
         depends=[("self", ["pole"]), ("pole", ["geom"])],
     )
     def geom(self):

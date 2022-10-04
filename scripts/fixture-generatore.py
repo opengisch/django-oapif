@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 import json
 
-magnitude = 10
-x_start = 2558500
-y_start = 1152000
-step = 50
+magnitude = 100
+x_start = 45  # 2508500
+y_start = 7  # 1152000
+step = 0.01
 signs_per_pole = 3
 pole_file = "signalo/signalo_app/fixtures/pole.json"
 sign_file = "signalo/signalo_app/fixtures/sign.json"
@@ -20,7 +20,7 @@ if __name__ == "__main__":
             # pole
             x = x_start + dx * step
             y = y_start + dy * step
-            pole_pk = f"00000000-0000-0000-0001-{dx:06d}{dy:06d}"
+            pole_pk = f"00000000-0000-0000-0002-{dx:06d}{dy:06d}"
             geom = f"Point({x} {y})"
             name = f"{dx}-{dy}"
 
@@ -38,7 +38,7 @@ if __name__ == "__main__":
                 signs.append(
                     {
                         "model": "signalo_app.sign",
-                        "pk": f"{dx:04d}{dy:04d}-0000-0000-0002-{order:012d}",
+                        "pk": f"{dx:04d}{dy:04d}-0000-0000-0003-{order:012d}",
                         "fields": {"order": order, "pole": pole_pk},
                     }
                 )
