@@ -30,7 +30,7 @@ services:
       - static_volume:/static_volume
       - media_volume:/media_volume
     environment:
-      DJANGO_DEBUG: "false"
+      DJANGO_DEBUG: "true"
       SIGNALO_HOST: ${SIGNALO_HOST:?}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?}
       DJANGO_STATIC_ROOT: /static_volume
