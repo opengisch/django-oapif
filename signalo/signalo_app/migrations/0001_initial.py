@@ -47,7 +47,7 @@ class Migration(migrations.Migration):
                         serialize=False,
                     ),
                 ),
-                ("magnitude", models.IntegerField(default=1)),
+                ("order", models.IntegerField(default=1)),
                 (
                     "pole",
                     models.ForeignKey(
