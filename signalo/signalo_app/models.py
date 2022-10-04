@@ -22,5 +22,5 @@ class Sign(ComputedFieldsModel):
         models.PointField(srid=2056, verbose_name=_("Geometry"), null=True),
         depends=[("self", ["pole"]), ("pole", ["geom"])],
     )
-    def computed_geom(self):
+    def geom(self):
         return self.pole.geom
