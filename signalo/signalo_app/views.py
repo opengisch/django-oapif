@@ -1,7 +1,8 @@
+from email.charset import Charset
 from django.conf import settings
 from django.http import HttpResponse
 from django_oapif.mixins import OAPIFDescribeModelViewSetMixin
-from rest_framework import viewsets
+from rest_framework import viewsets, serializers
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 from signalo_app.models import Pole, Sign
 
@@ -24,9 +25,22 @@ class SignSerializer(GeoFeatureModelSerializer):
         geo_field = "geom"
 
 
+###
+
+
+def serializeSign(pole: Pole):
+    return{
+        "id": str(pole.id),
+        "geom": ,
+        "name": pole.name
+    }
+
+###
+
+
 class SignViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
     queryset = Sign.objects.all()
-    serializer_class = SignSerializer
+    serializer_class = MySignSerializer
     oapif_title = "RoadSignOAPIFModel"
     oapif_description = "RoadSignOAPIFModel layer"
     oapif_geom_lookup = (
@@ -38,7 +52,7 @@ class SignViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
 
 
 class PoleViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
-    serializer_class = PoleSerializer
+    serializer_class = MyPoleSerializer
     oapif_title = "PoleOAPIFModel"
     oapif_description = "PoleOAPIFModel layer"
     oapif_geom_lookup = (
