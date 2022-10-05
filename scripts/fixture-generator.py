@@ -1,17 +1,34 @@
 #!/usr/bin/env python
+import argparse
 import json
-
-magnitude = 100
-x_start = 45  # 2508500
-y_start = 7  # 1152000
-step = 0.01
-signs_per_pole = 3
-pole_file = "signalo/signalo_app/fixtures/pole.json"
-sign_file = "signalo/signalo_app/fixtures/sign.json"
 
 ######
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Super Green Data Generator")
+    parser.add_argument("-s", "--srid", type=int, default=4326, choices=(4326, 2056))
+    parser.add_argument("-m", "--magnitude", type=int, default=10)
+
+    args = parser.parse_args()
+
+    magnitude = args.magnitude
+    if magnitude > 1000:
+        raise ValueError("magnitude > 1000")
+
+    if args.srid == 2056:
+        x_start = 2508500
+        y_start = 1152000
+        step = 100
+    else:
+        x_start = 45
+        y_start = 7
+        step = 0.01
+
+    signs_per_pole = 3
+
+    pole_file = "signalo/signalo_app/fixtures/pole.json"
+    sign_file = "signalo/signalo_app/fixtures/sign.json"
+
     poles = []
     signs = []
 
