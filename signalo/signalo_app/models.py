@@ -11,6 +11,13 @@ class Pole(ComputedFieldsModel):
     geom = models.PointField(srid=settings.SRID, verbose_name=_("Geometry"))
     name = models.CharField(max_length=255, verbose_name=_("Name"))
 
+    @computed(
+        models.CharField(null=True, max_length=1000),
+        depends=[("self", ["id", "geom", "name"])],
+    )
+    def _serialized(self):
+        return f'{{"id": "{str(self.id)}", "type": "Feature", "geometry": {self.geom.geojson}, "properties": {{"name": "{self.name}"}}}}'
+
 
 class Sign(ComputedFieldsModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

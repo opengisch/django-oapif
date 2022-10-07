@@ -147,7 +147,7 @@ REST_FRAMEWORK = {
     # "rest_framework.authentication.SessionAuthentication",
     # "geocity.auth.InternalTokenAuthentication",
     # ),
-    "DEFAULT_PAGINATION_CLASS": "django_oapif.pagination.CustomPagination",
+    "DEFAULT_PAGINATION_CLASS": "django_oapif.pagination.OapifPagination",
     # "DEFAULT_THROTTLE_CLASSES": [
     #     "rest_framework.throttling.ScopedRateThrottle",
     # ],
