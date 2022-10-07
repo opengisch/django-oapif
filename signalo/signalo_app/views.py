@@ -17,11 +17,6 @@ class OapifResponse(HttpResponse):
         super(OapifResponse, self).__init__(data)
 
 
-def poleSerializer(pole: Pole):
-    # return {"id": pole.id, "name": pole.name, "geom": GeoJsonDict(pole.geom.geojson)}
-    return pole
-
-
 class PoleSerializer(GeoFeatureModelSerializer):
     # used only for API route
     class Meta:
@@ -71,11 +66,11 @@ class PoleViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
         page = self.paginate_queryset(queryset)
         if page is not None:
             for pole in page:
-                serialized_poles.append(poleSerializer(pole))
+                serialized_poles.append(pole or "")
             return self.get_paginated_response(serialized_poles)
 
         for pole in queryset:
-            serialized_poles.append(poleSerializer(pole))
+            serialized_poles.append(pole or "")
         return OapifResponse(serialized_poles)
 
     def get_queryset(self):
