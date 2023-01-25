@@ -59,14 +59,16 @@ class PoleViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
 
-        queryset = queryset.values_list("_serialized", flat=True)
+        # queryset = queryset.values_list("_serialized", flat=True)
+        queryset = queryset.values_list("id","geom","name")
 
         serialized_poles = []
 
         page = self.paginate_queryset(queryset)
         if page is not None:
             for pole in page:
-                serialized_poles.append(pole or "")
+                serialized_poles.append(
+                 f'{{"id": "{pole[0]}", "type": "Feature", "geometry": {pole[1].hexewkb}, "properties": {{"name": "{pole[2]}"}}}}')
             return self.get_paginated_response(serialized_poles)
 
         for pole in queryset:
@@ -78,5 +80,7 @@ class PoleViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
             coords = self.request.GET["bbox"].split(",")
             my_bbox_polygon = Polygon.from_bbox(coords)
             return Pole.objects.filter(geom__intersects=my_bbox_polygon)
+
+        # for key in request.GET.iterkeys()
 
         return Pole.objects.all()
