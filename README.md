@@ -28,4 +28,3 @@ Once up and running, you can use it from QGIS like this:
   - Version: `OGC API - Features`
 - Click OK and ignore choose to ignore the invalid certificate error and store the exception
 - You should see the two layers in the list, select them and choose `add`.
-
