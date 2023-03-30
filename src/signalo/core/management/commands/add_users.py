@@ -22,7 +22,7 @@ class Command(BaseCommand):
         adding = [can_add_pole, can_add_sign]
         modifying = [can_modify_pole, can_modify_sign]
         viewing = [can_view_pole, can_view_sign]
-        editing = [adding + modifying + viewing]
+        editing = adding + modifying + viewing
 
         editors.save()
         viewers.save()
