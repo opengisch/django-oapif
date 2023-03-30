@@ -15,6 +15,10 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
+        """
+        Run command inside a transaction to
+        avoid broken state should some commits fail
+        """
         magnitude = options["magnitude"]
         if magnitude > 1000:
             raise ValueError("magnitude > 1000")
