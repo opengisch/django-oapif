@@ -1,7 +1,6 @@
 from django.core.management.base import BaseCommand
 from django.core.management import call_command
 from django.db import transaction
-from signalo_app.models import Pole, Sign
 
 
 class Command(BaseCommand):
@@ -62,3 +61,5 @@ class Command(BaseCommand):
 
         # Call 'update_data' to update computed properties
         call_command("updatedata")
+
+        print(f"🤖 testdata added!")
