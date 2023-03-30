@@ -9,10 +9,11 @@ cp .env.example .env
 # start the stack
 docker compose up --build -d
 
-# Run the local Django development server
-docker compose up -d
+# deploy static files and migrate database
+docker compose run django python manage.py collectstatic --no-input
+docker compose run django python manage.py migrate --no-input
 
-# Sprinkle some test data (refreshing computed fields is done from the command handler)
+# sprinkle some test data (refreshing computed fields is done from the command handler)
 docker compose run django python manage.py gen_data
 
 # wait a little, then check that https://localhost/oapif/collections/poles/items works from your browser
