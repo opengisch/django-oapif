@@ -1,7 +1,7 @@
 from django.db import transaction
 
 from ....core.management.commands.gen_data import Command as OriginalGenDataCommand
-from ...models import VariousGeom
+from ...models import HighlyPaginated, VariousGeom
 
 
 class Command(OriginalGenDataCommand):
@@ -29,4 +29,9 @@ class Command(OriginalGenDataCommand):
         VariousGeom.objects.create(
             geom=f"Point({x:4f} {y:4f})",
         )
+
+        for i in range(100):
+            HighlyPaginated.objects.create(
+                geom=f"Point({x+i*step:4f} {y:4f})",
+            )
         print(f"🐻 edgecase testdata added!")

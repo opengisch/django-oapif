@@ -3,7 +3,8 @@ from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from django_oapif.mixins import OAPIFDescribeModelViewSetMixin
 
-from .models import VariousGeom
+from .models import HighlyPaginated, VariousGeom
+from .pagination import HighlyPaginatedPagination
 
 
 class VariousGeomSerializer(GeoFeatureModelSerializer):
@@ -24,7 +25,6 @@ class VariousGeomViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
     oapif_description = "VariousGeoms layer"
     # (one day this will be retrieved automatically from the serializer)
     oapif_geom_lookup = "geom"
-
 
 
 class HighlyPaginatedSerializer(GeoFeatureModelSerializer):
