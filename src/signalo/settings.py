@@ -160,7 +160,6 @@ REST_FRAMEWORK = {
     #     # Full API for search
     #     "search": os.getenv("DRF_THROTTLE_RATE_SEARCH_API"),
     # },
-    # "DEFAULT_AUTHENTICATION_CLASSES": (
 }
 
 OAPIF_TITLE = "SIGNALO_ROADSIGNS_OAPIF"
