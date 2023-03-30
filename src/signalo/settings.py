@@ -35,7 +35,7 @@ ALLOWED_HOSTS = ["localhost"]
 # Application definition
 
 INSTALLED_APPS = [
-    "signalo_app.apps.SignaloAppConfig",
+    "signalo.core",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
