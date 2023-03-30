@@ -22,7 +22,7 @@ class OapifResponse(HttpResponse):
 class PoleSerializer(GeoFeatureModelSerializer):
     # used only for API route
     class Meta:
-        model = Sign
+        model = Pole
         fields = "__all__"
         geo_field = "geom"
 
@@ -48,6 +48,7 @@ class SignViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
 
 
 class PoleViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
+    queryset = Pole.objects.all()
     serializer_class = PoleSerializer  # used only for API route
     oapif_title = "PoleOAPIFModel"
     oapif_description = "PoleOAPIFModel layer"
@@ -57,6 +58,16 @@ class PoleViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
     oapif_srid = (
         settings.SRID
     )  # (one day this will be retrieved automatically from the DB field)
+
+
+class PoleHighPerfViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
+    serializer_class = PoleSerializer
+    oapif_title = "Poles High Performance"
+    oapif_description = "Poles layer - high performance"
+    # (one day this will be retrieved automatically from the serializer)
+    oapif_geom_lookup = "geom"
+    oapif_srid = settings.SRID
+    # (one day this will be retrieved automatically from the DB field)
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
