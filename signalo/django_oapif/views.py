@@ -59,7 +59,6 @@ class CollectionsView(routers.APIRootView):
     registry = None
 
     def get(self, request, *args, **kwargs):
-
         collections = []
         namespace = request.resolver_match.namespace
         for prefix, Viewset, basename in self.registry:
