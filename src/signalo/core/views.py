@@ -5,6 +5,7 @@ from rest_framework import viewsets
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from django_oapif.mixins import OAPIFDescribeModelViewSetMixin
+from django_oapif.pagination import HighPerfPagination
 
 from .models import Pole, Sign
 
@@ -23,8 +24,8 @@ class PoleSerializer(GeoFeatureModelSerializer):
     # used only for API route
     class Meta:
         model = Pole
-        fields = "__all__"
         geo_field = "geom"
+        exclude = ["_serialized"]
 
 
 class SignSerializer(GeoFeatureModelSerializer):
@@ -62,6 +63,7 @@ class PoleViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
 
 class PoleHighPerfViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
     serializer_class = PoleSerializer
+    pagination_class = HighPerfPagination
     oapif_title = "Poles High Performance"
     oapif_description = "Poles layer - high performance"
     # (one day this will be retrieved automatically from the serializer)
@@ -84,6 +86,7 @@ class PoleHighPerfViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet)
 
         for pole in queryset:
             serialized_poles.append(pole or "")
+
         return OapifResponse(serialized_poles)
 
     def get_queryset(self):
