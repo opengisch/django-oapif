@@ -27,8 +27,8 @@ class Command(BaseCommand):
             y_start = 1152000
             step = 100
         else:
-            x_start = 45
-            y_start = 7
+            x_start = 7
+            y_start = 45
             step = 0.01
 
         signs_per_pole = 3
@@ -37,7 +37,7 @@ class Command(BaseCommand):
 
         for dx in range(0, magnitude):
             for dy in range(0, magnitude):
-                # pole
+                # poles
                 x = x_start + dx * step
                 y = y_start + dy * step
                 geom_wkt = f"Point({x:4f} {y:4f})"
