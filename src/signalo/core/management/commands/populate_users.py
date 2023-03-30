@@ -4,11 +4,11 @@ from django.db import transaction
 
 
 class Command(BaseCommand):
-    help = "Add users along with their r+w permissions"
-
+    help = "Populate db with groups, set permissions, add users"
+        
     @transaction.atomic
     def handle(self, *args, **options):
-        """Create groups, set permissions, add users"""
+        """Populate db with groups, set permissions, add users"""
         can_add_pole = Permission.objects.get(codename="add_pole")
         can_modify_pole = Permission.objects.get(codename="change_pole")
         can_view_pole = Permission.objects.get(codename="view_pole")
