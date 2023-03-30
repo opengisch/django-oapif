@@ -1,10 +1,12 @@
 from django.conf import settings
 from django.contrib.gis.geos import Polygon
 from django.http import HttpResponse
-from django_oapif.mixins import OAPIFDescribeModelViewSetMixin
 from rest_framework import viewsets
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
-from signalo_app.models import Pole, Sign
+
+from django_oapif.mixins import OAPIFDescribeModelViewSetMixin
+
+from .models import Pole, Sign
 
 
 def index(request):

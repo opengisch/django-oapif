@@ -4,7 +4,7 @@ services:
 
   caddy:
     volumes:
-      - ./signalo/:/usr/src/app
+      - ./src/:/usr/src/app
 
   django:
     environment:
@@ -12,7 +12,7 @@ services:
       DJANGO_DEBUG: "true"
     volumes:
       # mounting the source code for live reloading
-      - ./signalo/:/usr/src/app
+      - ./src/:/usr/src/app
     ports:
       # making django directly accessible for debugging
       - 8000:8000

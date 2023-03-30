@@ -1,7 +1,8 @@
 from django.conf import settings
 from django.contrib.gis.db.models import Extent
-from django_oapif.urls import oapif_router
 from rest_framework.response import Response
+
+from django_oapif.urls import oapif_router
 
 
 class OAPIFDescribeModelViewSetMixin:
