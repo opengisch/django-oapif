@@ -18,6 +18,10 @@ class Pole(ComputedFieldsModel):
     def _serialized(self):
         return f'{{"id": "{str(self.id)}", "type": "Feature", "geometry": {self.geom.geojson}, "properties": {{"name": "{self.name}"}}}}'
 
+    @property
+    def geom_wkb(self):
+        return self.geom.hexewkb
+
 
 class Sign(ComputedFieldsModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
