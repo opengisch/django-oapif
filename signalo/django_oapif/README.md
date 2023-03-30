@@ -67,6 +67,16 @@ OAPIF_TITLE = "My Endpoint"
 OAPIF_DESCRIPTION = "Description"
 ```
 
+## Local development
+
+```bash
+# Run the local Django development server
+docker compose up -d
+
+# Sprinkle some test data
+docker compose run django python manage.py gen_data
+```
+
 ## Roadmap / status
 
 This is probably still relatively far from a full OGC Services API implementation and currently only aims to support read-only view from QGIS.
