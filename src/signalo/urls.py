@@ -20,6 +20,7 @@ from django_oapif.urls import oapif_router
 
 urlpatterns = [
     path("signalo_core/", include("signalo.core.urls")),
+    path("signalo_edge_cases/", include("signalo.edge_cases.urls")),
     path("admin/", admin.site.urls),
     path("oapif/", include(oapif_router.urls)),  # Django-rest urls
 ]
