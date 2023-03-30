@@ -62,3 +62,5 @@ class Command(BaseCommand):
 
         # Call 'update_data' to update computed properties
         call_command("updatedata")
+
+        print(f"🤖 testdata added!")
