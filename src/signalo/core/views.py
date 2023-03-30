@@ -23,9 +23,8 @@ class PoleSerializer(GeoFeatureModelSerializer):
     # used only for API route
     class Meta:
         model = Pole
-        fields = "__all__"
         geo_field = "geom"
-
+        exclude = ["_serialized"]
 
 class SignSerializer(GeoFeatureModelSerializer):
     class Meta:
@@ -84,7 +83,10 @@ class PoleHighPerfViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet)
 
         for pole in queryset:
             serialized_poles.append(pole or "")
-        return OapifResponse(serialized_poles)
+        
+        response = OapifResponse(serialized_poles)
+        del response.headers["sec-fetch-site"]
+        return response
 
     def get_queryset(self):
         if self.request.GET.get("bbox"):

@@ -142,7 +142,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Django REST Framework
 REST_FRAMEWORK = {
-    # "DEFAULT_AUTHENTICATION_CLASSES": (
     # "oauth2_provider.contrib.rest_framework.OAuth2Authentication",
     # "rest_framework.authentication.SessionAuthentication",
     # "geocity.auth.InternalTokenAuthentication",
@@ -161,6 +160,10 @@ REST_FRAMEWORK = {
     #     # Full API for search
     #     "search": os.getenv("DRF_THROTTLE_RATE_SEARCH_API"),
     # },
+    # "DEFAULT_AUTHENTICATION_CLASSES": (
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+    ],
 }
 
 OAPIF_TITLE = "SIGNALO_ROADSIGNS_OAPIF"
