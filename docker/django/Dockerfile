@@ -21,7 +21,3 @@ RUN pip install -r requirements.txt
 
 # copy project
 COPY /src /usr/src/app
-
-# setup entrypoint
-COPY ./docker/django/entrypoint.sh /entrypoint.sh
-ENTRYPOINT ["/entrypoint.sh"]
