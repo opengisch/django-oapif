@@ -35,6 +35,7 @@ ALLOWED_HOSTS = ["localhost"]
 # Application definition
 
 INSTALLED_APPS = [
+    "signalo.value_lists",
     "signalo.core",
     "django.contrib.admin",
     "django.contrib.auth",

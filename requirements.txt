@@ -6,3 +6,4 @@ djangorestframework
 djangorestframework-gis
 pyyaml
 uritemplate
+pillow

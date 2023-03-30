@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="86"
+   height="86"
+   version="1.1"
+   id="svg998"
+   sodipodi:docname="230.svg"
+   inkscape:version="1.0.2 (e86c870879, 2021-01-15, custom)">
+  <metadata
+     id="metadata1004">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <defs
+     id="defs1002" />
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1920"
+     inkscape:window-height="1017"
+     id="namedview1000"
+     showgrid="false"
+     inkscape:zoom="4.0069384"
+     inkscape:cx="51.042539"
+     inkscape:cy="39.140719"
+     inkscape:window-x="3832"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg998" />
+  <!-- Created with Method Draw - http://github.com/duopixel/Method-Draw/ -->
+  <g
+     id="g987">
+    <title
+       id="title981">background</title>
+    <rect
+       fill="#ffffff"
+       opacity="0"
+       id="canvas_background"
+       height="602"
+       width="602"
+       y="-1"
+       x="-1" />
+    <g
+       display="none"
+       overflow="visible"
+       y="0"
+       x="0"
+       height="100%"
+       width="100%"
+       id="canvasGrid">
+      <rect
+         fill="url(#gridpattern)"
+         stroke-width="0"
+         y="0"
+         x="0"
+         height="100%"
+         width="100%"
+         id="rect984" />
+    </g>
+  </g>
+  <g
+     id="g996"
+     transform="matrix(0.18881986,0,0,0.18881986,-13.910215,-13.494994)">
+    <title
+       id="title989">Layer 1</title>
+    <metadata
+       transform="matrix(5.284713788460294,0,0,5.284713788460294,0,0) "
+       id="svg_9">image/svg+xml</metadata>
+    <g
+       id="svg_11">
+      <path
+         fill="#ee2b2e"
+         fill-rule="nonzero"
+         id="svg_8"
+         d="m 299.99999,75.29643 c -124.10817,0 -224.70355,100.61604 -224.70355,224.7036 0,124.10817 100.59537,224.70355 224.70355,224.70355 124.10823,0 224.70355,-100.59537 224.70355,-224.70355 0,-124.08756 -100.59532,-224.7036 -224.70355,-224.7036" />
+      <path
+         fill="#ffffff"
+         fill-rule="nonzero"
+         id="svg_7"
+         d="m 299.99999,150.21142 c -82.71814,0 -149.80922,67.07042 -149.80922,149.78861 0,82.71814 67.09108,149.80922 149.80922,149.80922 82.71819,0 149.78861,-67.09108 149.78861,-149.80922 0,-82.71819 -67.07042,-149.78861 -149.78861,-149.78861" />
+    </g>
+    <text
+       xml:space="default"
+       dominant-baseline="middle"
+       text-anchor="middle"
+       font-family="sans-serif"
+       font-size="230px"
+       id="svg_12"
+       y="386.5"
+       x="300"
+       stroke-width="0"
+       stroke="#000000"
+       fill="#000000">param(text1)</text>
+  </g>
+</svg>

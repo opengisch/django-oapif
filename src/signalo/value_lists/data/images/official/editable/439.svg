@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="137"
+   height="109"
+   version="1.1"
+   id="svg3435"
+   sodipodi:docname="439.svg"
+   inkscape:version="1.0.2 (e86c870879, 2021-01-15, custom)">
+  <metadata
+     id="metadata3441">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <defs
+     id="defs3439" />
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1920"
+     inkscape:window-height="1017"
+     id="namedview3437"
+     showgrid="false"
+     inkscape:zoom="4.0069384"
+     inkscape:cx="89.759301"
+     inkscape:cy="61.400573"
+     inkscape:window-x="3832"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg3435" />
+  <!-- Created with Method Draw - http://github.com/duopixel/Method-Draw/ -->
+  <g
+     id="g3417">
+    <title
+       id="title3411">background</title>
+    <rect
+       fill="#ffffff"
+       opacity="0"
+       id="canvas_background"
+       height="602"
+       width="756"
+       y="-1"
+       x="-1" />
+    <g
+       display="none"
+       overflow="visible"
+       y="0"
+       x="0"
+       height="100%"
+       width="100%"
+       id="canvasGrid">
+      <rect
+         fill="url(#gridpattern)"
+         stroke-width="0"
+         y="0"
+         x="0"
+         height="100%"
+         width="100%"
+         id="rect3414" />
+    </g>
+  </g>
+  <g
+     id="g3433"
+     transform="matrix(0.24001551,0,0,0.24001551,-23.612708,-17.155435)">
+    <title
+       id="title3419">Layer 1</title>
+    <metadata
+       transform="matrix(1.539766046266834,0,0,1.539766046266834,0,0) "
+       id="svg_19">image/svg+xml</metadata>
+    <g
+       stroke="null"
+       id="svg_21">
+      <path
+         fill="#ffffff"
+         fill-rule="nonzero"
+         id="svg_18"
+         d="M 112.24739,517.04883 H 648.81142 V 77.06888 H 112.24739 Z m 0,0" />
+      <path
+         stroke="#211e1e"
+         fill="none"
+         stroke-width="0.2835"
+         stroke-miterlimit="4"
+         id="svg_17"
+         d="M 112.24739,517.04883 H 648.81142 V 77.06884 H 112.24739 v 439.97999" />
+      <path
+         fill="#211e1e"
+         fill-rule="nonzero"
+         id="svg_16"
+         d="m 642.01809,107.11244 c 0,-12.7003 -9.95121,-23.135 -22.33629,-23.135 H 141.25376 c -12.38511,0 -22.33633,10.4347 -22.33633,23.135 v 379.76515 c 0,12.81201 9.95121,23.24667 22.33633,23.24667 H 619.6818 c 12.38507,0 22.33629,-10.43465 22.33629,-23.24667 V 107.11244" />
+      <path
+         fill="#ffffff"
+         fill-rule="nonzero"
+         id="svg_15"
+         d="m 635.33262,107.11244 v 379.76515 c 0,9.04657 -7.02438,16.21046 -15.65081,16.21046 H 141.25377 c -8.61105,0 -15.66623,-7.16389 -15.66623,-16.21046 V 107.11244 c 0,-8.9349 7.05518,-16.21046 15.66623,-16.09875 h 478.42804 c 8.62643,-0.11171 15.65081,7.16385 15.65081,16.09875" />
+      <path
+         fill="#211e1e"
+         fill-rule="nonzero"
+         id="svg_14"
+         d="m 315.66172,304.84496 c 1.20155,0.38292 1.20155,2.26565 -0.12323,2.64857 l -11.89217,3.63776 4.12838,7.54681 28.03588,50.16308 v 115.77076 h -16.75992 v -111.1278 l -25.72522,-46.14239 -4.25162,-7.53084 -8.98072,8.91897 c -0.9705,1.00516 -2.54171,0 -2.29524,-1.24451 l 6.54682,-31.55933 c 0.12323,-0.74992 0.9705,-1.26048 1.69449,-1.0052 l 29.62255,9.92413" />
+      <path
+         fill="#211e1e"
+         fill-rule="nonzero"
+         id="svg_13"
+         d="m 511.06579,277.32228 c 0.23109,1.38809 -1.21693,2.26565 -2.18743,1.26044 l -9.10395,-8.80726 -4.12838,7.41917 -53.63791,96.2895 v 111.1278 H 425.2482 V 368.84117 l 55.82533,-100.32615 4.25162,-7.53084 -12.01541,-3.65373 c -1.20155,-0.38292 -1.32478,-2.138 0,-2.6326 l 29.62255,-9.9401 c 0.72399,-0.23931 1.44802,0.25528 1.69449,1.0052 l 6.43901,31.55933" />
+      <path
+         fill="#1966ba"
+         fill-rule="nonzero"
+         id="svg_12"
+         d="M 479.99522,174.36353 H 593.95655 V 109.50572 H 479.99522 Z m 0,0" />
+    </g>
+    <text
+       xml:space="default"
+       dominant-baseline="middle"
+       text-anchor="middle"
+       font-family="sans-serif"
+       font-size="24px"
+       id="svg_22"
+       y="149.41141"
+       x="535"
+       fill="#ffffff">param(text1)</text>
+    <text
+       xml:space="default"
+       dominant-baseline="middle"
+       text-anchor="middle"
+       font-family="sans-serif"
+       font-size="24px"
+       id="svg_23"
+       y="270.58817"
+       x="220"
+       fill="#000000">param(text2)</text>
+    <text
+       xml:space="default"
+       dominant-baseline="middle"
+       text-anchor="middle"
+       font-family="sans-serif"
+       font-size="24px"
+       id="svg_24"
+       y="222.35275"
+       x="535"
+       fill="#000000">param(text3)</text>
+  </g>
+</svg>
