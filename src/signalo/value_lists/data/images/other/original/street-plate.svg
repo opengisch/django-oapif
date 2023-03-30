@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="100pt"
+   height="50pt"
+   viewBox="0 0 100 50"
+   version="1.1"
+   id="svg891"
+   sodipodi:docname="street-plate.svg"
+   inkscape:version="1.2.2 (b0a8486, 2022-12-01)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <metadata
+     id="metadata897">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <defs
+     id="defs895" />
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1406"
+     inkscape:window-height="940"
+     id="namedview893"
+     showgrid="false"
+     inkscape:zoom="3.8305785"
+     inkscape:cx="54.822007"
+     inkscape:cy="39.158576"
+     inkscape:window-x="2177"
+     inkscape:window-y="321"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg891"
+     inkscape:document-rotation="0"
+     inkscape:snap-text-baseline="false"
+     inkscape:showpageshadow="2"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="pt" />
+  <rect
+     style="fill:#004af4;fill-opacity:1;stroke:none;stroke-width:4.43562;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:fill markers stroke"
+     id="rect840"
+     width="100"
+     height="50"
+     x="0"
+     y="0" />
+  <rect
+     style="fill:none;fill-opacity:1;stroke:#ffffff;stroke-width:1.90639;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;paint-order:fill markers stroke"
+     id="rect3620"
+     width="90.329346"
+     height="41.0201"
+     x="4.8353262"
+     y="4.4899511" />
+</svg>
