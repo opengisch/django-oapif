@@ -10,8 +10,8 @@ cp .env.example .env
 docker compose up --build -d
 
 # deploy static files and migrate database
-python manage.py collectstatic --no-input
-python manage.py migrate --no-input
+docker compose run django python manage.py collectstatic --no-input
+docker compose run django python manage.py migrate --no-input
 
 # sprinkle some test data (refreshing computed fields is done from the command handler)
 docker compose run django python manage.py gen_data
