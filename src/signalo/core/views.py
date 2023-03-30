@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.contrib.gis.geos import Polygon
 from django.http import HttpResponse
 from rest_framework import viewsets
@@ -42,8 +41,6 @@ class SignViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
     oapif_description = "Signs layer"
     # (one day this will be retrieved automatically from the serializer)
     oapif_geom_lookup = "geom"
-    # (one day this will be retrieved automatically from the DB field)
-    oapif_srid = settings.SRID
 
 
 class PoleViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
@@ -53,8 +50,6 @@ class PoleViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
     oapif_description = "Poles layer"
     # (one day this will be retrieved automatically from the serializer)
     oapif_geom_lookup = "geom"
-    # (one day this will be retrieved automatically from the DB field)
-    oapif_srid = settings.SRID
 
 
 class PoleHighPerfViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
@@ -64,8 +59,6 @@ class PoleHighPerfViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet)
     oapif_description = "Poles layer - including high performance optimization"
     # (one day this will be retrieved automatically from the serializer)
     oapif_geom_lookup = "geom"
-    # (one day this will be retrieved automatically from the DB field)
-    oapif_srid = settings.SRID
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())

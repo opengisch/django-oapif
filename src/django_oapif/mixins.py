@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.contrib.gis.db.models import Extent
 from rest_framework.response import Response
 
@@ -21,10 +20,11 @@ class OAPIFDescribeModelViewSetMixin:
             raise Exception(f"Did not find {self} in {oapif_router.registry}")
 
         # retrieve oapif config defined on the viewset
+        geom_lookup = getattr(self, "oapif_geom_lookup", "geom")
         title = getattr(self, "oapif_title", f"Layer {key}")
         description = getattr(self, "oapif_description", "No description")
-        srid = getattr(self, "oapif_srid", settings.SRID)
-        extents = self.get_queryset().aggregate(e=Extent(self.oapif_geom_lookup))["e"]
+        srid = self.get_queryset().model._meta.get_field(geom_lookup).srid
+        extents = self.get_queryset().aggregate(e=Extent(geom_lookup))["e"]
 
         # return the oapif layer description as an object
         return {

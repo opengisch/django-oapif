@@ -9,9 +9,6 @@ class Command(BaseCommand):
     help = "Generate test data directly from django models"
 
     def add_arguments(self, parser):
-        parser.add_argument(
-            "-s", "--srid", type=int, default=4326, choices=(4326, 2056)
-        )
         parser.add_argument("-m", "--magnitude", type=int, default=10)
 
     @transaction.atomic
@@ -22,14 +19,9 @@ class Command(BaseCommand):
         """
         magnitude = options["magnitude"]
 
-        if options["srid"] == 2056:
-            x_start = 2508500
-            y_start = 1152000
-            step = 100
-        else:
-            x_start = 7
-            y_start = 45
-            step = 0.01
+        x_start = 2508500
+        y_start = 1152000
+        step = 100
 
         signs_per_pole = 3
         poles = []
