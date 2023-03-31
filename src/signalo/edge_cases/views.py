@@ -3,7 +3,7 @@ from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from django_oapif.mixins import OAPIFDescribeModelViewSetMixin
 
-from .models import HighlyPaginated, VariousGeom
+from .models import DifferentSrid, HighlyPaginated, VariousGeom
 from .pagination import HighlyPaginatedPagination
 
 
