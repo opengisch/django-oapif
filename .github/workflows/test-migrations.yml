@@ -51,7 +51,7 @@ jobs:
         docker compose run django python manage.py migrate --no-input
 
         # sprinkle some test data (refreshing computed fields is done from the command handler)
-        docker compose run django python manage.py gen_data
+        docker compose run django python manage.py init --data --users
 
     - name: Healthcheck
       run: wget --no-check-certificate https://localhost/oapif/collections/poles/items
