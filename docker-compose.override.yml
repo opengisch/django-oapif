@@ -17,7 +17,3 @@ services:
       # making django directly accessible for debugging
       - 8000:8000
 
-#  postgres:
-#    ports:
-#      # making the postgres database accessible for debugging
-#      - 5432:5432
