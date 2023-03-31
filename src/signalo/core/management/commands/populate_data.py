@@ -6,17 +6,14 @@ from signalo.core.models import Pole, Sign
 
 
 class Command(BaseCommand):
-    help = "Generate test data directly from django models"
+    help = "Populate db with testdata"
 
     def add_arguments(self, parser):
         parser.add_argument("-m", "--magnitude", type=int, default=10)
 
     @transaction.atomic
     def handle(self, *args, **options):
-        """
-        Run command inside a transaction to
-        avoid broken state should some commits fail
-        """
+        """Populate db with testdata"""
         magnitude = options["magnitude"]
 
         x_start = 2508500
