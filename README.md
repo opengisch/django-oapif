@@ -13,10 +13,13 @@ docker compose up --build -d
 docker compose run django python manage.py collectstatic --no-input
 docker compose run django python manage.py migrate --no-input
 
-# sprinkle some test data (refreshing computed fields is done from the command handler)
-docker compose run django python manage.py gen_data
+# A convenience start-up Django command is there to help you get started with testdata
+# and users; call it without argument to let it populate the database with testdata, users and a superuser:
+docker compose run django python manage.py init
 
-# wait a little, then check that https://localhost/oapif/collections/poles/items works from your browser
+# Alternatively pass it any combination of the following options: --data, --users, --superuser
+
+# Wait a little, then check that https://localhost/oapif/collections/poles/items works from your browser
 ```
 
 ## Use from QGIS
