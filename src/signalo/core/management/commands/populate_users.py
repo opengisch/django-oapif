@@ -1,11 +1,11 @@
-from django.contrib.auth.models import User, Group, Permission
+from django.contrib.auth.models import Group, Permission, User
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
 
 class Command(BaseCommand):
     help = "Populate db with groups, set permissions, add users"
-        
+
     @transaction.atomic
     def handle(self, *args, **options):
         """Populate db with groups, set permissions, add users"""
@@ -21,16 +21,16 @@ class Command(BaseCommand):
         viewing = [can_view_pole, can_view_sign]
         editing = adding + modifying + viewing
 
-        editors = Group(name="editors")
-        viewers = Group(name="viewers")
+        editors, _ = Group.objects.get_or_create(name="editors")
+        viewers, _ = Group.objects.get_or_create(name="viewers")
         editors.save()
         viewers.save()
 
         editors.permissions.set(editing)
         viewers.permissions.set(viewing)
 
-        an_editor, _ = User.objects.get_or_create(username="Eddy")
-        a_viewer, _ = User.objects.get_or_create(username="Viggo")
+        an_editor, _ = User.objects.get_or_create(username="demo_editor")
+        a_viewer, _ = User.objects.get_or_create(username="demo_viewer")
 
         a_viewer.save()
         an_editor.save()
@@ -39,5 +39,5 @@ class Command(BaseCommand):
         a_viewer.groups.add(viewers)
 
         print(
-            f"🤖 added user 'Eddy' to group 'editors' and user 'Viggo' to group 'viewers'. Permissions set accordingly."
+            f"👥 added users 'demo_editor' & 'demo_viewer' to group 'editors' and 'viewers' respectively. Permissions set accordingly."
         )
