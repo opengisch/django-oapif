@@ -37,7 +37,7 @@ jobs:
         cache-to: type=registry,ref=opengisch/signalo-django:latest,mode=max
         tags: opengisch/signalo-django:latest
 
-    - name: Setup Compose appplication
+    - name: Setup Compose application
       run: |
         # copy default conf
         cp .env.example .env
@@ -63,10 +63,8 @@ jobs:
     - name: Install and run conformance test
       run: |
         # Wrapper around official test suite for more convenient handling in CI
-        git clone https://github.com/pblottiere/pyogctest
-        cd pyogctest
-        pip install -e .
-        ./pyogctest.py -s ogcapif -u http://localhost:8000/oapif/
+        pip install -r ./conformance-tests/requirements.txt
+        python3 -m unittest ./conformance-tests/ogcf.py
 
     - name: Failure logs
       if: failure()
