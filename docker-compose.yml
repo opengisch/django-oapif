@@ -25,6 +25,9 @@ services:
       cache_from:
         - opengisch/signalo-oapif:latest
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     volumes:
       - static_volume:/static_volume
       - media_volume:/media_volume
@@ -42,6 +45,11 @@ services:
     image: postgis/postgis:13-3.1
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     ## UNCOMMENT IF YOU NEED THE POSTGIS DATABASE TO BE ACCESSIBLE
     # ports:
     # - 5432:5432
