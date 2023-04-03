@@ -1,5 +1,6 @@
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
+from django.db.models import Model
 from rest_framework import viewsets
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
@@ -7,11 +8,11 @@ from django_oapif.mixins import OAPIFDescribeModelViewSetMixin
 from django_oapif.urls import oapif_router
 
 
-def register(
+def register_oapif_viewset(
     key: Optional[str] = None,
     custom_serializer_attrs: Dict[str, Any] = None,
     custom_viewset_attrs: Dict[str, Any] = None,
-):
+) -> Callable[[Any], Model]:
     """
     This decorator takes care of all boilerplate code (creating a serializer, a viewset and registering it) to register
     a model to the default OAPIF endpoint.
