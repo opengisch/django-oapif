@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.contrib.gis.geos import Polygon
 from django.http import HttpResponse
 from rest_framework import viewsets
@@ -38,38 +37,28 @@ class SignSerializer(GeoFeatureModelSerializer):
 class SignViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
     queryset = Sign.objects.all()
     serializer_class = SignSerializer
-    oapif_title = "RoadSignOAPIFModel"
-    oapif_description = "RoadSignOAPIFModel layer"
-    oapif_geom_lookup = (
-        "geom"  # (one day this will be retrieved automatically from the serializer)
-    )
-    oapif_srid = (
-        settings.SRID
-    )  # (one day this will be retrieved automatically from the DB field)
+    oapif_title = "Signs"
+    oapif_description = "Signs layer"
+    # (one day this will be retrieved automatically from the serializer)
+    oapif_geom_lookup = "geom"
 
 
 class PoleViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
     queryset = Pole.objects.all()
     serializer_class = PoleSerializer  # used only for API route
-    oapif_title = "PoleOAPIFModel"
-    oapif_description = "PoleOAPIFModel layer"
-    oapif_geom_lookup = (
-        "geom"  # (one day this will be retrieved automatically from the serializer)
-    )
-    oapif_srid = (
-        settings.SRID
-    )  # (one day this will be retrieved automatically from the DB field)
+    oapif_title = "Poles"
+    oapif_description = "Poles layer"
+    # (one day this will be retrieved automatically from the serializer)
+    oapif_geom_lookup = "geom"
 
 
 class PoleHighPerfViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
     serializer_class = PoleSerializer
     pagination_class = HighPerfPagination
-    oapif_title = "Poles High Performance"
-    oapif_description = "Poles layer - high performance"
+    oapif_title = "Poles (high perf)"
+    oapif_description = "Poles layer - including high performance optimization"
     # (one day this will be retrieved automatically from the serializer)
     oapif_geom_lookup = "geom"
-    oapif_srid = settings.SRID
-    # (one day this will be retrieved automatically from the DB field)
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())

@@ -43,7 +43,6 @@ class MyModelViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
     oapif_title = "layer title"
     oapif_description = "layer_description"
     oapif_geom_lookup = 'geom'  # (one day this will be retrieved automatically from the serializer)
-    oapif_srid = 2056  # (one day this will be retrieved automatically from the DB field)
 ```
 
 2. Register the routers against the `oapif router` (suggestion: do this in `{your_project}.urls.py`):
