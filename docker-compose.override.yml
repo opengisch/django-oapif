@@ -16,4 +16,3 @@ services:
     ports:
       # making django directly accessible for debugging
       - 8000:8000
-
