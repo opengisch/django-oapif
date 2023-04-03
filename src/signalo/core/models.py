@@ -9,7 +9,7 @@ from django.utils.translation import gettext as _
 class Pole(ComputedFieldsModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     geom = models.PointField(
-        srid=int(environ.get("GEOMETRY_SRID", 2056)), verbose_name=_("Geometry")
+        srid=int(environ["GEOMETRY_SRID"]), verbose_name=_("Geometry")
     )
     name = models.CharField(max_length=255, verbose_name=_("Name"))
 
@@ -30,7 +30,7 @@ class Sign(ComputedFieldsModel):
 
     @computed(
         models.PointField(
-            srid=int(environ.get("GEOMETRY_SRID", 2056)),
+            srid=int(environ["GEOMETRY_SRID"]),
             verbose_name=_("Geometry"),
             null=True,
         ),

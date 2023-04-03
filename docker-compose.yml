@@ -34,7 +34,7 @@ services:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?}
       DJANGO_STATIC_ROOT: /static_volume
       DJANGO_MEDIA_ROOT: /media_volume
-      GEOMETRY_SRID: ${GEOMETRY_SRID}
+      GEOMETRY_SRID: ${GEOMETRY_SRID:-2056}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
       TX_TOKEN: ${TX_TOKEN}
     command: python3 manage.py runserver 0.0.0.0:8000
