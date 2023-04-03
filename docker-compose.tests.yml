@@ -1,0 +1,9 @@
+services:
+  conformance_suite:
+    image: ogccite/ets-ogcapi-features10
+    depends_on: [django]
+
+  test_client:
+    build: ${PWD}/conformance-tests
+    volumes:
+      - ${PWD}/conformance-tests:/conformance-tests

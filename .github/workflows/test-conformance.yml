@@ -43,8 +43,11 @@ jobs:
         cp .env.example .env
 
         # start the stack
-        docker compose up --build -d
-        sleep 10
+        docker compose \
+          -f docker-compose.yml \
+          -f docker-compose.override.yml \
+          -f docker-compose.tests.yml \
+          up postgres django --build -d
 
         # deploy static files and migrate database
         docker compose run django python manage.py collectstatic --no-input
@@ -56,15 +59,8 @@ jobs:
     - name: Healthcheck
       run: wget --no-check-certificate https://localhost/oapif/collections/poles/items
 
-    - uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
-
-    - name: Install and run conformance test
-      run: |
-        # Wrapper around official test suite for more convenient handling in CI
-        pip install -r ./conformance-tests/requirements.txt
-        python3 -m unittest ./conformance-tests/ogcf.py
+    - name: Run conformance test
+      run: docker compose run test_client
 
     - name: Failure logs
       if: failure()
