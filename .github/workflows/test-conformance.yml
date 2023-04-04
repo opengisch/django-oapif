@@ -50,14 +50,18 @@ jobs:
           up postgres django conformance_suite --build -d
 
         # deploy static files and migrate database
-        docker compose run django python manage.py collectstatic --no-input
-        docker compose run django python manage.py migrate --no-input
+        docker compose exec django python manage.py collectstatic --no-input
+        docker compose exec django python manage.py migrate --no-input
 
         # sprinkle some test data (refreshing computed fields is done from the command handler)
-        docker compose run django python manage.py init --data
+        docker compose exec django python manage.py init --data
 
         # run conformance test
-        docker compose run test_client
+        docker compose \
+          -f docker-compose.yml \
+          -f docker-compose.override.yml \
+          -f docker-compose.tests.yml \
+          run test_client
 
     - name: Failure logs
       if: failure()
