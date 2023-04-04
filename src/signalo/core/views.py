@@ -1,6 +1,6 @@
 from django.contrib.gis.geos import Polygon
 from django.http import HttpResponse
-from rest_framework import viewsets
+from rest_framework import permissions, viewsets
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from django_oapif.mixins import OAPIFDescribeModelViewSetMixin
@@ -34,6 +34,7 @@ class PoleViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
     oapif_description = "Poles layer"
     # (one day this will be retrieved automatically from the serializer)
     oapif_geom_lookup = "geom"
+    permission_classes = (permissions.IsAuthenticated,)
 
 
 class PoleHighPerfViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
@@ -43,6 +44,7 @@ class PoleHighPerfViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet)
     oapif_description = "Poles layer - including high performance optimization"
     # (one day this will be retrieved automatically from the serializer)
     oapif_geom_lookup = "geom"
+    permission_classes = (permissions.IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())

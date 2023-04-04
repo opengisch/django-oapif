@@ -4,11 +4,16 @@ from computedfields.models import ComputedFieldsModel, computed
 from django.conf import settings
 from django.contrib.gis.db import models
 from django.utils.translation import gettext as _
+from rest_framework import permissions
 
 from django_oapif.decorators import register_oapif_viewset
 
 
-@register_oapif_viewset()
+@register_oapif_viewset(
+    custom_viewset_attrs={
+        "model_to_viewset_permissions": (permissions.IsAuthenticatedOrReadOnly,)
+    }
+)
 class Pole(ComputedFieldsModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     geom = models.PointField(srid=settings.GEOMETRY_SRID, verbose_name=_("Geometry"))
@@ -22,7 +27,11 @@ class Pole(ComputedFieldsModel):
         return f'{{"id": "{str(self.id)}", "type": "Feature", "geometry": {self.geom.geojson}, "properties": {{"name": "{self.name}"}}}}'
 
 
-@register_oapif_viewset()
+@register_oapif_viewset(
+    custom_viewset_attrs={
+        "model_to_viewset_permissions": (permissions.IsAuthenticatedOrReadOnly,)
+    }
+)
 class Sign(ComputedFieldsModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     pole = models.ForeignKey(
