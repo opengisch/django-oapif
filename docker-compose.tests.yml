@@ -4,6 +4,6 @@ services:
     depends_on: [django]
 
   test_client:
-    build: ${PWD}/conformance-tests
+    build: ./conformance-tests
     volumes:
-      - ${PWD}/conformance-tests:/conformance-tests
+      - ./conformance-tests:/conformance-tests
