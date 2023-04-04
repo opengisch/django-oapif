@@ -24,13 +24,11 @@ INSTALLED_APPS = [
 
 Add this to your `urls.py` :
 
-```
 urlpatterns += [
     ...,
     path("oapif/", include(django_oapif.urls)),
     ...,
 ]
-```
 
 2. Register your models with the decorator:
 
