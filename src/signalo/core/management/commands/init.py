@@ -18,7 +18,7 @@ class Command(BaseCommand):
         }
 
         for k, command in controller.items():
-            if not options or k in options:
+            if not options or options[k]:
                 command()
 
         print(f"🎉 All set up!")
