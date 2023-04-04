@@ -56,11 +56,8 @@ jobs:
         # sprinkle some test data (refreshing computed fields is done from the command handler)
         docker compose run django python manage.py init --data
 
-    - name: Healthcheck
-      run: wget --no-check-certificate https://localhost/oapif/collections/poles/items
-
-    - name: Run conformance test
-      run: docker compose run test_client
+        # run conformance test
+        docker compose run test_client
 
     - name: Failure logs
       if: failure()
