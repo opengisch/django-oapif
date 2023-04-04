@@ -162,3 +162,6 @@ REST_FRAMEWORK = {
 
 OAPIF_TITLE = "SIGNALO_ROADSIGNS_OAPIF"
 OAPIF_DESCRIPTION = "SIGNALO_ROADSIGNS_OAPIF"
+
+# Geometry's SRID. This can only be changed prior to initializing the database.
+GEOMETRY_SRID = int(os.environ.get("GEOMETRY_SRID", "2056"))
