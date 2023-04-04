@@ -22,6 +22,12 @@ docker compose run django python manage.py init
 # Wait a little, then check that https://localhost/oapif/collections/signalo_core.pole/items works from your browser
 ```
 
+## Authentication & permissions
+
+By default the viewsets constructed from `decorator.py` use the `AllowAny` permissions class. You can replace it the class(es) from https://www.django-rest-framework.org/api-guide/permissions/#api-reference that best fit your needs . Example:
+
+    permissions_classes = (DjangoModelPermissionsOrAnonReadOnly,)
+
 ## Use from QGIS
 
 Once up and running, you can use it from QGIS like this:

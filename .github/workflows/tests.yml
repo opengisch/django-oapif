@@ -7,7 +7,7 @@ on:
       - main
 
 jobs:
-  test-quickstart:
+  tests:
     runs-on: ubuntu-latest
     env:
       DOCKER_BUILDKIT: 1
@@ -37,7 +37,7 @@ jobs:
         cache-to: type=registry,ref=opengisch/signalo-django:latest,mode=max
         tags: opengisch/signalo-django:latest
 
-    - name: Do quickstart
+    - name: Setup Compose app & run all tests
       run: |
         # copy default conf
         cp .env.example .env
@@ -46,14 +46,14 @@ jobs:
         docker compose up --build -d
 
         # deploy static files and migrate database
-        docker compose run django python manage.py collectstatic --no-input
-        docker compose run django python manage.py migrate --no-input
+        docker compose exec django python manage.py collectstatic --no-input
+        docker compose exec django python manage.py migrate --no-input
 
         # sprinkle some test data (refreshing computed fields is done from the command handler)
-        docker compose run django python manage.py init --data --users
+        docker compose exec django python manage.py init --data --users
 
-    - name: Healthcheck
-      run: wget --no-check-certificate https://localhost/oapif/collections/signalo_core.pole/items
+        # test 'signalo.core'
+        docker compose exec django python manage.py test signalo.core
 
     - name: Failure logs
       if: failure()

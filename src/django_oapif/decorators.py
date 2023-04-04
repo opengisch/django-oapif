@@ -43,6 +43,7 @@ def register_oapif_viewset(
             oapif_title = "layer title"
             oapif_description = "layer_description"
             oapif_geom_lookup = "geom"  # (one day this will be retrieved automatically from the serializer)
+            permission_classes = ()
 
         # Apply custom serializer attributes
         for k, v in custom_serializer_attrs.items():
