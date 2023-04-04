@@ -81,3 +81,7 @@ docker compose run django python manage.py gen_data
 This is probably still relatively far from a full OGC Services API implementation and currently only aims to support read-only view from QGIS.
 
 This app will at some point be factored out into a reusable Django library.
+
+## Releases
+
+Releases are made automatically from the CI whenever a tag in format `v*` is pushed. Please use semantic versionning for tagging releases.
