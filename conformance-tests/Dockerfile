@@ -1,3 +1,5 @@
+# Courtesy of https://github.com/opengeospatial/ets-ogcapi-features10/issues/197
+
 FROM maven:3.8-openjdk-18
 
 # Copy actual source files
