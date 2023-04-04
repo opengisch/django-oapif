@@ -1,12 +1,7 @@
 services:
-  conformance_suite:
-    image: ogccite/ets-ogcapi-features10
-    depends_on: [django]
-    ports:
-      - 8081:8080
 
-  test_client:
+  conformance_test:
     build: ./conformance-tests
-    depends_on: [conformance_suite]
     volumes:
-      - ./conformance-tests:/conformance-tests
+      - ./_test_outputs:/build/run/output
+      # - .:/build/run/test-run-props.xml

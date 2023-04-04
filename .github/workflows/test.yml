@@ -7,7 +7,7 @@ on:
       - main
 
 jobs:
-  test-conformance:
+  test-quickstart:
     runs-on: ubuntu-latest
     env:
       DOCKER_BUILDKIT: 1
@@ -37,31 +37,33 @@ jobs:
         cache-to: type=registry,ref=opengisch/signalo-django:latest,mode=max
         tags: opengisch/signalo-django:latest
 
-    - name: Setup Compose application
+    - name: Do quickstart
       run: |
         # copy default conf
         cp .env.example .env
 
         # start the stack
-        docker compose \
-          -f docker-compose.yml \
-          -f docker-compose.override.yml \
-          -f docker-compose.tests.yml \
-          up postgres django conformance_suite --build -d
+        docker compose up --build -d
 
         # deploy static files and migrate database
-        docker compose exec django python manage.py collectstatic --no-input
-        docker compose exec django python manage.py migrate --no-input
+        docker compose run django python manage.py collectstatic --no-input
+        docker compose run django python manage.py migrate --no-input
 
         # sprinkle some test data (refreshing computed fields is done from the command handler)
-        docker compose exec django python manage.py init --data
+        docker compose run django python manage.py init --data --users
 
-        # run conformance test
-        docker compose \
-          -f docker-compose.yml \
-          -f docker-compose.override.yml \
-          -f docker-compose.tests.yml \
-          run test_client
+    - name: Healthcheck
+      run: wget --no-check-certificate https://localhost/oapif/collections/signalo_core.pole/items
+
+    - name: Run conformance test suite
+      run: docker compose -f docker-compose.tests.yml up --build conformance_test
+
+    - name: Archive production artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: emailable-report
+        path: |
+          ./_test_outputs/**/emailable-report.html
 
     - name: Failure logs
       if: failure()
