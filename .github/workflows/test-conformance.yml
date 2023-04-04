@@ -47,7 +47,7 @@ jobs:
           -f docker-compose.yml \
           -f docker-compose.override.yml \
           -f docker-compose.tests.yml \
-          up postgres django --build -d
+          up postgres django conformance_suite --build -d
 
         # deploy static files and migrate database
         docker compose run django python manage.py collectstatic --no-input
