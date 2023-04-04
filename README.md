@@ -19,7 +19,7 @@ docker compose run django python manage.py init
 
 # Alternatively pass it any combination of the following options: --data, --users, --superuser
 
-# Wait a little, then check that https://localhost/oapif/collections/poles/items works from your browser
+# Wait a little, then check that https://localhost/oapif/collections/signalo_core.pole/items works from your browser
 ```
 
 ## Use from QGIS

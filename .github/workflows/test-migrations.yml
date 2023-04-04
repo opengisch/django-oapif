@@ -53,7 +53,7 @@ jobs:
         docker compose run django python manage.py init --data --users
 
     - name: Healthcheck
-      run: wget --no-check-certificate https://localhost/oapif/collections/poles/items
+      run: wget --no-check-certificate https://localhost/oapif/collections/signalo_core.pole/items
 
     - name: Failure logs
       if: failure()

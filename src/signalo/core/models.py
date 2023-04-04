@@ -5,7 +5,10 @@ from computedfields.models import ComputedFieldsModel, computed
 from django.contrib.gis.db import models
 from django.utils.translation import gettext as _
 
+from django_oapif.decorators import register_oapif_viewset
 
+
+@register_oapif_viewset()
 class Pole(ComputedFieldsModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     geom = models.PointField(
@@ -21,6 +24,7 @@ class Pole(ComputedFieldsModel):
         return f'{{"id": "{str(self.id)}", "type": "Feature", "geometry": {self.geom.geojson}, "properties": {{"name": "{self.name}"}}}}'
 
 
+@register_oapif_viewset()
 class Sign(ComputedFieldsModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     pole = models.ForeignKey(
