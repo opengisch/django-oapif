@@ -7,6 +7,8 @@ from rest_framework_gis.serializers import GeoFeatureModelSerializer
 from django_oapif.mixins import OAPIFDescribeModelViewSetMixin
 from django_oapif.urls import oapif_router
 
+from .filters import BboxFilterBackend
+
 
 def register_oapif_viewset(
     key: Optional[str] = None,
@@ -40,9 +42,12 @@ def register_oapif_viewset(
         class Viewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
             queryset = Model.objects.all()
             serializer_class = AutoSerializer
+
+            # TODO: these should probably be moved to the mixin
             oapif_title = Model._meta.verbose_name
             oapif_description = Model.__doc__
             oapif_geom_lookup = "geom"  # (one day this will be retrieved automatically from the serializer)
+            filter_backends = [BboxFilterBackend]
 
         # Apply custom serializer attributes
         for k, v in custom_serializer_attrs.items():
