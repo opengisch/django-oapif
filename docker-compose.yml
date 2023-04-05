@@ -51,6 +51,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     ## UNCOMMENT IF YOU NEED THE POSTGIS DATABASE TO BE ACCESSIBLE
     # ports:
     # - 5432:5432
@@ -59,3 +61,4 @@ volumes:
   static_volume:
   media_volume:
   caddy_data:
+  postgres_data:

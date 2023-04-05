@@ -10,12 +10,12 @@ cp .env.example .env
 docker compose up --build -d
 
 # deploy static files and migrate database
-docker compose run django python manage.py collectstatic --no-input
-docker compose run django python manage.py migrate --no-input
+docker compose exec django python manage.py collectstatic --no-input
+docker compose exec django python manage.py migrate --no-input
 
 # A convenience start-up Django command is there to help you get started with testdata
 # and users; call it without argument to let it populate the database with testdata, users and a superuser:
-docker compose run django python manage.py init
+docker compose exec django python manage.py init
 
 # Alternatively pass it any combination of the following options: --data, --users, --superuser
 
