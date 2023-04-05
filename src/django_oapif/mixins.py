@@ -63,9 +63,7 @@ class OAPIFDescribeModelViewSetMixin:
         return Response(self._describe(request, base_url=""))
 
     def get_parsers(self):
-        """
-        Prepends the geojson parser to the list of parsers
-        """
+        # Prepends the geojson parser to the list of parsers
         return [
             JSONMergePatchParser(),
             GeojsonParser(),
