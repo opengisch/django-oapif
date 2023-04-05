@@ -7,6 +7,9 @@ services:
       - ./src/:/usr/src/app
 
   django:
+    build:
+      args:
+        DEV: "true"
     environment:
       # live-reload, show exceptions in browser, etc.
       DJANGO_DEBUG: "true"
@@ -16,3 +19,6 @@ services:
     ports:
       # making django directly accessible for debugging
       - 8000:8000
+      # debugpy
+      - 5678:5678
+    command: python3 -m debugpy --listen 0.0.0.0:5678 manage.py runserver 0.0.0.0:8000
