@@ -28,6 +28,7 @@ class DifferentSrid(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     geom = models.PointField(srid=2154, verbose_name=_("Geometry"))
 
+
 @register_oapif_viewset(
     custom_serializer_attrs={"permission_classes": (permissions.AllowAny,)}
 )
