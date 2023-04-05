@@ -8,6 +8,8 @@ __pycache__
 *.orig
 build
 dist
+*.egg-info
+src/django_oapif/__version__.py
 
 static
 media
