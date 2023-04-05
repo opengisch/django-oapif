@@ -17,8 +17,9 @@ class Command(BaseCommand):
             "superuser": lambda: call_command("createsuperuser"),
         }
 
+        no_options = not any(options[k] for k in controller.keys())
         for k, command in controller.items():
-            if not options or options[k]:
+            if no_options or options[k]:
                 command()
 
         print(f"🎉 All set up!")
