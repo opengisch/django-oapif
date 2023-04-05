@@ -32,4 +32,5 @@ ENV TEST_RUN_PROPS=${TEST_RUN_PROPS}
 
 ADD ./test-run-props.xml /build/run/test-run-props.xml
 
-CMD ["sh", "-c", "java -jar /build/target/ets-ogcapi-features10-${VERSION}-aio.jar -o ${OUTPUT_DIR} -h true ${TEST_RUN_PROPS}"]
+ENTRYPOINT [ "sh", "-c" ]
+CMD ["java -jar /build/target/ets-ogcapi-features10-${VERSION}-aio.jar -o /tmp/test_ouputs/ -h true ${TEST_RUN_PROPS} && find /tmp/test_ouputs/ -iname 'emailable-report.html' -exec mv '{}' ${OUTPUT_DIR} \\;"]
