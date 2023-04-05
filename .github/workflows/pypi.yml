@@ -20,18 +20,8 @@ jobs:
         python -m pip install --upgrade pip
         pip install build twine
 
-    - name: Set version
-      env:
-        GITHUB_TAG: ${{github.ref}}
-      run: python .github/workflows/_scripts/set_version_from_git.py
-
     - name: Build
       run: python -m build
-
-    - name: Assert version
-      env:
-        GITHUB_TAG: ${{github.ref}}
-      run: python scripts/assert_version_from_git.py
 
     - name: Publish
       env:
