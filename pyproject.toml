@@ -3,12 +3,12 @@ requires = ["setuptools>=45", "setuptools_scm[toml]==7.*"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "django-oapif"
+name = "django-ogcapif"
 authors = [
     {name = "OPENGIS.ch", email = "info@opengis.ch"},
 ]
-description = "Easily expose your Django models through an OGCAPI Features endpoint"
-keywords =  ["django", "ogcapi", "wfs3", "features", "rest", "gis"]
+description = "Easily expose your Django models through an OGCAPI-Features endpoint"
+keywords =  ["django", "ogc", "api", "wfs3", "features", "rest", "gis"]
 classifiers = [
     "Framework :: Django",
     "Intended Audience :: Developers",
