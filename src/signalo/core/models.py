@@ -5,10 +5,13 @@ from django.conf import settings
 from django.contrib.gis.db import models
 from django.utils.translation import gettext as _
 
+from django_oapif.decorators import register_oapif_viewset
 
+
+@register_oapif_viewset()
 class Pole(ComputedFieldsModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    geom = models.PointField(srid=settings.SRID, verbose_name=_("Geometry"))
+    geom = models.PointField(srid=settings.GEOMETRY_SRID, verbose_name=_("Geometry"))
     name = models.CharField(max_length=255, verbose_name=_("Name"))
 
     @computed(
@@ -19,6 +22,7 @@ class Pole(ComputedFieldsModel):
         return f'{{"id": "{str(self.id)}", "type": "Feature", "geometry": {self.geom.geojson}, "properties": {{"name": "{self.name}"}}}}'
 
 
+@register_oapif_viewset()
 class Sign(ComputedFieldsModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     pole = models.ForeignKey(
@@ -27,7 +31,11 @@ class Sign(ComputedFieldsModel):
     order = models.IntegerField(default=1)
 
     @computed(
-        models.PointField(srid=settings.SRID, verbose_name=_("Geometry"), null=True),
+        models.PointField(
+            srid=settings.GEOMETRY_SRID,
+            verbose_name=_("Geometry"),
+            null=True,
+        ),
         depends=[("self", ["pole"]), ("pole", ["geom"])],
     )
     def geom(self):

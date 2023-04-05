@@ -1,0 +1,7 @@
+services:
+
+  conformance_test:
+    build: ./conformance-tests
+    volumes:
+      - ./_test_outputs:/build/run/output
+      # - .:/build/run/test-run-props.xml
