@@ -40,8 +40,8 @@ def register_oapif_viewset(
         class Viewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
             queryset = Model.objects.all()
             serializer_class = Serializer
-            oapif_title = "layer title"
-            oapif_description = "layer_description"
+            oapif_title = Model._meta.verbose_name
+            oapif_description = Model.__doc__
             oapif_geom_lookup = "geom"  # (one day this will be retrieved automatically from the serializer)
 
         # Apply custom serializer attributes
