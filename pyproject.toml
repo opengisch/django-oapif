@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools", "setuptools-git-versioning==1.*"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -24,6 +24,8 @@ repository = "https://github.com/opengisch/signalo-oapif/issues"
 [tool.setuptools]
 packages = {find = {where = ["src"], exclude=["signalo*"]}}
 
+[tool.setuptools-git-versioning]
+enabled = true
+
 [tool.setuptools.dynamic]
-version = {attr = "django_oapif.__version__"}
 readme = {file = ["README.md"], content-type = "text/markdown"}
