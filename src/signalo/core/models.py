@@ -11,7 +11,7 @@ from django_oapif.decorators import register_oapif_viewset
 
 @register_oapif_viewset(
     custom_viewset_attrs={
-        "model_to_viewset_permissions": (permissions.IsAuthenticatedOrReadOnly,)
+        "permission_classes": (permissions.IsAuthenticatedOrReadOnly,)
     }
 )
 class Pole(ComputedFieldsModel):
@@ -29,7 +29,7 @@ class Pole(ComputedFieldsModel):
 
 @register_oapif_viewset(
     custom_viewset_attrs={
-        "model_to_viewset_permissions": (permissions.IsAuthenticatedOrReadOnly,)
+        "permission_classes": (permissions.IsAuthenticatedOrReadOnly,)
     }
 )
 class Sign(ComputedFieldsModel):

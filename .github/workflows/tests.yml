@@ -54,6 +54,7 @@ jobs:
 
         # test 'signalo.core'
         docker compose exec django python manage.py test signalo.core
+        docker compose exec django python manage.py test signalo.edge_cases
 
     - name: Failure logs
       if: failure()

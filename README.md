@@ -28,9 +28,11 @@ By default the viewsets under `signalo/core` use the `AllowAny` permissions clas
 
     models.py
     ---------
+    from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
+    ...
     @register_oapif_viewset(
         custom_viewset_attrs={
-            "model_to_viewset_permissions": (permissions.DjangoModelPermissionsOrAnonReadOnly,)
+            "permissions_classes": (DjangoModelPermissionsOrAnonReadOnly,)
         }
     )
 
