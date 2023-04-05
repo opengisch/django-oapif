@@ -3,7 +3,7 @@ from rest_framework.response import Response
 
 from django_oapif.urls import oapif_router
 
-from .parsers import GeojsonParser
+from .parsers import GeojsonParser, JSONMergePatchParser
 
 
 class OAPIFDescribeModelViewSetMixin:
@@ -67,6 +67,7 @@ class OAPIFDescribeModelViewSetMixin:
         Prepends the geojson parser to the list of parsers
         """
         return [
+            JSONMergePatchParser(),
             GeojsonParser(),
             *super().get_parsers(),
         ]

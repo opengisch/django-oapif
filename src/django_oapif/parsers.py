@@ -1,7 +1,12 @@
 from rest_framework.parsers import JSONParser
 
+# OGCAPIF uses these content-types, not sure how they differs from
+# regular application/json...
 
-# Not exactly sure why, but OGCAPIF uses this content-type, not sure how
-# it differs from redular application/json...
+
 class GeojsonParser(JSONParser):
     media_type = "application/geo+json"
+
+
+class JSONMergePatchParser(JSONParser):
+    media_type = "application/merge-patch+json"
