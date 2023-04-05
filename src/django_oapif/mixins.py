@@ -3,6 +3,8 @@ from rest_framework.response import Response
 
 from django_oapif.urls import oapif_router
 
+from .parsers import GeojsonParser
+
 
 class OAPIFDescribeModelViewSetMixin:
     """
@@ -59,3 +61,12 @@ class OAPIFDescribeModelViewSetMixin:
     def describe(self, request, *args, **kwargs):
         """Implementation of the `describe` endpoint"""
         return Response(self._describe(request, base_url=""))
+
+    def get_parsers(self):
+        """
+        Prepends the geojson parser to the list of parsers
+        """
+        return [
+            GeojsonParser(),
+            *super().get_parsers(),
+        ]

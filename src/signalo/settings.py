@@ -159,6 +159,8 @@ REST_FRAMEWORK = {
     #     # Full API for search
     #     "search": os.getenv("DRF_THROTTLE_RATE_SEARCH_API"),
     # },
+    # TODO: remove in favor of whatever ends up in https://github.com/opengisch/signalo-oapif/pull/29
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.AllowAny",),
 }
 
 OAPIF_TITLE = "SIGNALO_ROADSIGNS_OAPIF"

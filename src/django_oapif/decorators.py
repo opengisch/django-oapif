@@ -30,7 +30,7 @@ def register_oapif_viewset(
 
     def inner(Model):
         # Create the serializer
-        class Serializer(GeoFeatureModelSerializer):
+        class AutoSerializer(GeoFeatureModelSerializer):
             class Meta:
                 model = Model
                 fields = "__all__"
@@ -39,14 +39,14 @@ def register_oapif_viewset(
         # Create the viewset
         class Viewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
             queryset = Model.objects.all()
-            serializer_class = Serializer
+            serializer_class = AutoSerializer
             oapif_title = Model._meta.verbose_name
             oapif_description = Model.__doc__
             oapif_geom_lookup = "geom"  # (one day this will be retrieved automatically from the serializer)
 
         # Apply custom serializer attributes
         for k, v in custom_serializer_attrs.items():
-            setattr(Serializer.Meta, k, v)
+            setattr(AutoSerializer.Meta, k, v)
 
         # Apply custom viewset attributes
         for k, v in custom_viewset_attrs.items():
