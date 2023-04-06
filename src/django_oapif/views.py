@@ -82,6 +82,7 @@ class CollectionsView(routers.APIRootView):
             # Instantiating the viewset
             viewset = Viewset(request=request)
 
+            # Returning only viewsets that match the request's permissions
             if all(
                 permission.has_permission(request, self)
                 for permission in viewset.get_permissions()
