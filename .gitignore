@@ -6,6 +6,10 @@ db.sqlite3
 __pycache__
 .env
 *.orig
+build
+dist
+*.egg-info
+src/django_oapif/__version__.py
 
 static
 media

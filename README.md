@@ -1,4 +1,9 @@
-# Signalo OAPIF
+# django-ogcapif
+
+**WARNING** This is in under development. API will break. Do not use in production.
+
+*django-ogcapif* allows to easily expose your Django models through an OGCAPI-Features endpoint. It is based on Django REST Framework.
+
 
 ## Quickstart
 
