@@ -8,7 +8,7 @@ authors = [
     {name = "OPENGIS.ch", email = "info@opengis.ch"},
 ]
 description = "Easily expose your Django models through an OGCAPI-Features endpoint"
-keywords =  ["django", "ogc", "api", "wfs3", "features", "rest", "gis"]
+keywords =  ["django", "ogc", "api", "wfs3", "features", "rest", "gis", "ogcapif"]
 classifiers = [
     "Framework :: Django",
     "Intended Audience :: Developers",
