@@ -1,7 +1,15 @@
 from django.db import transaction
 
 from ....core.management.commands.init import Command as InitCommand
-from ...models import DifferentSrid, HighlyPaginated, SimpleGeom, VariousGeom
+from ...models import (
+    AllowAnyModel,
+    DifferentSrid,
+    DjangoModelPermissionsModel,
+    HighlyPaginated,
+    IsAdminUserModel,
+    SimpleGeom,
+    VariousGeom,
+)
 
 
 class Command(InitCommand):
@@ -40,5 +48,10 @@ class Command(InitCommand):
 
         # Create data for DifferentSrid
         DifferentSrid.objects.create(geom=f"Point(2600000 1200000)")
+
+        # Create data for models whose permissions we are testing against
+        AllowAnyModel.objects.create(geom=f"Point(2600000 1200000)")
+        IsAdminUserModel.objects.create(geom=f"Point(2600000 1200000)")
+        DjangoModelPermissionsModel.objects.create(geom=f"Point(2600000 1200000)")
 
         print(f"🐻 Edge cases test data added too!")

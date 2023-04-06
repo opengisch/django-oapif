@@ -6,7 +6,7 @@ test_status_codes = {
         "get": [200],
         "put": [403, 405],
     },
-    "/oapif/collections/signalo_edge_cases.isadminusermodel": {
+    "/oapif/collections/signalo_edge_cases.isadminusermodel/items": {
         "get": [403, 405],
         "put": [403, 405],
     },
@@ -39,8 +39,15 @@ class TestViewsets(APITestCase):
         self.assertTrue(not failed)
 
     def test_filteredout_collections_viewsets(self):
-        headers = {"Content-Type": "application/json"}
-        for url, filtered_out in test_filtered_out.items():
-            results = self.client.get(url, headers=headers).json()
+        failed = []
+
+        for url, to_filter_out in test_filtered_out.items():
+            results = self.client.get(
+                url, headers={"Content-Type": "application/json"}
+            ).json()
             collection_ids = {collection["id"] for collection in results["collections"]}
-            self.assertTrue(not collection_ids.intersection(filtered_out))
+            if collection_ids.intersection(to_filter_out):
+                failed.append(f"{url} unable to filter out: {to_filter_out}")
+
+            print(failed)
+            self.assertTrue(not failed)
