@@ -46,17 +46,17 @@ jobs:
         docker compose up --build -d
 
         # deploy static files and migrate database
-        docker compose run django python manage.py collectstatic --no-input
-        docker compose run django python manage.py migrate --no-input
+        docker compose exec django python manage.py collectstatic --no-input
+        docker compose exec django python manage.py migrate --no-input
 
         # sprinkle some test data (refreshing computed fields is done from the command handler)
-        docker compose run django python manage.py init --data --users
+        docker compose exec django python manage.py init --data --users
 
     - name: Healthcheck
       run: wget --no-check-certificate https://localhost/oapif/collections/signalo_core.pole/items
 
     - name: Run conformance test suite
-      run: docker compose -f docker-compose.tests.yml up --build conformance_test
+      run: docker compose up --build conformance_test
 
     - name: Archive production artifacts
       uses: actions/upload-artifact@v3
