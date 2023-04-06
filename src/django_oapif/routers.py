@@ -23,6 +23,9 @@ class OAPIFRouter(routers.SimpleRouter):
     APISchemaView = SchemaView
     SchemaGenerator = SchemaGenerator
 
+    oapif_title = getattr(settings, "OAPIF_TITLE", "Django OGC Api Services Endpoint")
+    oapif_description = getattr(settings, "OAPIF_DESCRIPTION", "No description")
+
     # This is the list of routes that get generated for viewsets.
     # It is adapted from routers.SimpleRouter but adapts URLs to the specs, and adds the describe URL
     # NOTE : we don't support routes created with @action(...), if needed copy implementation from SimpleRouter.routes here
@@ -73,40 +76,28 @@ class OAPIFRouter(routers.SimpleRouter):
 
     def get_urls(self):
         """Return all OAPIF routes"""
-        urls = super().get_urls()
 
-        title = getattr(settings, "OAPIF_TITLE", "Django OGC Api Services Endpoint")
-        description = getattr(settings, "OAPIF_DESCRIPTION", "No description")
-
-        # Root URL
         root_view = RootView.as_view(
-            title=title,
-            description=description,
+            title=self.oapif_title,
+            description=self.oapif_description,
         )
-        root_url = path("", root_view, name="capabilities")
-        urls.append(root_url)
-
-        # Schema
+        conformance_view = ConformanceView.as_view()
+        collections_view = CollectionsView.as_view(registry=self.registry)
         schema_view = get_schema_view(
-            title=title,
-            description=description,
+            title=self.oapif_title,
+            description=self.oapif_description,
             version="1.0.0",
             urlconf=self,
         )
-        schema_url = path("api", schema_view, name="service-desc")
-        urls.append(schema_url)
 
-        # Conformance
-        conformance_view = ConformanceView.as_view()
-        conformance_url = path("conformance", conformance_view, name="conformance")
-        urls.append(conformance_url)
-
-        # Collections (implementation adapted from DRF's DefaultRouter.get_api_root_view)
-        collections_view = CollectionsView.as_view(registry=self.registry)
-        collections_url = path("collections", collections_view, name="collections")
-        urls.append(collections_url)
+        urls = [
+            path("", root_view, name="capabilities"),
+            path("conformance", conformance_view, name="conformance"),
+            path("collections", collections_view, name="collections"),
+            path("api", schema_view, name="service-desc"),
+            *super().get_urls(),
+        ]
 
         if self.include_format_suffixes:
             urls = format_suffix_patterns(urls)
-
         return urls
