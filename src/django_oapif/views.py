@@ -1,5 +1,5 @@
 from django.urls import NoReverseMatch
-from rest_framework import routers, views
+from rest_framework import permissions, routers, views
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 
@@ -12,6 +12,7 @@ class RootView(views.APIView):
 
     title = None
     description = None
+    permission_classes = (permissions.AllowAny,)
 
     def get(self, request, *args, **kwargs):
         return Response(
@@ -57,6 +58,7 @@ class CollectionsView(routers.APIRootView):
 
     schema = None  # exclude from schema
     registry = None
+    permission_classes = (permissions.AllowAny,)
 
     def get(self, request, *args, **kwargs):
         collections = []

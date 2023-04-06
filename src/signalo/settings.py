@@ -146,7 +146,9 @@ REST_FRAMEWORK = {
     # "geocity.auth.InternalTokenAuthentication",
     # ),
     "DEFAULT_PAGINATION_CLASS": "django_oapif.pagination.OapifPagination",
-    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.AllowAny",),
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly",
+    ),
     # "DEFAULT_THROTTLE_CLASSES": [
     #     "rest_framework.throttling.ScopedRateThrottle",
     # ],
