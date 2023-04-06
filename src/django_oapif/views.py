@@ -82,7 +82,11 @@ class CollectionsView(routers.APIRootView):
             # Instantiating the viewset
             viewset = Viewset(request=request)
 
-            collections.append(viewset._describe(request, base_url=f"collections/"))
+            if all(
+                permission.has_permission(request, self)
+                for permission in viewset.get_permissions()
+            ):
+                collections.append(viewset._describe(request, base_url=f"collections/"))
 
         return Response(
             {
