@@ -5,7 +5,7 @@ from rest_framework.schemas import SchemaGenerator, get_schema_view
 from rest_framework.schemas.views import SchemaView
 from rest_framework.urlpatterns import format_suffix_patterns
 
-from .views import CollectionsView, RootView
+from .views import CollectionsView, ConformanceView, RootView
 
 
 class OAPIFRouter(routers.SimpleRouter):
@@ -95,6 +95,11 @@ class OAPIFRouter(routers.SimpleRouter):
         )
         schema_url = path("api", schema_view, name="service-desc")
         urls.append(schema_url)
+
+        # Conformance
+        conformance_view = ConformanceView.as_view()
+        conformance_url = path("conformance", conformance_view, name="conformance")
+        urls.append(conformance_url)
 
         # Collections (implementation adapted from DRF's DefaultRouter.get_api_root_view)
         collections_view = CollectionsView.as_view(registry=self.registry)
