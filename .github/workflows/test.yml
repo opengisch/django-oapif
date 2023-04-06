@@ -37,7 +37,7 @@ jobs:
         cache-to: type=registry,ref=opengisch/signalo-django:latest,mode=max
         tags: opengisch/signalo-django:latest
 
-    - name: Do quickstart
+    - name: Setup Compose & run all tests
       run: |
         # copy default conf
         cp .env.example .env
@@ -53,8 +53,7 @@ jobs:
         docker compose exec django python manage.py init --data --users
 
         # test 'signalo'
-        docker compose exec django python manage.py test signalo.core
-        docker compose exec django python manage.py test signalo.edge_cases
+        docker compose exec django python manage.py test
 
     - name: Healthcheck
       run: wget --no-check-certificate https://localhost/oapif/collections/signalo_core.pole/items

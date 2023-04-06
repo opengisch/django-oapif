@@ -22,17 +22,24 @@ docker compose exec django python manage.py init
 # Wait a little, then check that https://localhost/oapif/collections/signalo_core.pole/items works from your browser
 ```
 
+## Tests
+
+To run all tests, launch the Compose application as shown in the [Quickstart](#quickstart). Then run
+
+    docker compose exec django python manage.py test
+
 ## Authentication & permissions
 
-By default the viewsets under `signalo/core` use the `AllowAny` permissions class. You can override these app-level permissions for particular viewsets when registering their corresponding models. (Refer to https://www.django-rest-framework.org/api-guide/permissions/#api-reference for permission classes). Example:
+By default the viewsets under `signalo/core` use the `DjangoModelPermissionsOrAnonReadOnly` permissions class. You can add model permissions when registering their corresponding viewsets, as `permission_classes`. (Refer to https://www.django-rest-framework.org/api-guide/permissions/#api-reference for permission classes). Example:
 
     models.py
     ---------
-    from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
-    ...
+    from rest_framework import permissions
+    from django_oapif.decorators import register_oapif_viewset
+
     @register_oapif_viewset(
         custom_viewset_attrs={
-            "permissions_classes": (DjangoModelPermissionsOrAnonReadOnly,)
+            "permission_classes": (permissions.DjangoModelPermissionsOrAnonReadOnly,)
         }
     )
 
