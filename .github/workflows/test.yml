@@ -56,7 +56,7 @@ jobs:
       run: wget --no-check-certificate https://localhost/oapif/collections/signalo_core.pole/items
 
     - name: Run conformance test suite
-      run: docker compose -f docker-compose.tests.yml up --build conformance_test
+      run: docker compose up --build conformance_test
 
     - name: Archive production artifacts
       uses: actions/upload-artifact@v3

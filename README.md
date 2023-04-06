@@ -38,7 +38,7 @@ Once up and running, you can use it from QGIS like this:
 You can run the OGC API conformance test suite like this:
 
 ```
-docker compose -f docker-compose.tests.yml up --build conformance_test
+docker compose up --build conformance_test
 ```
 
 Results will be stored to `_test_outputs\testng\...\emailable-report.html
