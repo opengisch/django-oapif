@@ -2,11 +2,11 @@ from django.db import transaction
 
 from ....core.management.commands.init import Command as InitCommand
 from ...models import (
-    AllowAnyModel,
+    TestPermissionAllowAny,
     DifferentSrid,
-    DjangoModelPermissionsModel,
+    TestPermissionIsAdminUserModel,
     HighlyPaginated,
-    IsAdminUserModel,
+    TestPermissionDefaultPermissionsSettings,
     SimpleGeom,
     VariousGeom,
 )
@@ -50,8 +50,9 @@ class Command(InitCommand):
         DifferentSrid.objects.create(geom=f"Point(2600000 1200000)")
 
         # Create data for models whose permissions we are testing against
-        AllowAnyModel.objects.create(geom=f"Point(2600000 1200000)")
-        IsAdminUserModel.objects.create(geom=f"Point(2600000 1200000)")
-        DjangoModelPermissionsModel.objects.create(geom=f"Point(2600000 1200000)")
+        mock_id = 1
+        TestPermissionAllowAny.objects.get_or_create(id=mock_id, geom=f"Point(2600000 1200000)")
+        TestPermissionDefaultPermissionsSettings.objects.get_or_create(id=mock_id, geom=f"Point(2600000 1200000)")
+        TestPermissionIsAdminUserModel.objects.get_or_create(id=mock_id, geom=f"Point(2600000 1200000)")
 
         print(f"🐻 Edge cases test data added too!")
