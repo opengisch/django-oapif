@@ -1,5 +1,5 @@
 from django.urls import NoReverseMatch
-from rest_framework import permissions, routers, views, exceptions
+from rest_framework import exceptions, permissions, routers, views
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 
