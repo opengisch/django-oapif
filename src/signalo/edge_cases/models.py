@@ -53,30 +53,26 @@ class DifferentSrid(models.Model):
 @register_oapif_viewset(
     custom_serializer_attrs={"permission_classes": (permissions.AllowAny,)}
 )
-class AllowAnyModel(models.Model):
+class TestPermissionAllowAny(models.Model):
     """This model exemplifies the most permissive permission class (AllowAny)."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    geom = models.PointField(srid=2154)
+    geom = models.PointField()
 
 
-@register_oapif_viewset(
-    custom_serializer_attrs={
-        "permission_classes": (permissions.DjangoModelPermissions,)
-    }
-)
-class DjangoModelPermissionsModel(models.Model):
-    """This model exemplifies the 'DefaultPermissionsModel' class."""
+@register_oapif_viewset()
+class TestPermissionDefaultPermissionsSettings(models.Model):
+    """This model exemplifies the 'DefaultPermissionsSettings' class."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    geom = models.PointField(srid=2154)
+    geom = models.PointField()
 
 
 @register_oapif_viewset(
     custom_serializer_attrs={"permission_classes": (permissions.IsAdminUser,)}
 )
-class IsAdminUserModel(models.Model):
+class TestPermissionIsAdminUserModel(models.Model):
     """This model exemplifies the 'IsAdminUserModel' class."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    geom = models.PointField(srid=2154)
+    geom = models.PointField()

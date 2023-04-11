@@ -2,7 +2,7 @@
 
 ## Quickstart
 
-```
+```bash
 # copy default conf
 cp .env.example .env
 
@@ -32,16 +32,21 @@ To run all tests, launch the Compose application as shown in the [Quickstart](#q
 
 By default the viewsets under `signalo/core` use the `DjangoModelPermissionsOrAnonReadOnly` permissions class. You can add model permissions when registering their corresponding viewsets, as `permission_classes`. (Refer to https://www.django-rest-framework.org/api-guide/permissions/#api-reference for permission classes). Example:
 
-    models.py
-    ---------
-    from rest_framework import permissions
-    from django_oapif.decorators import register_oapif_viewset
+```python
+# models.py
+# ----------
+from rest_framework import permissions
+from django.contrib.gis.db import models
+from django_oapif.decorators import register_oapif_viewset
 
-    @register_oapif_viewset(
-        custom_viewset_attrs={
-            "permission_classes": (permissions.DjangoModelPermissionsOrAnonReadOnly,)
-        }
-    )
+@register_oapif_viewset(
+    custom_viewset_attrs={
+        "permission_classes": (permissions.DjangoModelPermissionsOrAnonReadOnly,)
+    }
+)
+class MyModel(models.Model):
+    ...
+```
 
 ## Use from QGIS
 
