@@ -90,8 +90,8 @@ class CollectionsView(routers.APIRootView):
                 exceptions.NotAuthenticated,
                 exceptions.AuthenticationFailed,
                 exceptions.PermissionDenied,
-            ) as e:
-                return Response(status=e.status_code)
+            ):
+                continue
 
         return Response(
             {
