@@ -19,5 +19,10 @@ RUN apt-get update && \
 COPY ./requirements.txt .
 RUN pip install -r requirements.txt
 
+# install dev depenencies
+ARG DEV=false
+COPY ./requirements-dev.txt .
+RUN if [ "$DEV" = "true" ] ; then pip install -r requirements-dev.txt ; fi
+
 # copy project
 COPY /src /usr/src/app

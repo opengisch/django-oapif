@@ -13,9 +13,6 @@ https://docs.djangoproject.com/en/4.1/ref/settings/
 import os
 from pathlib import Path
 
-# if changed, migrations must be deleted
-SRID = 4326
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -29,13 +26,14 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["localhost"]
+ALLOWED_HOSTS = ["localhost", "django"]
 
 
 # Application definition
 
 INSTALLED_APPS = [
     "signalo.value_lists",
+    "signalo.edge_cases",
     "signalo.core",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -166,3 +164,6 @@ REST_FRAMEWORK = {
 
 OAPIF_TITLE = "SIGNALO_ROADSIGNS_OAPIF"
 OAPIF_DESCRIPTION = "SIGNALO_ROADSIGNS_OAPIF"
+
+# Geometry's SRID. This can only be changed prior to initializing the database.
+GEOMETRY_SRID = int(os.environ.get("GEOMETRY_SRID", "2056"))

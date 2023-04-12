@@ -1,3 +1,5 @@
+# default stack
+
 version: '3.7'
 
 services:
@@ -25,6 +27,9 @@ services:
       cache_from:
         - opengisch/signalo-oapif:latest
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     volumes:
       - static_volume:/static_volume
       - media_volume:/media_volume
@@ -34,6 +39,7 @@ services:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?}
       DJANGO_STATIC_ROOT: /static_volume
       DJANGO_MEDIA_ROOT: /media_volume
+      GEOMETRY_SRID: ${GEOMETRY_SRID:-2056}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
       TX_TOKEN: ${TX_TOKEN}
     command: python3 manage.py runserver 0.0.0.0:8000
@@ -42,6 +48,13 @@ services:
     image: postgis/postgis:13-3.1
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     ## UNCOMMENT IF YOU NEED THE POSTGIS DATABASE TO BE ACCESSIBLE
     # ports:
     # - 5432:5432
@@ -50,3 +63,4 @@ volumes:
   static_volume:
   media_volume:
   caddy_data:
+  postgres_data:
