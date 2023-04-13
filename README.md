@@ -19,8 +19,8 @@ docker compose exec django python manage.py collectstatic --no-input
 docker compose exec django python manage.py migrate --no-input
 
 # A convenience start-up Django command is there to populate the database with testdata for each app:
-docker compose exec django python manage.py populate_core
 docker compose exec django python manage.py populate_edge_cases
+docker compose exec django python manage.py populate_core
 docker compose exec django python manage.py populate_valuelists
 
 # Wait a little, then check that https://localhost/oapif/collections/signalo_core.pole/items works from your browser
