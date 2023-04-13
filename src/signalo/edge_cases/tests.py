@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Tuple
+from typing import Any, Dict, List, Tuple
 
 from django.test import Client
 from rest_framework.test import APITestCase
@@ -10,6 +10,9 @@ from .models import (
     TestPermissionIsAdminUserModel,
 )
 
+app_collections_url = "/oapif/collections"
+app_models_url = f"{app_collections_url}/signalo_edge_cases"
+
 
 class Crud(str, Enum):
     create = "create"
@@ -17,10 +20,6 @@ class Crud(str, Enum):
     read = "read"
     update = "update"
     destroy = "destroy"
-
-
-app_collections_url = "/oapif/collections"
-app_models_url = f"{app_collections_url}/signalo_edge_cases"
 
 
 def make_request(client: Client, crud_type: Crud, url: str) -> Tuple[str, int, Any]:
@@ -53,45 +52,52 @@ def make_request(client: Client, crud_type: Crud, url: str) -> Tuple[str, int, A
     raise ValueError(f"Not supported CRUD type: {crud_type}")
 
 
-urls_default_role_against_model_results = {
-    f"{app_models_url}.{TestPermissionAllowAny.__name__.lower()}": {
-        Crud.create: 200,
-        Crud.list: 200,
-        Crud.read: 200,
-        Crud.update: 200,
-        Crud.destroy: 200,
+matrices = {
+    "anonymous": {
+        f"{app_models_url}.{TestPermissionAllowAny.__name__.lower()}": {
+            Crud.create: 403,
+            Crud.list: 200,
+            Crud.read: 200,
+            Crud.update: 403,
+            Crud.destroy: 403,
+        },
+        f"{app_models_url}.{TestPermissionDefaultPermissionsSettings.__name__.lower()}": {
+            Crud.create: 403,
+            Crud.list: 200,
+            Crud.read: 200,
+            Crud.update: 403,
+            Crud.destroy: 403,
+        },
+        f"{app_models_url}.{TestPermissionIsAdminUserModel.__name__.lower()}": {
+            Crud.create: 403,
+            Crud.list: 403,
+            Crud.read: 403,
+            Crud.update: 403,
+            Crud.destroy: 403,
+        },
+        f"{app_collections_url}": {"list": 200},
     },
-    f"{app_models_url}.{TestPermissionDefaultPermissionsSettings.__name__.lower()}": {
-        Crud.create: 403,
-        Crud.list: 200,
-        Crud.read: 200,
-        Crud.update: 403,
-        Crud.destroy: 403,
-    },
-    f"{app_models_url}.{TestPermissionIsAdminUserModel.__name__.lower()}": {
-        Crud.create: 403,
-        Crud.list: 403,
-        Crud.read: 403,
-        Crud.update: 403,
-        Crud.destroy: 403,
-    },
-    f"{app_collections_url}": {"list": 200},
+    "no_specific": "no_specific",
+    "model_specific": "model_specific",
+    "readonly": "readonly",
+    "all_perms": "all_perms",
+    "admin": "",
 }
 
 
-class TestViewsets(APITestCase):
-    def test_default_role_against_viewsets(self):
-        run = 0
-        failed = []
-        to_filter_out = (
-            f"{app_models_url}.{TestPermissionIsAdminUserModel.__name__.lower()}"
-        )
+def run_tests_matrices(client: Client) -> Tuple[int, List[str]]:
+    tot = 0
+    failed = []
+    to_filter_out = (
+        f"{app_models_url}.{TestPermissionIsAdminUserModel.__name__.lower()}"
+    )
+    for matrix in matrices.values():
+        if not isinstance(matrix, Dict):
+            continue
 
-        for model_url, crud_results in urls_default_role_against_model_results.items():
+        for model_url, crud_results in matrix.items():
             for crud_name, expected_status_code in crud_results.items():
-                url, response_code, results = make_request(
-                    self.client, crud_name, model_url
-                )
+                url, response_code, results = make_request(client, crud_name, model_url)
 
                 if response_code != expected_status_code:
                     failed.append(
@@ -106,13 +112,17 @@ class TestViewsets(APITestCase):
                     if collection_ids.intersection(to_filter_out):
                         failed.append(f"{url} unable to filter out: {to_filter_out}")
 
-                run += 1
+                tot += 1
+
+    return (tot, failed)
+
+
+class TestViewsets(APITestCase):
+    def test_user_not_logged_in(self):
+        tot, failed = run_tests_matrices(self.client)
 
         if failed:
-            print(f" => Failed {len(failed)}/{run}")
+            print(f" => Failed {len(failed)}/{tot}")
             print("\n".join(failed))
 
         self.assertTrue(not failed)
-
-
-# test_roles = "anonyme, pas d'autorisation spécifique, autorisations spécifiques au modèle, autorisation readonly, toutes les autorisations, admin"
