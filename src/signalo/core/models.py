@@ -10,6 +10,12 @@ from signalo.value_lists.models import OfficialSignType
 
 
 @register_oapif_viewset()
+class Azimuth(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    value = models.SmallIntegerField(default=0, null=False, blank=False)
+
+
+@register_oapif_viewset()
 class Pole(ComputedFieldsModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     geom = models.PointField(srid=settings.GEOMETRY_SRID, verbose_name=_("Geometry"))
@@ -35,6 +41,9 @@ class Sign(ComputedFieldsModel):
         blank=True,
         null=True,
         related_name="official_sign",
+    )
+    azimuth = models.ForeignKey(
+        Azimuth, models.SET_NULL, blank=True, null=True, related_name="azimuth"
     )
     order = models.IntegerField(default=1)
 

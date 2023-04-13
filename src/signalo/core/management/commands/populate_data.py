@@ -4,7 +4,7 @@ from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from signalo.core.models import Pole, Sign
+from signalo.core.models import Azimuth, Pole, Sign
 from signalo.value_lists.models import OfficialSignType
 
 
@@ -47,6 +47,7 @@ class Command(BaseCommand):
                             order=order,
                             pole=pole_instance,
                             sign_type=random.sample(sign_types, 1)[0],
+                            azimuth=Azimuth.objects.create(),
                         )
                     )
 
