@@ -1,17 +1,14 @@
+from django.core.management import BaseCommand
 from django.db import transaction
 
-from ....core.management.commands.init import Command as InitCommand
 from ...models import DifferentSrid, HighlyPaginated, SimpleGeom, VariousGeom
 
 
-class Command(InitCommand):
+class Command(BaseCommand):
     """Adds some edge case test data"""
 
     @transaction.atomic
     def handle(self, *args, **options):
-        # Call the base init data command
-        super().handle(*args, **options)
-
         # Add additional test data
 
         x = 7.4474

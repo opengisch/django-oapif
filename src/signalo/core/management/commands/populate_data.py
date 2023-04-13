@@ -1,8 +1,11 @@
+import random
+
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from signalo.core.models import Pole, Sign
+from signalo.value_lists.models import OfficialSignType
 
 
 class Command(BaseCommand):
@@ -23,6 +26,7 @@ class Command(BaseCommand):
         signs_per_pole = 3
         poles = []
         signs = []
+        sign_types = list(OfficialSignType.objects.all())
 
         for dx in range(0, magnitude):
             for dy in range(0, magnitude):
@@ -35,12 +39,14 @@ class Command(BaseCommand):
                 poles.append(pole_instance)
 
                 # signs
+
                 for s in range(0, signs_per_pole):
                     order = s + 1
                     signs.append(
                         Sign(
                             order=order,
                             pole=pole_instance,
+                            sign_type=random.sample(sign_types, 1)[0],
                         )
                     )
 
