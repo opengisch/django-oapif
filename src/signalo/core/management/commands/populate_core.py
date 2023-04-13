@@ -18,11 +18,14 @@ class Command(BaseCommand):
             parser.add_argument(f"--{opt}", action="store_true")
 
     def handle(self, *args, **kwargs):
-        selected_commands = [
-            user_options[key] for key in kwargs if key in user_options and kwargs[key]
-        ] or user_options.values()
+        defaults = {"data", "users"}
+        commands = {
+            user_options[key]
+            for key in kwargs
+            if key in user_options and (key in defaults or kwargs[key])
+        }
 
-        for cmd in selected_commands:
+        for cmd in commands:
             cmd()
 
         print(f"🎉 All set up!")

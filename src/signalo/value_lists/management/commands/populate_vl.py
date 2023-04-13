@@ -1,12 +1,11 @@
-from django.core.management import call_command
-from django.core.management.base import BaseCommand
-from django.db import transaction
-from django.core.files.base import ContentFile
-from django.db.utils import IntegrityError
-
 import argparse
 import json
 import os
+
+from django.core.files.base import ContentFile
+from django.core.management.base import BaseCommand
+from django.db import transaction
+from django.db.utils import IntegrityError
 
 from ...models import OfficialSignType
 
@@ -20,27 +19,31 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
-        if options['clean']:
-            print('cleaning all types of signs')
+        if options["clean"]:
+            print("cleaning all types of signs")
             OfficialSignType.objects.all().delete()
 
         signs = []
 
         path = os.path.abspath(os.path.dirname(__file__))
-        with open(f'{path}/../../data/official-signs.json') as csvfile:
+        with open(f"{path}/../../data/official-signs.json") as csvfile:
             data = json.load(csvfile)
             for row in data:
                 sign_instance = OfficialSignType(**row)
-                for lang in ('fr', 'de', 'it', 'ro'):
-                    field = f'img_{lang}'
-                    with open(f'{path}/../../data/images/official/original/{row[field]}') as fi:
+                for lang in ("fr", "de", "it", "ro"):
+                    field = f"img_{lang}"
+                    with open(
+                        f"{path}/../../data/images/official/original/{row[field]}"
+                    ) as fi:
                         data = fi.read()
-                        getattr(sign_instance, field).save(row[field], ContentFile(data))
+                        getattr(sign_instance, field).save(
+                            row[field], ContentFile(data)
+                        )
                 signs.append(sign_instance)
         try:
-            OfficialSignType.objects.bulk_create(signs)
+            OfficialSignType.objects.bulk_create(signs, ignore_conflicts=True)
         except IntegrityError as e:
-            print('you might need to clean the list of type of signs')
+            print("you might need to clean the list of type of signs")
             raise IntegrityError(e)
 
-
+        print(f"🚦 Added value lists for signs!")
