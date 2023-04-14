@@ -33,7 +33,7 @@ class EmptyTableGeom(models.Model):
 
 
 @register_oapif_viewset(
-    custom_serializer_attrs={"pagination_class": HighlyPaginatedPagination}
+    custom_viewset_attrs={"pagination_class": HighlyPaginatedPagination}
 )
 class HighlyPaginated(models.Model):
     """The viewset of this model has very short pages (3 items or so), so we can test the impact of pagination on components like the attribute table."""
@@ -51,7 +51,7 @@ class DifferentSrid(models.Model):
 
 
 @register_oapif_viewset(
-    custom_serializer_attrs={"permission_classes": (permissions.AllowAny,)}
+    custom_viewset_attrs={"permission_classes": (permissions.AllowAny,)}
 )
 class TestPermissionAllowAny(models.Model):
     """This model exemplifies the most permissive permission class (AllowAny)."""
@@ -69,7 +69,7 @@ class TestPermissionDefaultPermissionsSettings(models.Model):
 
 
 @register_oapif_viewset(
-    custom_serializer_attrs={"permission_classes": (permissions.IsAdminUser,)}
+    custom_viewset_attrs={"permission_classes": (permissions.IsAdminUser,)}
 )
 class TestPermissionIsAdminUserModel(models.Model):
     """This model exemplifies the 'IsAdminUserModel' class."""

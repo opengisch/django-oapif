@@ -32,7 +32,7 @@ class OAPIFRouter(routers.SimpleRouter):
             url=r"^collections/{prefix}/items{trailing_slash}$",
             mapping={
                 "get": "list",
-                # "post": "create",
+                "post": "create",
             },
             name="{basename}-list",
             detail=False,
@@ -43,9 +43,9 @@ class OAPIFRouter(routers.SimpleRouter):
             url=r"^collections/{prefix}/items/{lookup}{trailing_slash}$",
             mapping={
                 "get": "retrieve",
-                # "put": "update",
-                # "patch": "partial_update",
-                # "delete": "destroy",
+                "put": "update",
+                "patch": "partial_update",
+                "delete": "destroy",
             },
             name="{basename}-detail",
             detail=True,
