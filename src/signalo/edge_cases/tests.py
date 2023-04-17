@@ -1,6 +1,8 @@
 from enum import Enum
 from typing import Any, Dict, List, Tuple
 
+from django.contrib.auth.models import User
+from django.core.management import call_command
 from django.test import Client
 from rest_framework.test import APITestCase
 
@@ -40,7 +42,7 @@ matrix = {
             Crud.read: 200,
             Crud.partial_update: 200,
             Crud.update: 200,
-            Crud.destroy: 200,
+            Crud.destroy: 204,
         },
         f"{app_models_url}.{TestPermissionDefaultPermissionsSettings.__name__.lower()}": {
             Crud.create: 403,
@@ -60,11 +62,37 @@ matrix = {
         },
         f"{app_collections_url}": {"list": 200},
     },
-    Roles.no_specific: "no_specific",
-    Roles.model_specific: "model_specific",
-    Roles.readonly: "readonly",
-    Roles.all_perms: "all_perms",
-    Roles.admin: "admin",
+    # Roles.no_specific: "todo",
+    # Roles.model_specific: "todo",
+    # Roles.readonly: "todo",
+    # Roles.all_perms: "todo",
+    Roles.admin: {
+        f"{app_models_url}.{TestPermissionAllowAny.__name__.lower()}": {
+            Crud.create: 201,
+            Crud.list: 200,
+            Crud.read: 200,
+            Crud.partial_update: 200,
+            Crud.update: 200,
+            Crud.destroy: 204,
+        },
+        f"{app_models_url}.{TestPermissionDefaultPermissionsSettings.__name__.lower()}": {
+            Crud.create: 201,
+            Crud.list: 200,
+            Crud.read: 200,
+            Crud.partial_update: 200,
+            Crud.update: 200,
+            Crud.destroy: 204,
+        },
+        f"{app_models_url}.{TestPermissionIsAdminUserModel.__name__.lower()}": {
+            Crud.create: 201,
+            Crud.list: 200,
+            Crud.read: 200,
+            Crud.partial_update: 200,
+            Crud.update: 200,
+            Crud.destroy: 204,
+        },
+        f"{app_collections_url}": {"list": 200},
+    },
 }
 
 
@@ -73,39 +101,39 @@ def extract_ids_from_features(contents: Dict[str, Any]) -> List[str]:
 
 
 def make_request(client: Client, crud_type: Crud, url: str) -> Tuple[str, int, Any]:
-    headers = {"Content-Type": "application/json"}
     items = f"{url}/items"
-    write_params = {"geom": "Point(1300000 600000)"}
-    read_params = {"geom": "Point(2600000 1200000)"}
+    payload = {"geom": "Point(1300000 600000)"}
+    params = {"geom": "Point(2600000 1200000)"}
 
     if crud_type == Crud.create:
-        resp = client.post(items, data=write_params, headers=headers)
-        return (url, resp.status_code, None)
+        resp = client.post(items, payload, format="json")
+        return (items, resp.status_code, None)
 
     if crud_type == Crud.list:
         collections_or_items = url if url == app_collections_url else items
-        resp = client.get(collections_or_items, data=read_params, headers=headers)
+        resp = client.get(collections_or_items, params, format="json")
         return (collections_or_items, resp.status_code, resp.json())
 
     if crud_type == Crud.read:
-        resp = client.get(items, data=read_params, headers=headers)
+        resp = client.get(items, params, format="json")
         return (items, resp.status_code, resp.json())
 
-    contents = client.get(items, data=read_params, headers=headers).json()
+    contents = client.get(items, format="json").json()
+    print(f"Crud: {crud_type}, url: {items}, contents: {contents}")
     feature_ids = extract_ids_from_features(contents)
     detail_url = f"{items}/{feature_ids[0]}"
 
     if crud_type == Crud.partial_update:
-        resp = client.patch(detail_url, data=write_params, headers=headers)
-        return (items, resp.status_code, None)
+        resp = client.patch(detail_url, payload, format="json")
+        return (detail_url, resp.status_code, None)
 
     if crud_type == Crud.update:
-        resp = client.put(detail_url, data=write_params, headers=headers)
-        return (items, resp.status_code, None)
+        resp = client.put(detail_url, payload, format="json")
+        return (detail_url, resp.status_code, None)
 
     if crud_type == Crud.destroy:
-        resp = client.delete(detail_url, data=write_params, headers=headers)
-        return (items, resp.status_code, None)
+        resp = client.delete(detail_url, format="json")
+        return (detail_url, resp.status_code, None)
 
     raise ValueError(f"Not supported CRUD type: {crud_type}")
 
@@ -136,8 +164,85 @@ def traverse_matrix(
 
 
 class TestViewsets(APITestCase):
-    def test_anonymous_any(self):
+    def setUp(self):
+        call_command("populate_edge_cases")
+        self.admin_user_name = "admin_user"
+        self.admin_user_password = "123"
+        User.objects.create_user(
+            username=self.admin_user_name,
+            password=self.admin_user_password,
+            is_staff=True,
+        )
+
+    def test_anonymous_versus_any(self):
         model = TestPermissionAllowAny
+        path = f"{app_models_url}.{model.__name__.lower()}"
+        tot, failed = traverse_matrix(self.client, Roles.anonymous, path)
+
+        if failed:
+            print(f" => Failed {len(failed)}/{tot}")
+            print("\n".join(failed))
+
+        self.assertTrue(not failed)
+
+    def test_anonymous_versus_default_permissions(self):
+        model = TestPermissionDefaultPermissionsSettings
+        path = f"{app_models_url}.{model.__name__.lower()}"
+        tot, failed = traverse_matrix(self.client, Roles.anonymous, path)
+
+        if failed:
+            print(f" => Failed {len(failed)}/{tot}")
+            print("\n".join(failed))
+
+        self.assertTrue(not failed)
+
+    def test_anonymous_versus_is_admin(self):
+        model = TestPermissionIsAdminUserModel
+        path = f"{app_models_url}.{model.__name__.lower()}"
+        tot, failed = traverse_matrix(self.client, Roles.anonymous, path)
+
+        if failed:
+            print(f" => Failed {len(failed)}/{tot}")
+            print("\n".join(failed))
+
+        self.assertTrue(not failed)
+
+    def test_admin_versus_any(self):
+        self.client.login(
+            username=self.admin_user_name, password=self.admin_user_password
+        )
+
+        model = TestPermissionAllowAny
+        path = f"{app_models_url}.{model.__name__.lower()}"
+        tot, failed = traverse_matrix(self.client, Roles.anonymous, path)
+
+        if failed:
+            print(f" => Failed {len(failed)}/{tot}")
+            print("\n".join(failed))
+
+        self.assertTrue(not failed)
+
+    def test_admin_versus_default_permissions(self):
+        self.client.login(
+            username=self.admin_user_name, password=self.admin_user_password
+        )
+
+        model = TestPermissionDefaultPermissionsSettings
+        path = f"{app_models_url}.{model.__name__.lower()}"
+        tot, failed = traverse_matrix(self.client, Roles.anonymous, path)
+
+        if failed:
+            print(f" => Failed {len(failed)}/{tot}")
+            print("\n".join(failed))
+
+        self.assertTrue(not failed)
+
+    def test_admin_versus_is_admin(self):
+        self.client.login(
+            username=self.admin_user_name, password=self.admin_user_password
+        )
+
+        model = TestPermissionIsAdminUserModel
         path = f"{app_models_url}.{model.__name__.lower()}"
         tot, failed = traverse_matrix(self.client, Roles.anonymous, path)
 

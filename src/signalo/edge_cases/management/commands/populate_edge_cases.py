@@ -1,6 +1,6 @@
 from django.db import transaction
 
-from ....core.management.commands.init import Command as InitCommand
+from ....core.management.commands.init import BaseCommand
 from ...models import (
     DifferentSrid,
     HighlyPaginated,
@@ -12,14 +12,11 @@ from ...models import (
 )
 
 
-class Command(InitCommand):
+class Command(BaseCommand):
     """Adds some edge case test data"""
 
     @transaction.atomic
     def handle(self, *args, **options):
-        # Call the base init data command
-        super().handle(*args, **options)
-
         # Add additional test data
 
         x = 7.4474
@@ -50,12 +47,13 @@ class Command(InitCommand):
         DifferentSrid.objects.create(geom=f"Point(2600000 1200000)")
 
         # Create data for models whose permissions we are testing against
-        TestPermissionAllowAny.objects.get_or_create(geom=f"Point(2600000 1200000)")
-        TestPermissionDefaultPermissionsSettings.objects.get_or_create(
+        for i in range(30):
+            TestPermissionAllowAny.objects.get_or_create(geom=f"Point(2600000 1200000)")
+            TestPermissionDefaultPermissionsSettings.objects.get_or_create(
             geom=f"Point(2600000 1200000)"
-        )
-        TestPermissionIsAdminUserModel.objects.get_or_create(
-            geom=f"Point(2600000 1200000)"
-        )
+            )
+            TestPermissionIsAdminUserModel.objects.get_or_create(
+                geom=f"Point(2600000 1200000)"
+            )
 
         print(f"🐻 Edge cases test data added too!")
