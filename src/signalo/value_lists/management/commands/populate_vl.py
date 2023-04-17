@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 
+from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.db.utils import IntegrityError
@@ -22,14 +23,30 @@ class Command(BaseCommand):
             print("cleaning all types of signs")
             OfficialSignType.objects.all().delete()
 
+        langs = {"img_de", "img_fr", "img_it", "img_ro"}
+        saved_files = set()
         signs = []
+        path_to_images = os.path.abspath(os.path.dirname(__file__))
 
-        path = os.path.abspath(os.path.dirname(__file__))
-        with open(f"{path}/../../data/official-signs.json") as csvfile:
+        with open(f"{path_to_images}/../../data/official-signs.json") as csvfile:
             data = json.load(csvfile)
+
             for row in data:
                 sign_instance = OfficialSignType(**row)
                 signs.append(sign_instance)
+                lang_path = {k: v for k, v in row.items() if k in langs}
+
+                for lang, path_to_img in lang_path.items():
+                    if path_to_img not in saved_files:
+                        with open(
+                            f"{path_to_images}/../../data/images/official/original/{row[lang]}"
+                        ) as fi:
+                            data = fi.read()
+                            getattr(sign_instance, lang).save(
+                                row[lang], ContentFile(data)
+                            )
+                            saved_files.add(path_to_img)
+
         try:
             OfficialSignType.objects.bulk_create(signs, ignore_conflicts=True)
         except IntegrityError as e:
