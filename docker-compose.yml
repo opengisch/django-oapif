@@ -55,9 +55,6 @@ services:
       retries: 5
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ## UNCOMMENT IF YOU NEED THE POSTGIS DATABASE TO BE ACCESSIBLE
-    # ports:
-    # - 5432:5432
 
 volumes:
   static_volume:
