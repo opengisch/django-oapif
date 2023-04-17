@@ -140,11 +140,11 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Django REST Framework
 REST_FRAMEWORK = {
-    # "DEFAULT_AUTHENTICATION_CLASSES": (
-    # "oauth2_provider.contrib.rest_framework.OAuth2Authentication",
-    # "rest_framework.authentication.SessionAuthentication",
-    # "geocity.auth.InternalTokenAuthentication",
-    # ),
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        # "oauth2_provider.contrib.rest_framework.OAuth2Authentication",
+        "rest_framework.authentication.SessionAuthentication",
+        # "geocity.auth.InternalTokenAuthentication",
+    ),
     "DEFAULT_PAGINATION_CLASS": "django_oapif.pagination.OapifPagination",
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly",

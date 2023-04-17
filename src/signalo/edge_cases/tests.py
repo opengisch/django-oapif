@@ -166,11 +166,9 @@ def traverse_matrix(
 class TestViewsets(APITestCase):
     def setUp(self):
         call_command("populate_edge_cases")
-        self.admin_user_name = "admin_user"
-        self.admin_user_password = "123"
-        User.objects.create_user(
-            username=self.admin_user_name,
-            password=self.admin_user_password,
+        self.admin_user = User.objects.create_user(
+            username="username",
+            password="password",
             is_staff=True,
         )
 
@@ -208,9 +206,7 @@ class TestViewsets(APITestCase):
         self.assertTrue(not failed)
 
     def test_admin_versus_any(self):
-        self.client.login(
-            username=self.admin_user_name, password=self.admin_user_password
-        )
+        self.client.force_authenticate(user=self.admin_user)
 
         model = TestPermissionAllowAny
         path = f"{app_models_url}.{model.__name__.lower()}"
@@ -223,9 +219,7 @@ class TestViewsets(APITestCase):
         self.assertTrue(not failed)
 
     def test_admin_versus_default_permissions(self):
-        self.client.login(
-            username=self.admin_user_name, password=self.admin_user_password
-        )
+        self.client.force_authenticate(user=self.admin_user)
 
         model = TestPermissionDefaultPermissionsSettings
         path = f"{app_models_url}.{model.__name__.lower()}"
@@ -238,9 +232,7 @@ class TestViewsets(APITestCase):
         self.assertTrue(not failed)
 
     def test_admin_versus_is_admin(self):
-        self.client.login(
-            username=self.admin_user_name, password=self.admin_user_password
-        )
+        self.client.force_authenticate(user=self.admin_user)
 
         model = TestPermissionIsAdminUserModel
         path = f"{app_models_url}.{model.__name__.lower()}"

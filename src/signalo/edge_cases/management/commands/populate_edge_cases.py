@@ -50,7 +50,7 @@ class Command(BaseCommand):
         for i in range(30):
             TestPermissionAllowAny.objects.get_or_create(geom=f"Point(2600000 1200000)")
             TestPermissionDefaultPermissionsSettings.objects.get_or_create(
-            geom=f"Point(2600000 1200000)"
+                geom=f"Point(2600000 1200000)"
             )
             TestPermissionIsAdminUserModel.objects.get_or_create(
                 geom=f"Point(2600000 1200000)"
