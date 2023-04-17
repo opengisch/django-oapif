@@ -12,10 +12,9 @@ class OfficialSignType(models.Model):
     description_fr = models.TextField(null=True, blank=True)
     description_it = models.TextField(null=True, blank=True)
     description_ro = models.TextField(null=True, blank=True)
-    img_de = models.FileField(upload_to="official_signs/de")
-    img_fr = models.FileField(upload_to="official_signs/fr")
-    img_it = models.FileField(upload_to="official_signs/it")
-    img_ro = models.FileField(upload_to="official_signs/ro")
+    img = models.FileField(
+        upload_to="official_signs", default="settings.MEDIA_ROOT/official_signs"
+    )
     img_height = models.IntegerField(default=0)
     img_width = models.IntegerField(default=0)
     no_dynamic_inscription = models.IntegerField(default=0)

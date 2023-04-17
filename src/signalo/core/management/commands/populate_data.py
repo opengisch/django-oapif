@@ -27,6 +27,7 @@ class Command(BaseCommand):
         poles = []
         signs = []
         sign_types = list(OfficialSignType.objects.all())
+        sample_azimuths = [x * 5 for x in range(72)]
 
         for dx in range(0, magnitude):
             for dy in range(0, magnitude):
@@ -47,7 +48,9 @@ class Command(BaseCommand):
                             order=order,
                             pole=pole_instance,
                             sign_type=random.sample(sign_types, 1)[0],
-                            azimuth=Azimuth.objects.create(),
+                            azimuth=Azimuth.objects.create(
+                                value=random.sample(sample_azimuths, 1)
+                            ),
                         )
                     )
 

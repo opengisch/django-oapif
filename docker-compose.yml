@@ -53,6 +53,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    # If you need the database to be accessible from the host
+    # uncomment the two lines below
+    # ports:
+    #   - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
