@@ -47,13 +47,10 @@ class Command(BaseCommand):
         DifferentSrid.objects.create(geom=f"Point(2600000 1200000)")
 
         # Create data for models whose permissions we are testing against
-        for i in range(30):
-            TestPermissionAllowAny.objects.get_or_create(geom=f"Point(2600000 1200000)")
-            TestPermissionDefaultPermissionsSettings.objects.get_or_create(
-                geom=f"Point(2600000 1200000)"
-            )
-            TestPermissionIsAdminUserModel.objects.get_or_create(
-                geom=f"Point(2600000 1200000)"
-            )
+        TestPermissionAllowAny.objects.create(geom=f"Point(2600000 1200000)")
+        TestPermissionDefaultPermissionsSettings.objects.create(
+            geom=f"Point(2600000 1200000)"
+        )
+        TestPermissionIsAdminUserModel.objects.create(geom=f"Point(2800000 1300000)")
 
         print(f"🐻 Edge cases test data added too!")

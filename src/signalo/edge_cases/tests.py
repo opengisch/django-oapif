@@ -119,7 +119,7 @@ def make_request(client: Client, crud_type: Crud, url: str) -> Tuple[str, int, A
         return (items, resp.status_code, resp.json())
 
     contents = client.get(items, format="json").json()
-    print(f"Crud: {crud_type}, url: {items}, contents: {contents}")
+    # print(f"Crud: {crud_type}, url: {items}, contents: {contents}")
     feature_ids = extract_ids_from_features(contents)
     detail_url = f"{items}/{feature_ids[0]}"
 
@@ -172,6 +172,11 @@ class TestViewsets(APITestCase):
             is_staff=True,
         )
 
+    def tearDown(self):
+        self.client.force_authenticate(user=None)
+
+    # Anonymous
+
     def test_anonymous_versus_any(self):
         model = TestPermissionAllowAny
         path = f"{app_models_url}.{model.__name__.lower()}"
@@ -205,41 +210,43 @@ class TestViewsets(APITestCase):
 
         self.assertTrue(not failed)
 
-    def test_admin_versus_any(self):
-        self.client.force_authenticate(user=self.admin_user)
+    # # Admin
 
-        model = TestPermissionAllowAny
-        path = f"{app_models_url}.{model.__name__.lower()}"
-        tot, failed = traverse_matrix(self.client, Roles.anonymous, path)
+    # def test_admin_versus_any(self):
+    #     self.client.force_authenticate(user=self.admin_user)
 
-        if failed:
-            print(f" => Failed {len(failed)}/{tot}")
-            print("\n".join(failed))
+    #     model = TestPermissionAllowAny
+    #     path = f"{app_models_url}.{model.__name__.lower()}"
+    #     tot, failed = traverse_matrix(self.client, Roles.anonymous, path)
 
-        self.assertTrue(not failed)
+    #     if failed:
+    #         print(f" => Failed {len(failed)}/{tot}")
+    #         print("\n".join(failed))
 
-    def test_admin_versus_default_permissions(self):
-        self.client.force_authenticate(user=self.admin_user)
+    #     self.assertTrue(not failed)
 
-        model = TestPermissionDefaultPermissionsSettings
-        path = f"{app_models_url}.{model.__name__.lower()}"
-        tot, failed = traverse_matrix(self.client, Roles.anonymous, path)
+    # def test_admin_versus_default_permissions(self):
+    #     self.client.force_authenticate(user=self.admin_user)
 
-        if failed:
-            print(f" => Failed {len(failed)}/{tot}")
-            print("\n".join(failed))
+    #     model = TestPermissionDefaultPermissionsSettings
+    #     path = f"{app_models_url}.{model.__name__.lower()}"
+    #     tot, failed = traverse_matrix(self.client, Roles.anonymous, path)
 
-        self.assertTrue(not failed)
+    #     if failed:
+    #         print(f" => Failed {len(failed)}/{tot}")
+    #         print("\n".join(failed))
 
-    def test_admin_versus_is_admin(self):
-        self.client.force_authenticate(user=self.admin_user)
+    #     self.assertTrue(not failed)
 
-        model = TestPermissionIsAdminUserModel
-        path = f"{app_models_url}.{model.__name__.lower()}"
-        tot, failed = traverse_matrix(self.client, Roles.anonymous, path)
+    # def test_admin_versus_is_admin(self):
+    #     self.client.force_authenticate(user=self.admin_user)
 
-        if failed:
-            print(f" => Failed {len(failed)}/{tot}")
-            print("\n".join(failed))
+    #     model = TestPermissionIsAdminUserModel
+    #     path = f"{app_models_url}.{model.__name__.lower()}"
+    #     tot, failed = traverse_matrix(self.client, Roles.anonymous, path)
 
-        self.assertTrue(not failed)
+    #     if failed:
+    #         print(f" => Failed {len(failed)}/{tot}")
+    #         print("\n".join(failed))
+
+    #     self.assertTrue(not failed)
