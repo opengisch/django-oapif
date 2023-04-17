@@ -26,12 +26,14 @@ class Azimuth(models.Model):
         See https://github.com/opengisch/signalo/blob/0cda9329a6718c2d47a90aff6ecbbcab15f809c1/data_model/changelogs/0001/0001_1.sql#L1357
         and https://github.com/opengisch/signalo/blob/0cda9329a6718c2d47a90aff6ecbbcab15f809c1/data_model/changelogs/0001/0001_1.sql#L36-L50
         """
-        super().save(*args, **kwargs)
-        (
-            Sign.objects.filter(azimuth__id=self.id)
-            .order_by("order")
-            .update(order=F("order") + 1)
-        )
+        # si l'ordre est null:
+        # vérifier l'absence de duplicata dans les ordres        
+            super().save(*args, **kwargs)
+            (
+                Sign.objects.filter(azimuth__id=self.id)
+                .order_by("order")
+                .update(order=F("order") + 1)
+            )
 
 
 @receiver(signals.pre_delete, sender=Azimuth)
