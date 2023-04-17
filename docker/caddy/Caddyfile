@@ -1,4 +1,4 @@
-{$SIGNALO_HOST} {
+{$OGCAPIF_HOST} {
     # Static files
     handle /static/* {
         root * /static_volume
