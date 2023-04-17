@@ -4,31 +4,32 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('signalo_vl', '0001_initial'),
+        ("signalo_vl", "0001_initial"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='officialsigntype',
-            name='img_de',
+            model_name="officialsigntype",
+            name="img_de",
         ),
         migrations.RemoveField(
-            model_name='officialsigntype',
-            name='img_fr',
+            model_name="officialsigntype",
+            name="img_fr",
         ),
         migrations.RemoveField(
-            model_name='officialsigntype',
-            name='img_it',
+            model_name="officialsigntype",
+            name="img_it",
         ),
         migrations.RemoveField(
-            model_name='officialsigntype',
-            name='img_ro',
+            model_name="officialsigntype",
+            name="img_ro",
         ),
         migrations.AddField(
-            model_name='officialsigntype',
-            name='img',
-            field=models.FileField(default='settings.MEDIA_ROOT/official_signs', upload_to='official_signs'),
+            model_name="officialsigntype",
+            name="img",
+            field=models.FileField(
+                default="settings.MEDIA_ROOT/official_signs", upload_to="official_signs"
+            ),
         ),
     ]
