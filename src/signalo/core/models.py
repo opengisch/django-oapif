@@ -1,11 +1,10 @@
 import uuid
-from functools import reduce
 
 from computedfields.models import ComputedFieldsModel, computed
 from django.conf import settings
 from django.contrib.gis.db import models
 from django.db import transaction
-from django.db.models import F, signals
+from django.db.models import Count, Q, signals
 from django.dispatch import receiver
 from django.utils.translation import gettext as _
 
@@ -18,49 +17,28 @@ class Azimuth(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     value = models.SmallIntegerField(default=0, null=False, blank=False)
 
-    @transaction.atomic()
-    def save(self, *args, **kwargs):
-        """
-        Increment rank of Signs referencing this instance after atomically
-        saving the azimuth instance.
-        See https://github.com/opengisch/signalo/blob/0cda9329a6718c2d47a90aff6ecbbcab15f809c1/data_model/changelogs/0001/0001_1.sql#L1357
-        and https://github.com/opengisch/signalo/blob/0cda9329a6718c2d47a90aff6ecbbcab15f809c1/data_model/changelogs/0001/0001_1.sql#L36-L50
-        """
-        super().save(*args, **kwargs)
-        (
-            Sign.objects.filter(azimuth__id=self.id, order__isnull=True)
-            .order_by("order")
-            .update(order=F("order") + 1)
-        )
-
 
 @receiver(signals.pre_delete, sender=Azimuth)
 @transaction.atomic()
-def re_order_on_delete(sender, my_azimuth, *args, **kwargs):
+def ensure_sign_order_on_delete(sender, my_azimuth, *args, **kwargs):
     """
     Bump to last rank with respect to their common pole
     all signs such that any of the sign on that pole references a deleted azimuth.
     See https://github.com/opengisch/signalo/blob/0cda9329a6718c2d47a90aff6ecbbcab15f809c1/data_model/changelogs/0001/0001_1.sql#L1343
     and https://github.com/opengisch/signalo/blob/0cda9329a6718c2d47a90aff6ecbbcab15f809c1/data_model/changelogs/0001/0001_1.sql#L56-L63
     """
-
     # FIXME This is likely very inefficient without using pre_fetch or fetch_related
-    def collect(acc, sign):
-        acc[0].add(sign.azimuth.value)
-        acc[1].add(sign.order)
-        return acc
 
     signs = Sign.objects.all()
     poles = Pole.objects.all()
 
     for pole in poles:
         signs_on_pole = signs.filter(pole__id=pole.id)
-        azimuths, orders = reduce(collect, signs_on_pole, (set(), set()))
+        azimuths_used_on_pole = signs_on_pole.values_list("order")
+        gen_reorder = iter(range(len(signs_on_pole)))
 
-        if my_azimuth.value in azimuths:
-            signs_on_pole.filter(azimuth__id=my_azimuth.id).update(
-                order=max(orders) + 1
-            )
+        if my_azimuth.value in azimuths_used_on_pole:
+            signs_on_pole.order_by("order").asc().update(order=next(gen_reorder))
 
 
 @register_oapif_viewset()
@@ -98,7 +76,9 @@ class Sign(ComputedFieldsModel):
         related_name="azimuths",
         related_query_name="azimuth",
     )
-    order = models.IntegerField(default=1)
+    order = models.IntegerField(
+        default=Count("signs", filter=Q(signs__pole=pole)) + 1, null=False, blank=False
+    )
 
     @computed(
         models.PointField(
