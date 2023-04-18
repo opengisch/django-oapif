@@ -49,7 +49,7 @@ class Command(BaseCommand):
                             pole=pole_instance,
                             sign_type=random.sample(sign_types, 1)[0],
                             azimuth=Azimuth.objects.create(
-                                value=random.sample(sample_azimuths, 1)
+                                value=random.sample(sample_azimuths, 1)[0]
                             ),
                         )
                     )
