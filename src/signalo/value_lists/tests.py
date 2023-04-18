@@ -1,4 +1,5 @@
 import os
+import shutil
 from json import load
 from typing import Dict, List, Set, Union
 
@@ -26,25 +27,29 @@ class TestOfficialSigns(TestCase):
         path_to_official_signs = os.path.relpath(
             "signalo/value_lists/data/official-signs.json"
         )
-        cls.path_to_images = os.path.abspath("/media_volume/official_signs")
+        cls.path_to_signs_images = os.path.abspath("/media_volume/official_signs")
+
         with open(path_to_official_signs, "r") as fh:
             cls.official_signs = load(fh)
         cls.unique_official_names = get_unique_file_names(cls.official_signs)
 
     def setUp(self):
+        if os.path.exists(self.path_to_signs_images):
+            shutil.rmtree(self.path_to_signs_images)
+
         call_command("populate_vl")
-        self.assertTrue(os.listdir(self.path_to_images))
+        self.assertTrue(os.listdir(self.path_to_signs_images))
 
     def tearDown(self):
-        for file in os.listdir(self.path_to_images):
-            path_to_file = os.path.join(self.path_to_images, file)
+        for file in os.listdir(self.path_to_signs_images):
+            path_to_file = os.path.join(self.path_to_signs_images, file)
             os.remove(path_to_file)
-        self.assertTrue(not os.listdir(self.path_to_images))
+        self.assertTrue(not os.listdir(self.path_to_signs_images))
 
     def test_official_names(self):
         self.assertEqual(len(self.unique_official_names), 340)
 
     def test_exact_files(self):
         self.assertEqual(
-            self.unique_official_names, set(os.listdir(self.path_to_images))
+            self.unique_official_names, set(os.listdir(self.path_to_signs_images))
         )

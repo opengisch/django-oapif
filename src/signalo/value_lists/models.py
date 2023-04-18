@@ -1,4 +1,19 @@
+import os
+
+from django.core.files.storage import FileSystemStorage
 from django.db import models
+
+path_to_sign = os.path.abspath("/media_volume/official_signs")
+
+
+class SignsFileSystemStorage(FileSystemStorage):
+    def get_available_name(self, name, *args, **kwargs):
+        if self.exists(name):
+            os.remove(os.path.join(path_to_sign, name))
+        return name
+
+
+fs = SignsFileSystemStorage(location=path_to_sign)
 
 
 class OfficialSignType(models.Model):
@@ -12,18 +27,10 @@ class OfficialSignType(models.Model):
     description_fr = models.TextField(null=True, blank=True)
     description_it = models.TextField(null=True, blank=True)
     description_ro = models.TextField(null=True, blank=True)
-    img_de = models.FileField(
-        upload_to="official_signs", default="settings.MEDIA_ROOT/official_signs"
-    )
-    img_fr = models.FileField(
-        upload_to="official_signs", default="settings.MEDIA_ROOT/official_signs"
-    )
-    img_it = models.FileField(
-        upload_to="official_signs", default="settings.MEDIA_ROOT/official_signs"
-    )
-    img_ro = models.FileField(
-        upload_to="official_signs", default="settings.MEDIA_ROOT/official_signs"
-    )
+    img_de = models.FileField(storage=fs)
+    img_fr = models.FileField(storage=fs)
+    img_it = models.FileField(storage=fs)
+    img_ro = models.FileField(storage=fs)
     img_height = models.IntegerField(default=0)
     img_width = models.IntegerField(default=0)
     no_dynamic_inscription = models.IntegerField(default=0)

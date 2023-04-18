@@ -23,19 +23,22 @@ class Command(BaseCommand):
             print("cleaning all types of signs")
             OfficialSignType.objects.all().delete()
 
+        path_to_images = os.path.abspath(os.path.dirname(__file__))
         langs = {"img_de", "img_fr", "img_it", "img_ro"}
         saved_files = set()
         signs = []
-        path_to_images = os.path.abspath(os.path.dirname(__file__))
 
         with open(f"{path_to_images}/../../data/official-signs.json") as csvfile:
             data = json.load(csvfile)
 
             for row in data:
                 sign_instance = OfficialSignType(**row)
+                sign_instance.img_fr = f"official_signs/{sign_instance.img_fr}"
+                sign_instance.img_it = f"official_signs/{sign_instance.img_it}"
+                sign_instance.img_ro = f"official_signs/{sign_instance.img_ro}"
                 signs.append(sign_instance)
-                lang_path = {k: v for k, v in row.items() if k in langs}
 
+                lang_path = {k: v for k, v in row.items() if k in langs}
                 for lang, path_to_img in lang_path.items():
                     if path_to_img not in saved_files:
                         with open(
