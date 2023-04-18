@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="145"
+   height="37"
+   version="1.1"
+   id="svg986"
+   sodipodi:docname="03-g-hotel.svg"
+   inkscape:version="1.0.2 (e86c870879, 2021-01-15, custom)">
+  <metadata
+     id="metadata992">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <defs
+     id="defs990" />
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1920"
+     inkscape:window-height="1017"
+     id="namedview988"
+     showgrid="false"
+     inkscape:zoom="3.7352438"
+     inkscape:cx="53.207833"
+     inkscape:cy="43.676986"
+     inkscape:window-x="5752"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg986"
+     inkscape:document-rotation="0" />
+  <rect
+     style="fill:#723926;fill-opacity:1;stroke-width:0.826201"
+     id="rect852"
+     width="144.20726"
+     height="30.606983"
+     x="-144.84885"
+     y="3.38519"
+     transform="scale(-1,1)" />
+  <path
+     style="fill:#d0ae54;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.921149"
+     d="M 14.952859,34.014139 0.99759861,18.707341 14.952859,3.3851911 H 144.84884 V 34.014139 H 14.952859"
+     id="path949" />
+  <text
+     xml:space="default"
+     dominant-baseline="middle"
+     text-anchor="left"
+     font-family="sans-serif"
+     font-size="13.1037px"
+     id="svg_12"
+     y="22"
+     x="17"
+     stroke-width="0"
+     stroke="#723926"
+     fill="#723926"
+     style="fill:#723926;fill-opacity:1">Hotel Krone</text>
+</svg>

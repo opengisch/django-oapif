@@ -33,6 +33,7 @@ ALLOWED_HOSTS = ["localhost", "django"]
 
 INSTALLED_APPS = [
     "signalo.edge_cases",
+    "signalo.value_lists",
     "signalo.core",
     "django.contrib.admin",
     "django.contrib.auth",

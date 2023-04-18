@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="145"
+   height="37"
+   version="1.1"
+   id="svg676"
+   sodipodi:docname="432-1-g.svg"
+   inkscape:version="1.0.2 (e86c8708, 2021-01-15)">
+  <metadata
+     id="metadata682">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <defs
+     id="defs680" />
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="3440"
+     inkscape:window-height="1359"
+     id="namedview678"
+     showgrid="false"
+     inkscape:zoom="6.515"
+     inkscape:cx="90.602223"
+     inkscape:cy="25.895696"
+     inkscape:window-x="1478"
+     inkscape:window-y="25"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg676"
+     inkscape:document-rotation="0" />
+  <!-- Created with Method Draw - http://github.com/duopixel/Method-Draw/ -->
+  <g
+     id="g666">
+    <title
+       id="title660">background</title>
+    <rect
+       fill="#ffffff"
+       opacity="0"
+       id="canvas_background"
+       height="202"
+       width="402"
+       y="-1"
+       x="-1" />
+    <g
+       display="none"
+       overflow="visible"
+       y="0"
+       x="0"
+       height="100%"
+       width="100%"
+       id="canvasGrid">
+      <rect
+         fill="url(#gridpattern)"
+         stroke-width="0"
+         y="0"
+         x="0"
+         height="100%"
+         width="100%"
+         id="rect663" />
+    </g>
+  </g>
+  <g
+     stroke="null"
+     id="svg_54"
+     transform="matrix(-0.52395685,0,0,0.54343481,177.6065,-35.783758)">
+    <path
+       stroke="#211e1e"
+       fill="#ffffff"
+       fill-rule="nonzero"
+       stroke-width="0.2835"
+       stroke-linejoin="round"
+       stroke-miterlimit="4"
+       id="svg_51"
+       d="m 62.6479,133.28999 h 216.13876 l 59.435,-33.27166 L 278.78666,66.71 H 62.6479 v 66.57999" />
+    <path
+       fill="#1966ba"
+       fill-rule="nonzero"
+       id="svg_50"
+       d="M 66.6986,129.28975 H 277.71443 L 308.50418,100.011 277.71443,70.70288 H 66.6986 v 58.58686" />
+  </g>
+  <text
+     xml:space="default"
+     dominant-baseline="middle"
+     text-anchor="left"
+     font-family="sans-serif"
+     font-size="15.7187px"
+     id="svg_12"
+     y="22"
+     x="36"
+     fill="#ffffff"
+     style="stroke-width:0.523957">Zürich</text>
+</svg>
