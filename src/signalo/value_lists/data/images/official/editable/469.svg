@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="121.00000000000001"
+   height="112"
+   version="1.1"
+   id="svg2026"
+   sodipodi:docname="469.svg"
+   inkscape:version="1.0.2 (e86c870879, 2021-01-15, custom)">
+  <metadata
+     id="metadata2032">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <defs
+     id="defs2030" />
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1920"
+     inkscape:window-height="1017"
+     id="namedview2028"
+     showgrid="false"
+     inkscape:zoom="3.7946429"
+     inkscape:cx="13.634305"
+     inkscape:cy="62.302811"
+     inkscape:window-x="3832"
+     inkscape:window-y="-3"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg2026" />
+  <!-- Created with Method Draw - http://github.com/duopixel/Method-Draw/ -->
+  <g
+     id="g2613"
+     transform="matrix(0.96794829,0,0,0.9699484,2.3291331,1.8146543)">
+    <g
+       id="g2009">
+      <title
+         id="title2003">background</title>
+      <rect
+         fill="#ffffff"
+         id="canvas_background"
+         height="114"
+         width="123"
+         y="-1"
+         x="-1" />
+      <g
+         display="none"
+         overflow="visible"
+         y="0"
+         x="0"
+         height="100%"
+         width="100%"
+         id="canvasGrid">
+        <rect
+           fill="url(#gridpattern)"
+           stroke-width="0"
+           y="0"
+           x="0"
+           height="100%"
+           width="100%"
+           id="rect2006" />
+      </g>
+    </g>
+    <g
+       id="g2024">
+      <title
+         id="title2011">Layer 1</title>
+      <metadata
+         id="svg_17">image/svg+xml</metadata>
+      <g
+         id="svg_19">
+        <path
+           fill="#007d45"
+           fill-rule="nonzero"
+           id="svg_16"
+           d="m 0.08534,111.20262 h 120.3568 V 0.5593 H 0.08534 Z m 0,0" />
+        <path
+           fill="#ffffff"
+           fill-rule="nonzero"
+           id="svg_15"
+           d="m 6.62068,109.84461 c -2.84712,0 -5.16114,-2.28288 -5.1572,-5.10037 V 7.01379 C 1.45954,4.2002 3.77356,1.91342 6.62068,1.91732 H 113.9068 c 2.85106,-0.00391 5.16114,2.28288 5.16114,5.09647 v 97.73045 c 0,2.81749 -2.31008,5.10427 -5.16114,5.10037 H 6.62068" />
+        <path
+           fill="#007d45"
+           fill-rule="nonzero"
+           id="svg_14"
+           d="M 6.62068,108.14318 H 113.9068 c 1.8994,0.004 3.43945,-1.51801 3.43945,-3.39505 V 7.01378 c 0,-1.87702 -1.54005,-3.39894 -3.43945,-3.39894 H 6.62068 c -1.8994,0 -3.43945,1.52192 -3.43945,3.39894 v 97.73045 c 0,1.87702 1.54005,3.39894 3.43945,3.39894" />
+        <path
+           fill="#ffffff"
+           fill-rule="nonzero"
+           id="svg_13"
+           d="m 63.15231,82.79351 h -5.77715 v 7.74617 l -9.78524,-2.06435 c -0.81741,-0.1756 -1.35051,0.8234 -0.74239,1.39314 L 60.2657,102.3677 73.7431,89.80994 C 74.35517,89.2441 73.81813,88.2412 73.00072,88.4168 l -9.84842,2.12288 v -7.74617" />
+        <path
+           fill="#ffffff"
+           fill-rule="nonzero"
+           id="svg_12"
+           d="M 31.72347,74.6376 H 88.804 V 49.49085 H 31.72347 Z m 0,0" />
+        <path
+           fill="#1966ba"
+           fill-rule="nonzero"
+           id="svg_11"
+           d="M 32.41056,73.95859 H 88.1169 V 50.16987 H 32.41056 Z m 0,0" />
+      </g>
+      <text
+         xml:space="default"
+         dominant-baseline="middle"
+         text-anchor="middle"
+         font-family="sans-serif"
+         font-size="13px"
+         id="svg_20"
+         y="20.7059"
+         x="40.621571"
+         fill="#ffffff">param(text1)</text>
+      <text
+         xml:space="default"
+         dominant-baseline="middle"
+         text-anchor="middle"
+         font-family="sans-serif"
+         font-size="13px"
+         id="svg_21"
+         y="39.294128"
+         x="41.092159"
+         fill="#ffffff">param(text2)</text>
+      <text
+         xml:space="default"
+         dominant-baseline="middle"
+         text-anchor="middle"
+         font-family="sans-serif"
+         font-size="13px"
+         id="svg_22"
+         y="66.117653"
+         x="40.856869"
+         fill="#ffffff">param(text3)</text>
+    </g>
+  </g>
+</svg>
