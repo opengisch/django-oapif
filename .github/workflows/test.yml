@@ -55,6 +55,9 @@ jobs:
         docker compose exec django python manage.py populate_core
         docker compose exec django python manage.py populate_edge_cases
 
+        # run tests
+        docker compose exec django python manage.py test signalo.value_lists
+
     - name: Healthcheck
       run: wget --no-check-certificate https://localhost/oapif/collections/signalo_core.pole/items
 
