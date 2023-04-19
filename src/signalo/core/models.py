@@ -4,7 +4,8 @@ from computedfields.models import ComputedFieldsModel, computed
 from django.conf import settings
 from django.contrib.gis.db import models
 from django.db import transaction
-from django.db.models import Count, Q, signals
+from django.db.models import F, Window, signals
+from django.db.models.functions import DenseRank
 from django.dispatch import receiver
 from django.utils.translation import gettext as _
 
@@ -22,23 +23,19 @@ class Azimuth(models.Model):
 @transaction.atomic()
 def ensure_sign_order_on_delete(sender, my_azimuth, *args, **kwargs):
     """
-    Bump to last rank with respect to their common pole
-    all signs such that any of the sign on that pole references a deleted azimuth.
-    See https://github.com/opengisch/signalo/blob/0cda9329a6718c2d47a90aff6ecbbcab15f809c1/data_model/changelogs/0001/0001_1.sql#L1343
-    and https://github.com/opengisch/signalo/blob/0cda9329a6718c2d47a90aff6ecbbcab15f809c1/data_model/changelogs/0001/0001_1.sql#L56-L63
+    Ensure dense ranking of Sign orders in spite of deletion of related Azimuth
     """
-    # FIXME This is likely very inefficient without using pre_fetch or fetch_related
-
     signs = Sign.objects.all()
     poles = Pole.objects.all()
 
     for pole in poles:
         signs_on_pole = signs.filter(pole__id=pole.id)
-        azimuths_used_on_pole = signs_on_pole.values_list("order")
-        gen_reorder = iter(range(len(signs_on_pole)))
+        azimuths_used_on_pole = signs_on_pole.values_list("azimuth")
 
         if my_azimuth.value in azimuths_used_on_pole:
-            signs_on_pole.order_by("order").asc().update(order=next(gen_reorder))
+            signs_on_pole.update(
+                order=Window(expression=DenseRank(), order_by=F("order").asc())
+            )
 
 
 @register_oapif_viewset()
@@ -76,9 +73,8 @@ class Sign(ComputedFieldsModel):
         related_name="azimuths",
         related_query_name="azimuth",
     )
-    order = models.IntegerField(
-        default=Count("signs", filter=Q(signs__pole=pole)) + 1, null=False, blank=False
-    )
+
+    order = models.IntegerField(null=False, blank=False)
 
     @computed(
         models.PointField(
@@ -90,3 +86,15 @@ class Sign(ComputedFieldsModel):
     )
     def geom(self):
         return self.pole.geom
+
+    def save(self, *args, **kwargs):
+        """
+        Custom default value for instances set at initialization:
+        sum of all other signs
+        """
+        if self.order is None:
+            signs_on_pole = Pole.objects.get(id=self.pole.id).sign_set
+            other_signs_on_pole = signs_on_pole.exclude(id=self.id)
+            self.order = other_signs_on_pole.count() + 1
+
+        super().save(*args, **kwargs)
