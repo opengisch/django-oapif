@@ -31,7 +31,7 @@ repos:
     rev: 23.3.0
     hooks:
       - id: black
-        exclude: ^migrations/
+        exclude: migrations/
 
 
   # Lint files
