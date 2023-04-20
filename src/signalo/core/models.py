@@ -21,19 +21,15 @@ class Azimuth(models.Model):
 
 @receiver(signals.pre_delete, sender=Azimuth)
 @transaction.atomic()
-def ensure_sign_order_on_delete(sender, my_azimuth, *args, **kwargs):
+def ensure_sign_order_on_delete(sender, *args, **kwargs):
     """
     Ensure dense ranking of Sign orders in spite of deletion of related Azimuth
     """
-    signs = Sign.objects.all()
-    poles = Pole.objects.all()
+    for pole in Pole.objects.all():
+        azimuths_used_on_pole = pole.signs.values_list("azimuth")
 
-    for pole in poles:
-        signs_on_pole = signs.filter(pole__id=pole.id)
-        azimuths_used_on_pole = signs_on_pole.values_list("azimuth")
-
-        if my_azimuth.value in azimuths_used_on_pole:
-            signs_on_pole.update(
+        if sender.value in azimuths_used_on_pole:
+            pole.signs.update(
                 order=Window(expression=DenseRank(), order_by=F("order").asc())
             )
 

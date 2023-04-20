@@ -1,10 +1,10 @@
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
 
-from . import populate_data, populate_users
+from . import populate_signs_poles, populate_users
 
 user_options = {
-    "data": lambda: call_command(populate_data.Command()),
+    "data": lambda: call_command(populate_signs_poles.Command()),
     "users": lambda: call_command(populate_users.Command()),
     "superuser": lambda: call_command("createsuperuser"),
 }
