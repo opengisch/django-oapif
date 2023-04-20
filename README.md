@@ -1,4 +1,9 @@
-# Signalo OAPIF
+# django-ogcapif
+
+**WARNING** This is in under development. API will break. Do not use in production.
+
+*django-ogcapif* allows to easily expose your Django models through an OGCAPI-Features endpoint. It is based on Django REST Framework.
+
 
 ## Quickstart
 
@@ -64,7 +69,7 @@ Once up and running, you can use it from QGIS like this:
 You can run the OGC API conformance test suite like this:
 
 ```
-docker compose up --build conformance_test
+docker compose run conformance_test
 ```
 
 Results will be stored to `_test_outputs\testng\...\emailable-report.html

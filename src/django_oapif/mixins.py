@@ -1,7 +1,10 @@
+import pyproj
 from django.contrib.gis.db.models import Extent
 from rest_framework.response import Response
 
 from django_oapif.urls import oapif_router
+
+from .parsers import GeojsonParser, JSONMergePatchParser
 
 
 class OAPIFDescribeModelViewSetMixin:
@@ -25,6 +28,9 @@ class OAPIFDescribeModelViewSetMixin:
         description = getattr(self, "oapif_description", "No description")
         srid = self.get_queryset().model._meta.get_field(geom_lookup).srid
         extents = self.get_queryset().aggregate(e=Extent(geom_lookup))["e"]
+
+        if not extents:
+            extents = pyproj.CRS(srid).area_of_use.bounds
 
         # return the oapif layer description as an object
         return {
@@ -59,3 +65,11 @@ class OAPIFDescribeModelViewSetMixin:
     def describe(self, request, *args, **kwargs):
         """Implementation of the `describe` endpoint"""
         return Response(self._describe(request, base_url=""))
+
+    def get_parsers(self):
+        # Prepends the geojson parser to the list of parsers
+        return [
+            JSONMergePatchParser(),
+            GeojsonParser(),
+            *super().get_parsers(),
+        ]

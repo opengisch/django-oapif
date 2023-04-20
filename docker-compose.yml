@@ -14,7 +14,7 @@ services:
       - media_volume:/media_volume
     restart: unless-stopped
     environment:
-      SIGNALO_HOST: ${SIGNALO_HOST:?}
+      OGCAPIF_HOST: ${OGCAPIF_HOST:?}
     ports:
       - 80:80
       - 443:443
@@ -35,7 +35,7 @@ services:
       - media_volume:/media_volume
     environment:
       DJANGO_DEBUG: "true"
-      SIGNALO_HOST: ${SIGNALO_HOST:?}
+      OGCAPIF_HOST: ${OGCAPIF_HOST:?}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?}
       DJANGO_STATIC_ROOT: /static_volume
       DJANGO_MEDIA_ROOT: /media_volume
