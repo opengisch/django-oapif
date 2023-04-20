@@ -31,26 +31,33 @@ class Command(BaseCommand):
         azimuths = []
         for dx in range(magnitude):
             for dy in range(magnitude):
-                # poles
+                """poles"""
                 x = x_start + dx * step
                 y = y_start + dy * step
                 geom_wkt = f"Point({x:4f} {y:4f})"
                 name = f"{dx}-{dy}"
                 pole = Pole(geom=geom_wkt, name=name)
                 poles.append(pole)
+                azimuth_values = sorted(
+                    random.sample(all_possible_azimuths, azimuths_per_pole)
+                )
+                pole_azimuths_by_value = [
+                    Azimuth(value=value) for value in azimuth_values
+                ]
+                azimuths += pole_azimuths_by_value
 
-                # signs
-                for _ in range(azimuths_per_pole):
-                    azimuth_values = sorted(
-                        random.sample(all_possible_azimuths, signs_per_azimuth)
-                    )
-                    for i, value in enumerate(azimuth_values):
-                        azimuth = Azimuth(value=value)
-                        azimuths.append(azimuth)
+                """
+                signs
+                - 4 signs per azimuth
+                - 3 azimuths per pole
+                """
+
+                for order, azimuth in enumerate(pole_azimuths_by_value, 1):
+                    for _ in range(signs_per_azimuth):
                         sign_type = random.sample(all_possible_sign_types, 1)[0]
                         signs.append(
                             Sign(
-                                order=i + 1,
+                                order=order,
                                 pole=pole,
                                 sign_type=sign_type,
                                 azimuth=azimuth,
@@ -58,11 +65,10 @@ class Command(BaseCommand):
                         )
 
         # Create objects in batches
+        Azimuth.objects.bulk_create(azimuths)
         Pole.objects.bulk_create(poles)
         Sign.objects.bulk_create(signs)
-        Azimuth.objects.bulk_create(azimuths)
 
         # Call 'update_data' to update computed properties
         call_command("updatedata")
-
         print(f"🤖 testdata added!")

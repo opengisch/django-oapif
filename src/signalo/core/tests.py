@@ -48,3 +48,12 @@ class TestValuesListSignsPoles(TestCase):
         for az in islice(azimuths, perc_10):
             az.delete()
         self.test_dense_orders_signs()
+
+    def test_azimuth_and_ranks_are_a_partial_coorder(self):
+        for pole in Pole.objects.all():
+            signs_on_pole = pole.signs
+            order_by_azimuth_value = signs_on_pole.order_by(
+                "azimuth__value"
+            ).values_list("id")
+            order_by_rank = signs_on_pole.order_by("order").values_list("id")
+            self.assertEqual(list(order_by_azimuth_value), list(order_by_rank))
