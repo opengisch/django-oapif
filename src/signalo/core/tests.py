@@ -16,7 +16,7 @@ def is_dense(it: Iterable[int]) -> bool:
     return True
 
 
-class TestOfficialSigns(TestCase):
+class TestValuesListSignsPoles(TestCase):
     def setUp(self):
         call_command("populate_vl")
         call_command("populate_signs_poles")
@@ -38,7 +38,9 @@ class TestOfficialSigns(TestCase):
 
     def test_deletion_preserves_order_density(self):
         azimuths = Azimuth.objects.all()
-        perc_10 = round(10 / 100 * azimuths.count())
+        azimuths_count = azimuths.count()
+        perc_10 = round(10 / 100 * azimuths_count)
+        self.assertGreater(azimuths_count, perc_10)
         for az in islice(azimuths, perc_10):
             az.delete()
         self.test_dense_orders_signs()
