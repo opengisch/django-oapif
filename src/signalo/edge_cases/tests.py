@@ -175,6 +175,16 @@ class TestViewsets(APITestCase):
     def tearDown(self):
         self.client.force_authenticate(user=None)
 
+    # pre-tests
+
+    def test_instances_exist(self):
+        allow_any = TestPermissionAllowAny.objects.all().count()
+        settings = TestPermissionDefaultPermissionsSettings.objects.all().count()
+        admin_user = TestPermissionIsAdminUserModel.objects.all().count()
+        self.assertGreater(allow_any, 0)
+        self.assertGreater(settings, 0)
+        self.assertGreater(admin_user, 0)
+
     # Anonymous
 
     def test_anonymous_versus_any(self):
