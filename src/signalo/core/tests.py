@@ -7,12 +7,16 @@ from django.test import TestCase
 from .models import Azimuth, Pole, Sign
 
 
-def is_dense(it: Iterable[int]) -> bool:
+def is_dense_partial_order(sorted_it: Iterable[int]) -> bool:
     prev = 0
-    for i in sorted(it):
-        if i != prev + 1:
+    for i in sorted_it:
+        if i == prev + 1:
+            prev += 1
+            continue
+        elif i == prev:
+            continue
+        else:
             return False
-        prev += 1
     return True
 
 
@@ -30,8 +34,8 @@ class TestValuesListSignsPoles(TestCase):
     def test_dense_orders_signs(self):
         for pole in Pole.objects.all():
             values_list = pole.signs.values_list("order")
-            order = [o[0] if isinstance(o, Tuple) else o for o in values_list]
-            if not is_dense(order):
+            order = sorted([o[0] if isinstance(o, Tuple) else o for o in values_list])
+            if not is_dense_partial_order(order):
                 raise self.failureException(
                     f"{pole} does not have a dense order: {pole.signs}. Culprit: {order}"
                 )

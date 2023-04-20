@@ -4,8 +4,7 @@ from computedfields.models import ComputedFieldsModel, computed
 from django.conf import settings
 from django.contrib.gis.db import models
 from django.db import transaction
-from django.db.models import F, Window, signals
-from django.db.models.functions import DenseRank
+from django.db.models import signals
 from django.dispatch import receiver
 from django.utils.translation import gettext as _
 
@@ -21,17 +20,22 @@ class Azimuth(models.Model):
 
 @receiver(signals.pre_delete, sender=Azimuth)
 @transaction.atomic()
-def ensure_sign_order_on_delete(sender, *args, **kwargs):
+def ensure_sign_order_on_delete(sender, instance, *args, **kwargs):
     """
     Ensure dense ranking of Sign orders in spite of deletion of related Azimuth
     """
+    signs_to_update = []
     for pole in Pole.objects.all():
-        azimuths_used_on_pole = pole.signs.values_list("azimuth")
-
-        if sender.value in azimuths_used_on_pole:
-            pole.signs.update(
-                order=Window(expression=DenseRank(), order_by=F("order").asc())
-            )
+        signs_on_pole = pole.signs
+        using_azimuth = list(signs_on_pole.filter(azimuth__value=instance.value))
+        if not using_azimuth:
+            continue
+        for i, sign in enumerate(
+            signs_on_pole.exclude(azimuth__id=instance.id).order_by("azimuth__value")
+        ):
+            sign.order = i + 1
+            signs_to_update.append(sign)
+    Sign.objects.bulk_update(signs_to_update, ["order"])
 
 
 @register_oapif_viewset()
@@ -66,8 +70,7 @@ class Sign(ComputedFieldsModel):
         models.SET_NULL,
         blank=True,
         null=True,
-        related_name="azimuths",
-        related_query_name="azimuth",
+        related_name="signs",
     )
 
     order = models.IntegerField(null=False, blank=False)
@@ -91,6 +94,9 @@ class Sign(ComputedFieldsModel):
         if self.order is None:
             signs_on_pole = Pole.objects.get(id=self.pole.id).sign_set
             other_signs_on_pole = signs_on_pole.exclude(id=self.id)
-            self.order = other_signs_on_pole.count() + 1
+            self.order = (
+                other_signs_on_pole.filter(azimuth__value=self.azimuth.value).count()
+                + 1
+            )
 
         super().save(*args, **kwargs)

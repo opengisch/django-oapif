@@ -28,8 +28,9 @@ class Command(BaseCommand):
 
         poles = []
         signs = []
-        for dx in range(0, magnitude):
-            for dy in range(0, magnitude):
+        azimuths = []
+        for dx in range(magnitude):
+            for dy in range(magnitude):
                 # poles
                 x = x_start + dx * step
                 y = y_start + dy * step
@@ -43,23 +44,23 @@ class Command(BaseCommand):
                     azimuth_values = sorted(
                         random.sample(all_possible_azimuths, signs_per_azimuth)
                     )
-                    order = 1
-                    for value in azimuth_values:
-                        azimuth = Azimuth.objects.create(value=value)
+                    for i, value in enumerate(azimuth_values):
+                        azimuth = Azimuth(value=value)
+                        azimuths.append(azimuth)
                         sign_type = random.sample(all_possible_sign_types, 1)[0]
                         signs.append(
                             Sign(
-                                order=order,
+                                order=i + 1,
                                 pole=pole,
                                 sign_type=sign_type,
                                 azimuth=azimuth,
                             )
                         )
-                        order += 1
 
         # Create objects in batches
         Pole.objects.bulk_create(poles)
         Sign.objects.bulk_create(signs)
+        Azimuth.objects.bulk_create(azimuths)
 
         # Call 'update_data' to update computed properties
         call_command("updatedata")
