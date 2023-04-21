@@ -38,21 +38,16 @@ class Command(BaseCommand):
                 y = y_start + dy * step
                 geom_wkt = f"Point({x:4f} {y:4f})"
                 name = f"{dx}-{dy}"
-                pole = Pole(geom=geom_wkt, name=name)
-                poles.append(pole)
                 azimuth_values = sorted(
                     random.sample(all_possible_azimuths, azimuths_per_pole)
                 )
-
-                """
-                signs
-                - 4 signs per azimuth
-                - 3 azimuths per pole
-                """
-
+                pole = Pole(geom=geom_wkt, name=name)
+                poles.append(pole)
+                
                 for azimuth in azimuth_values:
-                    azimuth = Azimuth(value=azimuth)
+                    azimuth = Azimuth(value=azimuth, pole=pole)
                     azimuths.append(azimuth)
+                    
                     order = 1
                     for _ in range(signs_per_azimuth):
                         sign_type = random.sample(all_possible_sign_types, 1)[0]
@@ -60,8 +55,7 @@ class Command(BaseCommand):
                             Sign(
                                 order=order,
                                 pole=pole,
-                                sign_type=sign_type,
-                                azimuth=azimuth,
+                                sign_type=sign_type
                             )
                         )
                         order += 1

@@ -2,7 +2,7 @@ from itertools import islice
 from typing import Iterable, Tuple
 
 from django.core.management import call_command
-from django.test import TestCase
+from rest_framework.test import APITestCase
 
 from .models import Azimuth, Pole, Sign
 
@@ -20,7 +20,7 @@ def is_dense_partial_order(sorted_it: Iterable[int]) -> bool:
     return True
 
 
-class TestValuesListSignsPoles(TestCase):
+class TestValuesListSignsPoles(APITestCase):
     def setUp(self):
         call_command("populate_vl")
         call_command("populate_signs_poles")
@@ -48,3 +48,9 @@ class TestValuesListSignsPoles(TestCase):
         for az in islice(azimuths, perc_10):
             az.delete()
         self.test_dense_orders_signs()
+
+    def test_adding_api(self):
+        pass
+
+    def test_deleting_api(self):
+        pass
