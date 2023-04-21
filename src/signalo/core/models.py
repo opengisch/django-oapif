@@ -30,10 +30,10 @@ def ensure_sign_order_on_delete(sender, instance, *args, **kwargs):
         using_azimuth = list(signs_on_pole.filter(azimuth__value=instance.value))
         if not using_azimuth:
             continue
-        for i, sign in enumerate(
-            signs_on_pole.exclude(azimuth__id=instance.id).order_by("azimuth__value")
+        for new_order, sign in enumerate(
+            signs_on_pole.exclude(azimuth__id=instance.id).order_by("order"), 1
         ):
-            sign.order = i + 1
+            sign.order = new_order
             signs_to_update.append(sign)
     Sign.objects.bulk_update(signs_to_update, ["order"])
 

@@ -23,6 +23,8 @@ class Command(BaseCommand):
         step = 100
         azimuths_per_pole = 3
         signs_per_azimuth = 4
+
+        # Preparing
         all_possible_sign_types = list(OfficialSignType.objects.all())
         all_possible_azimuths = [x * 5 for x in range(72)]
 
@@ -41,10 +43,6 @@ class Command(BaseCommand):
                 azimuth_values = sorted(
                     random.sample(all_possible_azimuths, azimuths_per_pole)
                 )
-                pole_azimuths_by_value = [
-                    Azimuth(value=value) for value in azimuth_values
-                ]
-                azimuths += pole_azimuths_by_value
 
                 """
                 signs
@@ -52,7 +50,10 @@ class Command(BaseCommand):
                 - 3 azimuths per pole
                 """
 
-                for order, azimuth in enumerate(pole_azimuths_by_value, 1):
+                for azimuth in azimuth_values:
+                    azimuth = Azimuth(value=azimuth)
+                    azimuths.append(azimuth)
+                    order = 1
                     for _ in range(signs_per_azimuth):
                         sign_type = random.sample(all_possible_sign_types, 1)[0]
                         signs.append(
@@ -63,6 +64,7 @@ class Command(BaseCommand):
                                 azimuth=azimuth,
                             )
                         )
+                        order += 1
 
         # Create objects in batches
         Azimuth.objects.bulk_create(azimuths)
