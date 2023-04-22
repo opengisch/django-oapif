@@ -136,7 +136,7 @@ def make_request(
 
     # Force-authenticating and then de-authenticate
     # on the fly to make sure we retrieve an item
-    # to test POST, PUT and PATCH
+    # to test DELETE, PUT and PATCH
     client.force_authenticate(user=admin_user)
     items = client.get(items_url, format="json").json()
     client.force_authenticate(user=None)
@@ -250,7 +250,7 @@ class TestViewsets(APITestCase):
 
         self.assertTrue(not failed)
 
-    # """ For upcoming Pull Request """
+    # """ For an upcoming Pull Request """
 
     # # admin
 
