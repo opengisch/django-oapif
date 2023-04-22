@@ -50,11 +50,9 @@ jobs:
         docker compose exec django python manage.py collectstatic --no-input
         docker compose exec django python manage.py migrate --no-input
 
-        # sprinkle some test data (refreshing computed fields is done from the command handler)
-        docker compose exec django python manage.py init --data --users
-
-        # test 'signalo'
-        docker compose exec django python manage.py test
+        # unit tests
+        docker compose exec django python manage.py test signalo.value_lists
+        docker compose exec django python manage.py test signalo.edge_cases
 
     - name: Healthcheck
       run: wget --no-check-certificate https://localhost/oapif/collections/signalo_core.pole/items

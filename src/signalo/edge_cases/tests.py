@@ -12,10 +12,12 @@ from .models import (
     TestPermissionIsAdminUserModel,
 )
 
+# API urls
 app_collections_url = "/oapif/collections"
 app_models_url = f"{app_collections_url}/signalo_edge_cases"
 
 
+# Enums to build test matrix
 class Url(str, Enum):
     allow_any = f"{app_models_url}.{TestPermissionAllowAny.__name__.lower()}"
     default = (
@@ -97,6 +99,7 @@ status_codes_matrix = {
             Crud.destroy: 204,
         },
         Url.list: {"list": 200},
+        # """ For upcoming Pull Request """
         # Roles.no_specific: "todo",
         # Roles.model_specific: "todo",
         # Roles.readonly: "todo",
@@ -105,11 +108,15 @@ status_codes_matrix = {
 }
 
 
+# Helper to get features
 def extract_ids_from_items(contents: Dict[str, Any]) -> List[str]:
     return [feature["id"] for feature in contents["features"]]
 
 
-def make_request(client: Client, crud_type: Crud, url: str) -> Tuple[str, int, Any]:
+# Helper to make requests
+def make_request(
+    client: Client, crud_type: Crud, url: str, admin_user: Optional[User] = None
+) -> Tuple[str, int, Any]:
     items_url = f"{url}/items"
     params = {"geom": "Point(2600000 1200000)"}
     data = {"geom": "Point(1300000 600000)"}
@@ -127,7 +134,13 @@ def make_request(client: Client, crud_type: Crud, url: str) -> Tuple[str, int, A
         resp = client.get(items_url, params, format="json")
         return (items_url, resp.status_code, resp.json())
 
+    # Force-authenticating and then de-authenticate
+    # on the fly to make sure we retrieve an item
+    # to test POST, PUT and PATCH
+    client.force_authenticate(user=admin_user)
     items = client.get(items_url, format="json").json()
+    client.force_authenticate(user=None)
+
     feature_ids = extract_ids_from_items(items)
     single_item_id = feature_ids[0]
     detail_url = f"{items_url}/{single_item_id}"
@@ -147,16 +160,21 @@ def make_request(client: Client, crud_type: Crud, url: str) -> Tuple[str, int, A
     raise TypeError(f"Not supported CRUD type: {crud_type}")
 
 
+# Helper to run through test matrix
 def traverse_matrix(
-    client: Client,
+    test_instance,
     role: Roles,
     endpoint: Optional[str] = None,
     to_filter_out: Optional[list[str]] = None,
 ) -> Tuple[int, List[str]]:
+    client = test_instance.client
+    admin_user = test_instance.admin_user
     failed = []
     tot = 0
     for crud_name, expected_status_code in status_codes_matrix[role][endpoint].items():
-        actual_url, response_code, results = make_request(client, crud_name, endpoint)
+        actual_url, response_code, results = make_request(
+            client, crud_name, endpoint, admin_user
+        )
 
         if response_code != expected_status_code:
             failed.append(
@@ -198,15 +216,15 @@ class TestViewsets(APITestCase):
         default_settings = (
             TestPermissionDefaultPermissionsSettings.objects.all().count()
         )
-        admin_user = TestPermissionIsAdminUserModel.objects.all().count()
+        is_admin = TestPermissionIsAdminUserModel.objects.all().count()
         self.assertGreater(allow_any, 0)
         self.assertGreater(default_settings, 0)
-        self.assertGreater(admin_user, 0)
+        self.assertGreater(is_admin, 0)
 
-    # Anonymous
+    # anonymous
 
     def test_anonymous_versus_any(self):
-        tot, failed = traverse_matrix(self.client, Roles.anonymous, Url.allow_any)
+        tot, failed = traverse_matrix(self, Roles.anonymous, Url.allow_any)
 
         if failed:
             print(f" => Failed {len(failed)}/{tot}")
@@ -215,7 +233,7 @@ class TestViewsets(APITestCase):
         self.assertTrue(not failed)
 
     def test_anonymous_versus_default_permissions(self):
-        tot, failed = traverse_matrix(self.client, Roles.anonymous, Url.default)
+        tot, failed = traverse_matrix(self, Roles.anonymous, Url.default)
 
         if failed:
             print(f" => Failed {len(failed)}/{tot}")
@@ -224,7 +242,7 @@ class TestViewsets(APITestCase):
         self.assertTrue(not failed)
 
     def test_anonymous_versus_is_admin(self):
-        tot, failed = traverse_matrix(self.client, Roles.anonymous, Url.is_admin)
+        tot, failed = traverse_matrix(self, Roles.anonymous, Url.is_admin)
 
         if failed:
             print(f" => Failed {len(failed)}/{tot}")
@@ -232,7 +250,9 @@ class TestViewsets(APITestCase):
 
         self.assertTrue(not failed)
 
-    # # Admin
+    # """ For upcoming Pull Request """
+
+    # # admin
 
     # def test_admin_versus_any(self):
     #     self.client.force_authenticate(user=self.admin_user)
