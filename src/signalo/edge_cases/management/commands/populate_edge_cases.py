@@ -51,6 +51,6 @@ class Command(BaseCommand):
         TestPermissionDefaultPermissionsSettings.objects.create(
             geom=f"Point(2600000 1200000)"
         )
-        TestPermissionIsAdminUserModel.objects.create(geom=f"Point(2800000 1300000)")
+        TestPermissionIsAdminUserModel.objects.create(geom=f"Point(2600000 1200000)")
 
         print(f"🐻 Edge cases test data added too!")
