@@ -47,9 +47,11 @@ class Command(BaseCommand):
                     azimuth = Azimuth(value=azimuth_value, pole=pole)
                     azimuths.append(azimuth)
 
-                    for order in range(signs_per_azimuth):
+                    for order in range(1, signs_per_azimuth + 1):
                         sign_type = random.sample(all_possible_sign_types, 1)[0]
-                        signs.append(Sign(order=order + 1, sign_type=sign_type))
+                        signs.append(
+                            Sign(order=order, azimuth=azimuth, sign_type=sign_type)
+                        )
 
         # Create objects in batches
         Azimuth.objects.bulk_create(azimuths)
