@@ -53,7 +53,9 @@ class Sign(ComputedFieldsModel):
         null=True,
         related_name="official_sign",
     )
-    azimuth = models.ForeignKey(Azimuth, models.CASCADE, blank=False, null=False, related_name="signs")
+    azimuth = models.ForeignKey(
+        Azimuth, models.CASCADE, blank=False, null=False, related_name="signs"
+    )
     order = models.IntegerField(null=False, blank=False)
 
     @computed(
