@@ -28,7 +28,7 @@ class Azimuth(ComputedFieldsModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     value = models.SmallIntegerField(default=0, null=False, blank=False)
     pole = models.ForeignKey(
-        Pole, on_delete=models.CASCADE, blank=True, null=True, related_name="azimuths"
+        Pole, on_delete=models.CASCADE, blank=False, null=False, related_name="azimuths"
     )
 
     @computed(
@@ -53,13 +53,7 @@ class Sign(ComputedFieldsModel):
         null=True,
         related_name="official_sign",
     )
-    azimuth = models.ForeignKey(
-        Azimuth,
-        models.SET_NULL,
-        blank=True,
-        null=True,
-        related_name="signs",
-    )
+    azimuth = models.ForeignKey(Azimuth, models.CASCADE, blank=False, null=False, related_name="signs")
     order = models.IntegerField(null=False, blank=False)
 
     @computed(

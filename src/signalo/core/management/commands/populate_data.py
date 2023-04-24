@@ -38,9 +38,8 @@ class Command(BaseCommand):
                 y = y_start + dy * step
                 geom_wkt = f"Point({x:4f} {y:4f})"
                 name = f"{dx}-{dy}"
-                azimuth_values = sorted(
-                    random.sample(all_possible_azimuths, azimuths_per_pole)
-                )
+                azimuth_values = random.sample(all_possible_azimuths, azimuths_per_pole)
+
                 pole = Pole(geom=geom_wkt, name=name)
                 poles.append(pole)
 
