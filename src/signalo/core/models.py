@@ -111,7 +111,9 @@ def ensure_sign_order_on_delete(sender, instance, *args, **kwargs):
         azimuths_ids_on_pole = azimuths.filter(pole=pole).values_list("pk")
         signs_on_pole = Sign.objects.filter(azimuth__id__in=azimuths_ids_on_pole)
         using_azimuth = list(
-            signs_on_pole.filter(azimuth__value=instance.azimuth.value).values_list("pk")
+            signs_on_pole.filter(azimuth__value=instance.azimuth.value).values_list(
+                "pk"
+            )
         )
         if not using_azimuth:
             continue
