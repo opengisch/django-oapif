@@ -102,23 +102,22 @@ class Sign(ComputedFieldsModel):
 @transaction.atomic()
 def ensure_sign_order_on_delete(sender, instance, *args, **kwargs):
     """
-    Ensure dense ranking of Sign orders in spite of deletion of related Azimuth
+    Ensure dense ranking of sign orders despite deletions on same pole
     """
-    azimuths = Azimuth.objects.all()
-
     signs_to_update = []
     for pole in Pole.objects.all():
-        azimuths_ids_on_pole = azimuths.filter(pole=pole).values_list("pk")
+        azimuths_ids_on_pole = Azimuth.objects.filter(pole=pole).values_list("id")
         signs_on_pole = Sign.objects.filter(azimuth__id__in=azimuths_ids_on_pole)
         using_azimuth = list(
             signs_on_pole.filter(azimuth__value=instance.azimuth.value).values_list(
-                "pk"
+                "id", flat=True
             )
         )
+
         if not using_azimuth:
             continue
         for new_order, sign in enumerate(
-            signs_on_pole.exclude(azimuth__id=instance.id).order_by("order"), 1
+            signs_on_pole.exclude(id=instance.id).order_by("order"), 1
         ):
             sign.order = new_order
             signs_to_update.append(sign)
