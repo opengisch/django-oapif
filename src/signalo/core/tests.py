@@ -1,3 +1,4 @@
+from itertools import islice
 from typing import Iterable, Tuple
 
 from django.core.management import call_command
@@ -47,17 +48,11 @@ class TestValuesListSignsPoles(APITestCase):
                     f"{pole} does not have a dense order: {pole.signs}. Culprit: {order}"
                 )
 
-    # def test_deletion_preserves_order_density(self):
-    #     azimuths = Azimuth.objects.all()
-    #     azimuths_count = azimuths.count()
-    #     perc_10 = round(10 / 100 * azimuths_count)
-    #     self.assertGreater(azimuths_count, perc_10)
-    #     for az in islice(azimuths, perc_10):
-    #         az.delete()
-    #     self.test_dense_orders_signs()
-
-    # def test_adding_api(self):
-    #     pass
-
-    # def test_deleting_api(self):
-    #     pass
+    def test_deletion_preserves_order_density(self):
+        azimuths = Azimuth.objects.all()
+        azimuths_count = azimuths.count()
+        perc_10 = round(10 / 100 * azimuths_count)
+        self.assertGreater(azimuths_count, perc_10)
+        for az in islice(azimuths, perc_10):
+            az.delete()
+        self.test_dense_orders_signs()

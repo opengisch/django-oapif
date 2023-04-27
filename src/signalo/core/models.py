@@ -67,9 +67,13 @@ def ensure_sign_order_on_delete(sender, instance, *args, **kwargs):
     """
     Ensure dense ranking of Sign orders in spite of deletion of related Azimuth
     """
+    azimuths = Azimuth.objects.all()
+    signs = Sign.objects.all()
+
     signs_to_update = []
     for pole in Pole.objects.all():
-        signs_on_pole = pole.signs
+        azimuths_ids_on_pole = azimuths.filter(pole=pole).values_list("pk")
+        signs_on_pole = signs.filter(azimuth__id__in=azimuths_ids_on_pole)
         using_azimuth = list(signs_on_pole.filter(azimuth__value=instance.value))
         if not using_azimuth:
             continue
