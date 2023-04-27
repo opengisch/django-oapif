@@ -34,6 +34,32 @@ class Azimuth(models.Model):
         Pole, on_delete=models.CASCADE, blank=True, null=True, related_name="azimuths"
     )
 
+    def save(self, *args, **kwargs):
+        """
+        Custom default value for instances set at initialization:
+        sum of all other signs
+        """
+        if self.order is None:
+            signs_on_pole = Pole.objects.get(id=self.pole.id).sign_set
+            other_signs_on_pole = signs_on_pole.exclude(id=self.id)
+            self.order = (
+                other_signs_on_pole.filter(azimuth__value=self.azimuth.value).count()
+                + 1
+            )
+
+        super().save(*args, **kwargs)
+
+    @computed(
+        models.PointField(
+            srid=settings.GEOMETRY_SRID,
+            verbose_name=_("Geometry"),
+            null=True,
+        ),
+        depends=[("self", ["pole"]), ("pole", ["geom"])],
+    )
+    def geom(self):
+        return self.pole.geom
+
 
 @receiver(signals.pre_delete, sender=Azimuth)
 @transaction.atomic()
@@ -58,9 +84,6 @@ def ensure_sign_order_on_delete(sender, instance, *args, **kwargs):
 @register_oapif_viewset()
 class Sign(ComputedFieldsModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    pole = models.ForeignKey(
-        Pole, on_delete=models.CASCADE, blank=True, null=True, related_name="signs"
-    )
     sign_type = models.ForeignKey(
         OfficialSignType,
         models.SET_NULL,
@@ -68,7 +91,9 @@ class Sign(ComputedFieldsModel):
         null=True,
         related_name="official_sign",
     )
-
+    azimuth = models.ForeignKey(
+        Azimuth, models.CASCADE, blank=False, null=False, related_name="signs"
+    )
     order = models.IntegerField(null=False, blank=False)
 
     @computed(
@@ -77,22 +102,10 @@ class Sign(ComputedFieldsModel):
             verbose_name=_("Geometry"),
             null=True,
         ),
-        depends=[("self", ["pole"]), ("pole", ["geom"])],
+        depends=[
+            ("self", ["azimuth"]),
+            ("azimuth", ["geom"]),
+        ],
     )
     def geom(self):
-        return self.pole.geom
-
-    def save(self, *args, **kwargs):
-        """
-        Custom default value for instances set at initialization:
-        sum of all other signs
-        """
-        if self.order is None:
-            signs_on_pole = Pole.objects.get(id=self.pole.id).sign_set
-            other_signs_on_pole = signs_on_pole.exclude(id=self.id)
-            self.order = (
-                other_signs_on_pole.filter(azimuth__value=self.azimuth.value).count()
-                + 1
-            )
-
-        super().save(*args, **kwargs)
+        return self.geom
