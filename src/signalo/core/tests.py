@@ -45,14 +45,15 @@ class TestValuesListSignsPoles(APITestCase):
             )
             if not is_dense_partial_order(order):
                 raise self.failureException(
-                    f"{pole} does not have a dense order: {pole.signs}. Culprit: {order}"
+                    f"{pole} does not have a dense order: {order}"
                 )
 
     def test_deletion_preserves_order_density(self):
-        azimuths = Azimuth.objects.all()
-        azimuths_count = azimuths.count()
-        perc_10 = round(10 / 100 * azimuths_count)
-        self.assertGreater(azimuths_count, perc_10)
-        for az in islice(azimuths, perc_10):
-            az.delete()
+        signs = Sign.objects.all()
+        signs_count = signs.count()
+        perc_10 = round(10 / 100 * signs_count)
+        self.assertGreater(signs_count, perc_10)
+        for sig in islice(signs, perc_10):
+            sig.delete()
+        print(f"Deleted {perc_10} signs; checking order density")
         self.test_dense_orders_signs()

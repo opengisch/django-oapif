@@ -34,21 +34,6 @@ class Azimuth(ComputedFieldsModel):
         Pole, on_delete=models.CASCADE, blank=False, null=False, related_name="azimuths"
     )
 
-    def save(self, *args, **kwargs):
-        """
-        Custom default value for instances set at initialization:
-        sum of all other signs
-        """
-        if self.order is None:
-            signs_on_pole = Pole.objects.get(id=self.pole.id).sign_set
-            other_signs_on_pole = signs_on_pole.exclude(id=self.id)
-            self.order = (
-                other_signs_on_pole.filter(azimuth__value=self.azimuth.value).count()
-                + 1
-            )
-
-        super().save(*args, **kwargs)
-
     @computed(
         models.PointField(
             srid=settings.GEOMETRY_SRID,
@@ -59,30 +44,6 @@ class Azimuth(ComputedFieldsModel):
     )
     def geom(self):
         return self.pole.geom
-
-
-@receiver(signals.pre_delete, sender=Azimuth)
-@transaction.atomic()
-def ensure_sign_order_on_delete(sender, instance, *args, **kwargs):
-    """
-    Ensure dense ranking of Sign orders in spite of deletion of related Azimuth
-    """
-    azimuths = Azimuth.objects.all()
-    signs = Sign.objects.all()
-
-    signs_to_update = []
-    for pole in Pole.objects.all():
-        azimuths_ids_on_pole = azimuths.filter(pole=pole).values_list("pk")
-        signs_on_pole = signs.filter(azimuth__id__in=azimuths_ids_on_pole)
-        using_azimuth = list(signs_on_pole.filter(azimuth__value=instance.value))
-        if not using_azimuth:
-            continue
-        for new_order, sign in enumerate(
-            signs_on_pole.exclude(azimuth__id=instance.id).order_by("order"), 1
-        ):
-            sign.order = new_order
-            signs_to_update.append(sign)
-    Sign.objects.bulk_update(signs_to_update, ["order"])
 
 
 @register_oapif_viewset()
@@ -100,6 +61,28 @@ class Sign(ComputedFieldsModel):
     )
     order = models.IntegerField(null=False, blank=False)
 
+    def save(self, *args, **kwargs):
+        """
+        Custom default value for instances set at initialization:
+        sum of all other signs
+        """
+        if self.order is None:
+            signs = Sign.objects.all()
+            azimuths = Azimuth.objects.all()
+
+            for pole in Pole.objects.all():
+                azimuths_ids_on_pole = azimuths.filter(pole=pole).values_list("pk")
+                signs_on_pole = signs.filter(azimuth__id__in=azimuths_ids_on_pole)
+                other_signs_on_pole = signs_on_pole.exclude(id=self.id)
+                self.order = (
+                    other_signs_on_pole.filter(
+                        azimuth__value=self.azimuth.value
+                    ).count()
+                    + 1
+                )
+
+        super().save(*args, **kwargs)
+
     @computed(
         models.PointField(
             srid=settings.GEOMETRY_SRID,
@@ -113,3 +96,29 @@ class Sign(ComputedFieldsModel):
     )
     def geom(self):
         return self.geom
+
+
+@receiver(signals.pre_delete, sender=Sign)
+@transaction.atomic()
+def ensure_sign_order_on_delete(sender, instance, *args, **kwargs):
+    """
+    Ensure dense ranking of Sign orders in spite of deletion of related Azimuth
+    """
+    azimuths = Azimuth.objects.all()
+
+    signs_to_update = []
+    for pole in Pole.objects.all():
+        azimuths_ids_on_pole = azimuths.filter(pole=pole).values_list("pk")
+        signs_on_pole = Sign.objects.filter(azimuth__id__in=azimuths_ids_on_pole)
+        using_azimuth = list(
+            signs_on_pole.filter(azimuth__value=instance.azimuth.value).values_list("pk")
+        )
+        if not using_azimuth:
+            continue
+        for new_order, sign in enumerate(
+            signs_on_pole.exclude(azimuth__id=instance.id).order_by("order"), 1
+        ):
+            sign.order = new_order
+            signs_to_update.append(sign)
+
+    Sign.objects.bulk_update(signs_to_update, ["order"])
