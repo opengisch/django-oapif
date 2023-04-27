@@ -27,11 +27,11 @@ class Pole(ComputedFieldsModel):
 
 
 @register_oapif_viewset()
-class Azimuth(models.Model):
+class Azimuth(ComputedFieldsModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     value = models.SmallIntegerField(default=0, null=False, blank=False)
     pole = models.ForeignKey(
-        Pole, on_delete=models.CASCADE, blank=True, null=True, related_name="azimuths"
+        Pole, on_delete=models.CASCADE, blank=False, null=False, related_name="azimuths"
     )
 
     def save(self, *args, **kwargs):

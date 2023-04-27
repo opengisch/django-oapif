@@ -38,27 +38,20 @@ class Command(BaseCommand):
                 y = y_start + dy * step
                 geom_wkt = f"Point({x:4f} {y:4f})"
                 name = f"{dx}-{dy}"
-                azimuth_values = sorted(
-                    random.sample(all_possible_azimuths, azimuths_per_pole)
-                )
+                azimuth_values = random.sample(all_possible_azimuths, azimuths_per_pole)
+
                 pole = Pole(geom=geom_wkt, name=name)
                 poles.append(pole)
-                
-                for azimuth in azimuth_values:
-                    azimuth = Azimuth(value=azimuth, pole=pole)
+
+                for azimuth_value in azimuth_values:
+                    azimuth = Azimuth(value=azimuth_value, pole=pole)
                     azimuths.append(azimuth)
-                    
-                    order = 1
-                    for _ in range(signs_per_azimuth):
+
+                    for order in range(1, signs_per_azimuth + 1):
                         sign_type = random.sample(all_possible_sign_types, 1)[0]
                         signs.append(
-                            Sign(
-                                order=order,
-                                pole=pole,
-                                sign_type=sign_type
-                            )
+                            Sign(order=order, azimuth=azimuth, sign_type=sign_type)
                         )
-                        order += 1
 
         # Create objects in batches
         Azimuth.objects.bulk_create(azimuths)
