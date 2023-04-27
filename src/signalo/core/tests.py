@@ -1,3 +1,4 @@
+import logging
 from itertools import islice
 from typing import Iterable, Tuple
 
@@ -5,6 +6,8 @@ from django.core.management import call_command
 from rest_framework.test import APITestCase
 
 from .models import Azimuth, Pole, Sign
+
+logger = logging.getLogger(__name__)
 
 
 def is_dense_partial_order(sorted_it: Iterable[int]) -> bool:
@@ -55,5 +58,6 @@ class TestValuesListSignsPoles(APITestCase):
         self.assertGreater(signs_count, perc_10)
         for sig in islice(signs, perc_10):
             sig.delete()
-        print(f"Deleted {perc_10} signs; checking order density")
+
+        logger.info(f"Deleted {perc_10} signs; checking order density")
         self.test_dense_orders_signs()

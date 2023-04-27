@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 from computedfields.models import ComputedFieldsModel, computed
@@ -10,6 +11,8 @@ from django.utils.translation import gettext as _
 
 from django_oapif.decorators import register_oapif_viewset
 from signalo.value_lists.models import OfficialSignType
+
+logger = logging.getLogger(__name__)
 
 
 @register_oapif_viewset()
@@ -123,3 +126,6 @@ def ensure_sign_order_on_delete(sender, instance, *args, **kwargs):
             signs_to_update.append(sign)
 
     Sign.objects.bulk_update(signs_to_update, ["order"])
+    logger.debug(
+        f"Sign {instance.id} is about to get deleted! Updated {len(signs_to_update)} signs to avoid gappy or missing order."
+    )
