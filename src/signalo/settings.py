@@ -45,9 +45,11 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_gis",
     "computedfields",
+    "debug_toolbar",
 ]
 
 MIDDLEWARE = [
+    "debug_toolbar.middleware.DebugToolbarMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -169,3 +171,11 @@ OAPIF_DESCRIPTION = "SIGNALO_ROADSIGNS_OAPIF"
 
 # Geometry's SRID. This can only be changed prior to initializing the database.
 GEOMETRY_SRID = int(os.environ.get("GEOMETRY_SRID", "2056"))
+
+INTERNAL_IPS = [
+    "127.0.0.1",  # so that Django toolbar is displayed to localhost
+]
+
+DEBUG_TOOLBAR_CONFIG = {
+    "SHOW_TOOLBAR_CALLBACK": lambda request: True,
+}
