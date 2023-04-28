@@ -53,6 +53,9 @@ jobs:
         # sprinkle some test data (refreshing computed fields is done from the command handler)
         docker compose exec django python manage.py init --data --users
 
+        # create flamegraph
+        docker compose exec django flameprof ./unit_test_outputs/results.prof > ./flamegraph.svg
+
     - name: Healthcheck
       run: wget --no-check-certificate https://localhost/oapif/collections/signalo_core.pole/items
 
@@ -65,6 +68,7 @@ jobs:
         name: emailable-report
         path: |
           ./_test_outputs/**/emailable-report.html
+          ./flamegraph.svg
 
     - name: Failure logs
       if: failure()

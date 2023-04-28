@@ -19,6 +19,8 @@ services:
     volumes:
       # mounting the source code for live reloading
       - ./src/:/usr/src/app
+      # mounting directory to hold unit tests outputs
+      - ./unit_tests_outputs/:/unit_tests_outputs
     ports:
       # making django directly accessible for debugging
       - 8000:8000
