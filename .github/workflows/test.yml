@@ -50,8 +50,9 @@ jobs:
         docker compose exec django python manage.py collectstatic --no-input
         docker compose exec django python manage.py migrate --no-input
 
-        # sprinkle some test data (refreshing computed fields is done from the command handler)
-        docker compose exec django python manage.py init --data --users
+        # run tests
+        docker compose exec django python manage.py test signalo.value_lists
+        docker compose exec django python manage.py test signalo.core
 
         # create flamegraph
         docker compose exec django flameprof ./unit_test_outputs/results.prof > ./flamegraph.svg

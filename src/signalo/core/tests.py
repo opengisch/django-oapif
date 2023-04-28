@@ -96,7 +96,6 @@ class TestValuesListSignsPoles(APITestCase):
         logger.info(f"Deleted {perc_10} signs; checking order density")
         self.test_dense_orders_signs()
 
-
 def serialize_poles(poles) -> cProfile.Profile:
     with cProfile.Profile() as profile:
         for pole in poles:
