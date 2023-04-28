@@ -23,8 +23,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 
-# SECURITY WARNING: don't run with debug turned on in production!
+# SECURITY WARNING: don't run with DEBUG turned on in production!
 DEBUG = True
+DEBUG_TOOLBAR_CONFIG = {
+    "SHOW_TOOLBAR_CALLBACK": lambda request: DEBUG,
+}
+
 
 ALLOWED_HOSTS = ["localhost", "django"]
 
@@ -175,7 +179,3 @@ GEOMETRY_SRID = int(os.environ.get("GEOMETRY_SRID", "2056"))
 INTERNAL_IPS = [
     "127.0.0.1",  # so that Django toolbar is displayed to localhost
 ]
-
-DEBUG_TOOLBAR_CONFIG = {
-    "SHOW_TOOLBAR_CALLBACK": lambda request: True,
-}
