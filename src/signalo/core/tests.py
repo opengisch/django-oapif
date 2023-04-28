@@ -51,13 +51,43 @@ class TestValuesListSignsPoles(APITestCase):
                     f"{pole} does not have a dense order: {order}"
                 )
 
-    def test_deletion_preserves_order_density(self):
-        signs = Sign.objects.all()
-        signs_count = signs.count()
-        perc_10 = round(10 / 100 * signs_count)
-        self.assertGreater(signs_count, perc_10)
-        for sig in islice(signs, perc_10):
-            sig.delete()
+    def test_deletion_preserves_order_density_first(self):
+        poles = Pole.objects.all()
+        perc_10 = round(10 / 100 * poles.count())
+        self.assertGreater(poles.count(), perc_10)
+
+        for pole in islice(poles, perc_10):
+            signs = Sign.objects.filter(azimuth__pole__id=pole.id, order=1)
+            for found in signs:
+                found.delete()
+
+        logger.info(f"Deleted {perc_10} signs; checking order density")
+        self.test_dense_orders_signs()
+
+    def test_deletion_preserves_order_density_second(self):
+        poles = Pole.objects.all()
+        perc_10 = round(10 / 100 * poles.count())
+        self.assertGreater(poles.count(), perc_10)
+
+        for pole in islice(poles, perc_10):
+            signs = Sign.objects.filter(azimuth__pole__id=pole.id, order=2)
+            for found in signs:
+                found.delete()
+
+        logger.info(f"Deleted {perc_10} signs; checking order density")
+        self.test_dense_orders_signs()
+
+    def test_deletion_preserves_order_density_last(self):
+        poles = Pole.objects.all()
+        perc_10 = round(10 / 100 * poles.count())
+        self.assertGreater(poles.count(), perc_10)
+
+        for pole in islice(poles, perc_10):
+            signs_on_pole = Sign.objects.filter(azimuth__pole__id=pole.id)
+            last = signs_on_pole.count()
+            signs = signs_on_pole.filter(order=last)
+            for sign in signs:
+                sign.delete()
 
         logger.info(f"Deleted {perc_10} signs; checking order density")
         self.test_dense_orders_signs()
