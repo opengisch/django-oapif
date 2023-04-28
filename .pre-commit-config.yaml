@@ -31,6 +31,7 @@ repos:
     rev: 23.3.0
     hooks:
       - id: black
+        exclude: migrations/
 
   # Lint files
   # - repo: https://gitlab.com/pycqa/flake8

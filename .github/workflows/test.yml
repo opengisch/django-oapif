@@ -50,7 +50,7 @@ jobs:
         docker compose exec django python manage.py collectstatic --no-input
         docker compose exec django python manage.py migrate --no-input
 
-        # unit tests
+        # run tests
         docker compose exec django python manage.py test signalo.value_lists
         docker compose exec django python manage.py test signalo.edge_cases
 
