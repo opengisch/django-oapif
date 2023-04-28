@@ -2,7 +2,7 @@ import cProfile
 import logging
 import os
 from itertools import islice
-from typing import Iterable, Tuple
+from typing import Callable, Iterable, Tuple
 
 from django.core.management import call_command
 from rest_framework.test import APITestCase
@@ -97,11 +97,13 @@ class TestValuesListSignsPoles(APITestCase):
         self.test_dense_orders_signs()
 
 
-def serialize_poles(poles) -> cProfile.Profile:
+def serialize_with_profile(
+    objects, serializer: Callable
+) -> Tuple[cProfile.Profile, str]:
     with cProfile.Profile() as profile:
-        for pole in poles:
-            _ = PoleSerializer(pole).data
-    return profile
+        for object in objects:
+            _ = serializer(object).data
+    return profile, serializer.__name__
 
 
 class SpeedTestSerialization(APITestCase):
@@ -110,12 +112,16 @@ class SpeedTestSerialization(APITestCase):
         call_command("populate_vl")
         call_command("populate_data", magnitude=50)
         cls.poles = Pole.objects.all()
+        cls.path = os.path.abspath("/unit_tests_outputs")
         super().setUpClass(*args, **kwargs)
 
     def test_data(self):
         self.assertEqual(self.poles.count(), 2500)
 
-    def test_with_flamegraph(self):
-        profile = serialize_poles(self.poles)
-        _path = os.path.join(os.path.abspath("/unit_tests_outputs"), "results.prof")
-        profile.dump_stats(_path)
+    def test_with_poleserializer(self):
+        profile, name = serialize_with_profile(self.poles, PoleSerializer)
+        path = os.path.join(
+            self.path,
+            f"{name}.prof",
+        )
+        profile.dump_stats(path)
