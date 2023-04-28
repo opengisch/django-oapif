@@ -70,19 +70,13 @@ class Sign(ComputedFieldsModel):
         sum of all other signs
         """
         if self.order is None:
-            signs = Sign.objects.all()
-            azimuths = Azimuth.objects.all()
-
-            for pole in Pole.objects.all():
-                azimuths_ids_on_pole = azimuths.filter(pole=pole).values_list("pk")
-                signs_on_pole = signs.filter(azimuth__id__in=azimuths_ids_on_pole)
-                other_signs_on_pole = signs_on_pole.exclude(id=self.id)
-                self.order = (
-                    other_signs_on_pole.filter(
-                        azimuth__value=self.azimuth.value
-                    ).count()
-                    + 1
-                )
+            pole_id = self.azimuth.pole.id
+            signs_on_pole = Sign.objects.filter(azimuth__pole__id=pole_id)
+            other_signs_on_pole = signs_on_pole.exclude(id=self.id)
+            self.order = (
+                other_signs_on_pole.filter(azimuth__value=self.azimuth.value).count()
+                + 1
+            )
 
         super().save(*args, **kwargs)
 
@@ -107,23 +101,15 @@ def ensure_sign_order_on_delete(sender, instance, *args, **kwargs):
     """
     Ensure dense ranking of sign orders despite deletions on same pole
     """
-    signs_to_update = []
-    for pole in Pole.objects.all():
-        azimuths_ids_on_pole = Azimuth.objects.filter(pole=pole).values_list("id")
-        signs_on_pole = Sign.objects.filter(azimuth__id__in=azimuths_ids_on_pole)
-        using_azimuth = list(
-            signs_on_pole.filter(azimuth__value=instance.azimuth.value).values_list(
-                "id", flat=True
-            )
-        )
+    pole_id = instance.azimuth.pole.id
+    signs_on_pole = Sign.objects.filter(azimuth__pole__id=pole_id)
 
-        if not using_azimuth:
-            continue
-        for new_order, sign in enumerate(
-            signs_on_pole.exclude(id=instance.id).order_by("order"), 1
-        ):
-            sign.order = new_order
-            signs_to_update.append(sign)
+    signs_to_update = []
+    for new_order, sign in enumerate(
+        signs_on_pole.exclude(id=instance.id).order_by("order"), 1
+    ):
+        sign.order = new_order
+        signs_to_update.append(sign)
 
     Sign.objects.bulk_update(signs_to_update, ["order"])
     logger.debug(
