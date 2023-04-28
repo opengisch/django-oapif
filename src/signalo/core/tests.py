@@ -96,6 +96,7 @@ class TestValuesListSignsPoles(APITestCase):
         logger.info(f"Deleted {perc_10} signs; checking order density")
         self.test_dense_orders_signs()
 
+
 def serialize_poles(poles) -> cProfile.Profile:
     with cProfile.Profile() as profile:
         for pole in poles:
@@ -116,5 +117,5 @@ class SpeedTestSerialization(APITestCase):
 
     def test_with_flamegraph(self):
         profile = serialize_poles(self.poles)
-        _path = os.path.join(os.path.abspath("/unit_test_outputs"), "results.prof")
+        _path = os.path.join(os.path.abspath("/unit_tests_outputs"), "results.prof")
         profile.dump_stats(_path)
