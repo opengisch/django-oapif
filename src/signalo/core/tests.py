@@ -1,6 +1,7 @@
 import cProfile
 import logging
 import os
+import pstats
 from itertools import islice
 from typing import Callable, Iterable, Tuple
 
@@ -120,8 +121,11 @@ class SpeedTestSerialization(APITestCase):
 
     def test_with_poleserializer(self):
         profile, name = serialize_with_profile(self.poles, PoleSerializer)
-        path = os.path.join(
+        path_to_bin = os.path.join(
             self.path,
             f"{name}.prof",
         )
-        profile.dump_stats(path)
+        profile.dump_stats(path_to_bin)
+        with open(os.path.join(self.path, f"{name}.txt"), "w") as fh:
+            stats = pstats.Stats(path_to_bin, stream=fh)
+            stats.print_stats()
