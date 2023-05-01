@@ -110,13 +110,13 @@ class SpeedTestSerialization(APITestCase):
     @classmethod
     def setUpClass(cls, *args, **kwargs):
         call_command("populate_vl")
-        call_command("populate_data", magnitude=50)
+        call_command("populate_data", magnitude=100)
         cls.poles = Pole.objects.all()
         cls.path = os.path.abspath("/unit_tests_outputs")
         super().setUpClass(*args, **kwargs)
 
     def test_data(self):
-        self.assertEqual(self.poles.count(), 2500)
+        self.assertEqual(self.poles.count(), 10000)
 
     def test_with_poleserializer(self):
         profile, name = serialize_with_profile(self.poles, PoleSerializer)
