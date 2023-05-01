@@ -24,4 +24,9 @@ jobs:
           key: ${{ secrets.KEY }}
           script: |
             cd /home/ubuntu/django-ogcapif
-            ./startup.sh
+            docker-compose pull
+            docker-compose up -d --build --force-recreate
+            docker-compose exec django python manage.py migrate --no-input
+            docker-compose exec django python manage.py collectstatic --no-input
+            docker-compose exec django python manage.py populate_vl
+            docker-compose exec django python manage.py populate_signs_poles --magnitude=100
