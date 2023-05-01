@@ -1,12 +1,11 @@
-name: Test
+name: Conformance
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+  workflow_run:
+    workflows: ["Test"]
+    branches: [main]
+    types:
+      - completed
 
 jobs:
   test-quickstart:
@@ -52,9 +51,18 @@ jobs:
         docker compose exec django python manage.py collectstatic --no-input
         docker compose exec django python manage.py migrate --no-input
 
-        # run tests
-        docker compose exec django python manage.py test signalo.value_lists
-        docker compose exec django python manage.py test signalo.core
+    - name: Healthcheck
+      run: wget --no-check-certificate https://localhost/oapif/collections/signalo_core.pole/items
+
+    - name: Run conformance test suite
+      run: docker compose run conformance_test
+
+    - name: Archive production artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: emailable-report
+        path: |
+          ./_test_outputs/**/emailable-report.html
 
     - name: Failure logs
       if: failure()
