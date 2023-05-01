@@ -5,7 +5,7 @@ from computedfields.models import ComputedFieldsModel, computed
 from django.conf import settings
 from django.contrib.gis.db import models
 from django.db import transaction
-from django.db.models import signals
+from django.db.models import Sum, signals
 from django.dispatch import receiver
 from django.utils.translation import gettext as _
 
@@ -93,6 +93,27 @@ class Sign(ComputedFieldsModel):
     )
     def geom(self):
         return self.azimuth.geom
+
+    @computed(
+        models.IntegerField(default=0),
+        depends=[
+            ("self", ["azimuth"]),
+            ("sign_type", ["img_height", "img_width"]),
+        ],
+    )
+    def offset(self) -> int:
+        previous_signs_on_pole = Sign.objects.filter(
+            azimuth__pole__id=self.azimuth.pole.id, order__lte=self.order
+        )
+        default_padding = 2
+        sum_heights = previous_signs_on_pole.aggregate(
+            height=Sum("sign_type__img_height")
+        )["height"]
+        return (
+            previous_signs_on_pole.count() * default_padding
+            + default_padding
+            + sum_heights
+        )
 
 
 @receiver(signals.pre_delete, sender=Sign)
