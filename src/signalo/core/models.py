@@ -92,7 +92,7 @@ class Sign(ComputedFieldsModel):
         ],
     )
     def geom(self):
-        return self.geom
+        return self.azimuth.geom
 
 
 @receiver(signals.pre_delete, sender=Sign)
