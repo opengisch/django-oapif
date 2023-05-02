@@ -25,6 +25,7 @@ class OAPIFDescribeModelViewSetMixin:
             raise Exception(f"Did not find {self} in {oapif_router.registry}")
 
         # retrieve oapif config defined on the viewset
+        # distinguishing between geometric and non-geometric models
         geom_lookup = getattr(self, "oapif_geom_lookup", "geom")
         title = getattr(self, "oapif_title", f"Layer {key}")
         description = getattr(self, "oapif_description", "No description")

@@ -33,7 +33,12 @@ def register_oapif_viewset(
         custom_viewset_attrs = {}
 
     def inner(Model):
-        # Create the serializer
+        """
+        Create the serializers
+        1 for viewsets for models with a geometry and
+        1 for viewsets for models without (aka 'non-geometric features').
+        """
+
         class AutoSerializer(GeoFeatureModelSerializer):
             class Meta:
                 model = Model
@@ -46,9 +51,7 @@ def register_oapif_viewset(
                 fields = "__all__"
 
         viewset_serializer_class, viewset_oapif_geom_lookup = (
-            AutoSerializer,
-            "geom" if not skip_geom else AutoNonGeomSerializer,
-            None,
+            (AutoSerializer, "geom") if not skip_geom else (AutoNonGeomSerializer, None)
         )
 
         # Create the viewset
@@ -59,6 +62,7 @@ def register_oapif_viewset(
             # TODO: these should probably be moved to the mixin
             oapif_title = Model._meta.verbose_name
             oapif_description = Model.__doc__
+
             # (one day this will be retrieved automatically from the serializer)
             oapif_geom_lookup = viewset_oapif_geom_lookup
             filter_backends = [BboxFilterBackend]
@@ -67,7 +71,8 @@ def register_oapif_viewset(
         if viewset_serializer_class.__name__ == "AutoNonGeomSerializer":
             for k, v in custom_serializer_attrs.items():
                 setattr(AutoNonGeomSerializer.Meta, k, v)
-        else:
+
+        elif viewset_serializer_class.__name__ == "AutoSerializer":
             for k, v in custom_serializer_attrs.items():
                 setattr(AutoSerializer.Meta, k, v)
 
