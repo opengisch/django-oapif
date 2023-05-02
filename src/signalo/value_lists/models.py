@@ -3,6 +3,8 @@ import os
 from django.core.files.storage import FileSystemStorage
 from django.db import models
 
+from django_oapif.decorators import register_oapif_viewset
+
 path_to_sign = os.path.abspath("/media_volume/official_signs")
 
 
@@ -16,6 +18,7 @@ class SignsFileSystemStorage(FileSystemStorage):
 fs = SignsFileSystemStorage(location=path_to_sign)
 
 
+@register_oapif_viewset(skip_geom=True)
 class OfficialSignType(models.Model):
     id = models.CharField(primary_key=True, max_length=10)
     active = models.BooleanField(default=True)

@@ -2,6 +2,7 @@ from typing import Any, Callable, Dict, Optional
 
 from django.db.models import Model
 from rest_framework import viewsets
+from rest_framework.serializers import ModelSerializer
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from django_oapif.mixins import OAPIFDescribeModelViewSetMixin
@@ -12,6 +13,7 @@ from .filters import BboxFilterBackend
 
 def register_oapif_viewset(
     key: Optional[str] = None,
+    skip_geom: Optional[bool] = False,
     custom_serializer_attrs: Dict[str, Any] = None,
     custom_viewset_attrs: Dict[str, Any] = None,
 ) -> Callable[[Any], Model]:
@@ -38,20 +40,36 @@ def register_oapif_viewset(
                 fields = "__all__"
                 geo_field = "geom"
 
+        class AutoNonGeomSerializer(ModelSerializer):
+            class Meta:
+                mode = Model
+                fields = "__all__"
+
+        viewset_serializer_class, viewset_oapif_geom_lookup = (
+            AutoSerializer,
+            "geom" if not skip_geom else AutoNonGeomSerializer,
+            None,
+        )
+
         # Create the viewset
         class Viewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
             queryset = Model.objects.all()
-            serializer_class = AutoSerializer
+            serializer_class = viewset_serializer_class
 
             # TODO: these should probably be moved to the mixin
             oapif_title = Model._meta.verbose_name
             oapif_description = Model.__doc__
-            oapif_geom_lookup = "geom"  # (one day this will be retrieved automatically from the serializer)
+            # (one day this will be retrieved automatically from the serializer)
+            oapif_geom_lookup = viewset_oapif_geom_lookup
             filter_backends = [BboxFilterBackend]
 
         # Apply custom serializer attributes
-        for k, v in custom_serializer_attrs.items():
-            setattr(AutoSerializer.Meta, k, v)
+        if viewset_serializer_class.__name__ == "AutoNonGeomSerializer":
+            for k, v in custom_serializer_attrs.items():
+                setattr(AutoNonGeomSerializer.Meta, k, v)
+        else:
+            for k, v in custom_serializer_attrs.items():
+                setattr(AutoSerializer.Meta, k, v)
 
         # Apply custom viewset attributes
         for k, v in custom_viewset_attrs.items():

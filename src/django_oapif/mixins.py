@@ -1,3 +1,5 @@
+import os
+
 import pyproj
 from django.contrib.gis.db.models import Extent
 from rest_framework.response import Response
@@ -26,8 +28,14 @@ class OAPIFDescribeModelViewSetMixin:
         geom_lookup = getattr(self, "oapif_geom_lookup", "geom")
         title = getattr(self, "oapif_title", f"Layer {key}")
         description = getattr(self, "oapif_description", "No description")
-        srid = self.get_queryset().model._meta.get_field(geom_lookup).srid
-        extents = self.get_queryset().aggregate(e=Extent(geom_lookup))["e"]
+        meta_model = self.get_queryset().model._meta
+        extents = None
+
+        if geom_lookup:
+            srid = meta_model.get_field(geom_lookup).srid
+            extents = self.get_queryset().aggregate(e=Extent(geom_lookup))["e"]
+        else:
+            srid = os.getenv("GEOMETRY_SRID")
 
         if not extents:
             extents = pyproj.CRS(srid).area_of_use.bounds
