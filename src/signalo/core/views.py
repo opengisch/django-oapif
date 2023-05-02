@@ -46,16 +46,15 @@ class PoleViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
             if user_crs:
                 try:
                     crs_epsg = int(user_crs)
-                    user_crs = CRS.from_epsg(crs_epsg)
-                    api_crs = CRS.from_epsg(int(getenv("GEOMETRY_SRID", "2056")))
-                    transformer = Transformer.from_crs(user_crs, api_crs)
-                    transformed_coords = transformer.transform(coords)
-                    my_bbox_polygon = Polygon.from_bbox(transformed_coords)
-
                 except ValueError:
                     return HttpResponseBadRequest(
                         "This API supports only EPSG-specified CRS. Make sure to use the appropriate value for the `bbox-crs`query parameter."
                     )
+                user_crs = CRS.from_epsg(crs_epsg)
+                api_crs = CRS.from_epsg(int(getenv("GEOMETRY_SRID", "2056")))
+                transformer = Transformer.from_crs(user_crs, api_crs)
+                transformed_coords = transformer.transform(coords)
+                my_bbox_polygon = Polygon.from_bbox(transformed_coords)
 
             else:
                 my_bbox_polygon = Polygon.from_bbox(coords)
