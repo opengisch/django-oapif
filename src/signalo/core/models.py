@@ -102,13 +102,16 @@ class Sign(ComputedFieldsModel):
         ],
     )
     def offset_px(self) -> int:
-        previous_signs_on_pole = Sign.objects.filter(
-            azimuth__pole__id=self.azimuth.pole.id, order__lte=self.order
-        )
         default_padding_px = 5
-        sum_heights = previous_signs_on_pole.aggregate(
-            height=Sum("sign_type__img_height")
-        )["height"]
+        previous_signs_on_pole = Sign.objects.filter(
+            azimuth__pole__id=self.azimuth.pole.id, order__lt=self.order
+        )
+        sum_heights = (
+            previous_signs_on_pole.aggregate(height=Sum("sign_type__img_height"))[
+                "height"
+            ]
+            or 0
+        )
         return (
             previous_signs_on_pole.count() * default_padding_px
             + default_padding_px
