@@ -20,13 +20,13 @@ jobs:
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
+          username: ${{ secrets.USER }}
           key: ${{ secrets.KEY }}
           script: |
             cd /home/ubuntu/django-ogcapif
-            docker-compose pull
+            git pull -f
             docker-compose up -d --build --force-recreate
             docker-compose exec django python manage.py migrate --no-input
             docker-compose exec django python manage.py collectstatic --no-input
             docker-compose exec django python manage.py populate_vl
-            docker-compose exec django python manage.py populate_signs_poles --magnitude=100
+            docker-compose exec django python manage.py populate_signs_poles
