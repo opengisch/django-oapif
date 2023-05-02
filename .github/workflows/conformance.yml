@@ -1,11 +1,12 @@
 name: Conformance
 
 on:
-  workflow_run:
-    workflows: ["Test"]
-    branches: [main]
-    types:
-      - completed
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   test-quickstart:
