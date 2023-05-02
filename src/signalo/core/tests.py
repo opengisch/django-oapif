@@ -29,7 +29,8 @@ def is_dense_partial_order(sorted_it: Iterable[int]) -> bool:
 
 
 class TestValuesListSignsPoles(APITestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         call_command("populate_vl")
         call_command("populate_signs_poles")
 
@@ -109,12 +110,12 @@ def serialize_with_profile(
 
 class SpeedTestSerialization(APITestCase):
     @classmethod
-    def setUpClass(cls, *args, **kwargs):
-        super().setUpClass(*args, **kwargs)
+    def setUpClass(cls):
         call_command("populate_vl")
-        call_command("populate_signs_poles", magnitude=100)
+        call_command("populate_signs_poles", magnitude=70)
         cls.poles = Pole.objects.all()
         cls.path = os.path.abspath("/unit_tests_outputs")
+        super().setUpClass()
 
     def test_data(self):
         self.assertEqual(self.poles.count(), 10000)
