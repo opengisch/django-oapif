@@ -1,9 +1,14 @@
+import cProfile
 import logging
+import os
+import pstats
 from itertools import islice
-from typing import Iterable, Tuple
+from typing import Callable, Iterable, Tuple
 
 from django.core.management import call_command
 from rest_framework.test import APITestCase
+
+from signalo.core.views import PoleSerializer
 
 from .models import Azimuth, Pole, Sign
 
@@ -91,3 +96,36 @@ class TestValuesListSignsPoles(APITestCase):
 
         logger.info(f"Deleted {perc_10} signs; checking order density")
         self.test_dense_orders_signs()
+
+
+def serialize_with_profile(
+    objects, serializer: Callable
+) -> Tuple[cProfile.Profile, str]:
+    with cProfile.Profile() as profile:
+        for object in objects:
+            _ = serializer(object).data
+    return profile, serializer.__name__
+
+
+class SpeedTestSerialization(APITestCase):
+    @classmethod
+    def setUpClass(cls, *args, **kwargs):
+        super().setUpClass(*args, **kwargs)
+        call_command("populate_vl")
+        call_command("populate_data", magnitude=100)
+        cls.poles = Pole.objects.all()
+        cls.path = os.path.abspath("/unit_tests_outputs")
+
+    def test_data(self):
+        self.assertEqual(self.poles.count(), 10000)
+
+    def test_with_poleserializer(self):
+        profile, name = serialize_with_profile(self.poles, PoleSerializer)
+        path_to_bin = os.path.join(
+            self.path,
+            f"{name}.prof",
+        )
+        profile.dump_stats(path_to_bin)
+        with open(os.path.join(self.path, f"{name}.txt"), "w") as fh:
+            stats = pstats.Stats(path_to_bin, stream=fh)
+            stats.print_stats()

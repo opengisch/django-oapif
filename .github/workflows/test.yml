@@ -54,6 +54,15 @@ jobs:
         docker compose exec django python manage.py test signalo.value_lists
         docker compose exec django python manage.py test signalo.core
 
+        # create flamegraphs
+        profiles=$(ls ./unit_tests_outputs)
+        parent=/unit_tests_outputs
+        for file in "$profiles"; do
+            short_name=${file%%.*}
+            docker compose exec django bash -c "flameprof ${parent}/${short_name}.prof > ${parent}/${short_name}.svg"
+            docker compose exec django bash -c "gprof2dot -f pstats ${parent}/${short_name}.prof | dot -Tpng -o ${parent}/${short_name}.png"
+        done
+
     - name: Healthcheck
       run: wget --no-check-certificate https://localhost/oapif/collections/signalo_core.pole/items
 
@@ -63,9 +72,10 @@ jobs:
     - name: Archive production artifacts
       uses: actions/upload-artifact@v3
       with:
-        name: emailable-report
+        name: Test outputs
         path: |
           ./_test_outputs/**/emailable-report.html
+          ./unit_tests_outputs/*
 
     - name: Failure logs
       if: failure()
