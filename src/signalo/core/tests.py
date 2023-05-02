@@ -112,7 +112,7 @@ class SpeedTestSerialization(APITestCase):
     def setUpClass(cls, *args, **kwargs):
         super().setUpClass(*args, **kwargs)
         call_command("populate_vl")
-        call_command("populate_data", magnitude=100)
+        call_command("populate_signs_poles", magnitude=100)
         cls.poles = Pole.objects.all()
         cls.path = os.path.abspath("/unit_tests_outputs")
 
