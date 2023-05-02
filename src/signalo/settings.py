@@ -30,7 +30,7 @@ DEBUG_TOOLBAR_CONFIG = {
 }
 
 
-ALLOWED_HOSTS = ["localhost", "django"]
+ALLOWED_HOSTS = ["localhost", "django", os.getenv("OGCAPIF_HOST", "")]
 
 
 # Application definition
