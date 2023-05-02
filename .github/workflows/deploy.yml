@@ -24,9 +24,9 @@ jobs:
           key: ${{ secrets.KEY }}
           script: |
             cd /home/ubuntu/django-ogcapif
+            docker-compose down -v --remove-orphans
             git checkout main && git pull -f
             docker-compose up -d --build --force-recreate
-            docker-compose exec django python manage.py flush --no-input 
             docker-compose exec django python manage.py migrate --no-input
             docker-compose exec django python manage.py collectstatic --no-input
             docker-compose exec django python manage.py populate_vl
