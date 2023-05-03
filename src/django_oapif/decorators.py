@@ -51,11 +51,11 @@ def register_oapif_viewset(
                 fields = "__all__"
 
         if skip_geom:
-            viewset_serializer_class = AutoNonGeomSerializer
+            viewset_serializer_class = AutoNoGeomSerializer
             viewset_oapif_geom_lookup = None
         else:
             viewset_serializer_class = AutoSerializer
-            viewset_oapif_geom_lookup = "geom" # one day this will be retrieved automatically from the serializer
+            viewset_oapif_geom_lookup = "geom"  # one day this will be retrieved automatically from the serializer
 
         # Create the viewset
         class Viewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
