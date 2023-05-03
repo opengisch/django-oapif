@@ -1,0 +1,2 @@
+setuptools_rust
+pip

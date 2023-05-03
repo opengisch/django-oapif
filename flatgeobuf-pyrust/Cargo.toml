@@ -1,0 +1,16 @@
+[package]
+name = "flatgeobuf-pyrust"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "flatgeobuf_pyrust"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { git = "https://github.com/pyo3/pyo3", features = ["extension-module"] }
+flatgeobuf = "3.25.0"
+geozero = "0.9.9"
+
+[profile.release]
+lto = true

@@ -1,0 +1,47 @@
+name: Test Rust lib
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-rust-lib:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: dtolnay/rust-toolchain@1.69.0
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Dev build + tests
+        run: |
+          python -m venv .env
+          source .env/bin/activate
+          pip install maturin
+          cd flatgeobuf-pyrust
+          maturin develop
+          cd tests
+          python -m unittest
+
+      - name: Archive production artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: flatgeobuf_test_output
+          path: ./flatgeobuf-pyrust/decoded.json
+
+      - name: Publish to PyPI
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+        env:
+          TWINE_USERNAME: "__token__"
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+        run: |
+          cd flatgeobuf-pyrust
+          maturing build --release
+          twine upload ./dist/* --verbose
