@@ -47,7 +47,7 @@ def register_oapif_viewset(
 
         class AutoNoGeomSerializer(ModelSerializer):
             class Meta:
-                mode = Model
+                model = Model
                 fields = "__all__"
 
         if skip_geom:
