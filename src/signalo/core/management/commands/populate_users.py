@@ -29,8 +29,10 @@ class Command(BaseCommand):
         editors.permissions.set(editing)
         viewers.permissions.set(viewing)
 
-        an_editor, _ = User.objects.get_or_create(username="demo_editor")
-        a_viewer, _ = User.objects.get_or_create(username="demo_viewer")
+        an_editor, _ = User.objects.get_or_create(
+            username="demo_editor", password="123"
+        )
+        a_viewer, _ = User.objects.get_or_create(username="demo_viewer", password="123")
 
         a_viewer.save()
         an_editor.save()
