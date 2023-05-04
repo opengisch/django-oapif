@@ -41,16 +41,18 @@ class Command(BaseCommand):
 
         # Create data for HighlyPaginated
         for i in range(100):
-            HighlyPaginated.objects.create(geom=f"Point({x+i*step} {y})")
+            HighlyPaginated.objects.create(geom=f"Point({x+i*step} {y+i*step})")
 
-        # Create data for DifferentSrid
-        DifferentSrid.objects.create(geom=f"Point(2600000 1200000)")
+            # Create data for DifferentSrid
+            DifferentSrid.objects.create(geom=f"Point({x+i*step} {y+i*step})")
 
-        # Create data for models whose permissions we are testing against
-        TestPermissionAllowAny.objects.create(geom=f"Point(2600000 1200000)")
-        TestPermissionDefaultPermissionsSettings.objects.create(
-            geom=f"Point(2600000 1200000)"
-        )
-        TestPermissionIsAdminUserModel.objects.create(geom=f"Point(2600000 1200000)")
+            # Create data for models whose permissions we are testing against
+            TestPermissionAllowAny.objects.create(geom=f"Point({x+i*step} {y+i*step})")
+            TestPermissionDefaultPermissionsSettings.objects.create(
+                geom=f"Point({x+i*step} {y+i*step})"
+            )
+            TestPermissionIsAdminUserModel.objects.create(
+                geom=f"Point({x+i*step} {y+i*step})"
+            )
 
         print(f"🐻 Edge cases test data added too!")

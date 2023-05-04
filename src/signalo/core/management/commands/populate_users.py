@@ -33,9 +33,13 @@ class Command(BaseCommand):
             username="demo_editor", password="123"
         )
         a_viewer, _ = User.objects.get_or_create(username="demo_viewer", password="123")
+        a_super_user = User.objects.create_superuser(
+            username="admin", password="123", is_staff=True
+        )
 
         a_viewer.save()
         an_editor.save()
+        a_super_user.save()
 
         an_editor.groups.add(editors)
         a_viewer.groups.add(viewers)
