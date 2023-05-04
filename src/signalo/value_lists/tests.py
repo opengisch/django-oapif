@@ -4,7 +4,7 @@ from json import load
 from typing import Dict, List, Set, Union
 
 from django.core.management import call_command
-from django.test import TestCase
+from rest_framework.test import APITestCase
 
 
 def get_unique_file_names(rows: Union[List[Dict], List[str]]) -> Set[str]:
@@ -20,7 +20,7 @@ def get_unique_file_names(rows: Union[List[Dict], List[str]]) -> Set[str]:
     return names
 
 
-class TestOfficialSigns(TestCase):
+class TestOfficialSigns(APITestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -53,3 +53,15 @@ class TestOfficialSigns(TestCase):
         self.assertEqual(
             self.unique_official_names, set(os.listdir(self.path_to_signs_images))
         )
+
+    def test_official_signs_collection(self):
+        response = self.client.get("/oapif/collections/signalo_vl.officialsigntype")
+        self.assertEqual(response.status_code, 200)
+        self.assertGreater(len(response.json()), 0)
+
+    def test_official_signs_items(self):
+        response = self.client.get(
+            "/oapif/collections/signalo_vl.officialsigntype/items"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertGreater(len(response.json()), 0)

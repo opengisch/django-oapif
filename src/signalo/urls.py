@@ -22,4 +22,5 @@ urlpatterns = [
     path("signalo_core/", include("signalo.core.urls")),
     path("admin/", admin.site.urls),
     path("oapif/", include(oapif_router.urls)),  # Django-rest urls
+    path("__debug__/", include("debug_toolbar.urls")),  # Debug toolbar
 ]

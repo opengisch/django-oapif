@@ -23,10 +23,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 
-# SECURITY WARNING: don't run with debug turned on in production!
+# SECURITY WARNING: don't run with DEBUG turned on in production!
 DEBUG = True
+DEBUG_TOOLBAR_CONFIG = {
+    "SHOW_TOOLBAR_CALLBACK": lambda request: DEBUG,
+}
 
-ALLOWED_HOSTS = ["localhost", "django"]
+
+ALLOWED_HOSTS = ["localhost", "django", os.getenv("OGCAPIF_HOST", "")]
 
 
 # Application definition
@@ -45,9 +49,11 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_gis",
     "computedfields",
+    "debug_toolbar",
 ]
 
 MIDDLEWARE = [
+    "debug_toolbar.middleware.DebugToolbarMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -172,3 +178,7 @@ OAPIF_DESCRIPTION = "SIGNALO_ROADSIGNS_OAPIF"
 
 # Geometry's SRID. This can only be changed prior to initializing the database.
 GEOMETRY_SRID = int(os.environ.get("GEOMETRY_SRID", "2056"))
+
+INTERNAL_IPS = [
+    "127.0.0.1",  # so that Django toolbar is displayed to localhost
+]

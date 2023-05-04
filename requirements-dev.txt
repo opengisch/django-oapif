@@ -1,2 +1,5 @@
 pre-commit
 debugpy
+django-debug-toolbar
+flameprof
+gprof2dot

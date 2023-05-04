@@ -1,6 +1,6 @@
+from django.core.management import BaseCommand
 from django.db import transaction
 
-from ....core.management.commands.init import BaseCommand
 from ...models import (
     DifferentSrid,
     HighlyPaginated,
@@ -10,6 +10,7 @@ from ...models import (
     TestPermissionIsAdminUserModel,
     VariousGeom,
 )
+from ...models import DifferentSrid, HighlyPaginated, SimpleGeom, VariousGeom
 
 
 class Command(BaseCommand):
