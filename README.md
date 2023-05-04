@@ -7,7 +7,7 @@
 
 ## Quickstart
 
-```
+```bash
 # copy default conf
 cp .env.example .env
 
@@ -24,6 +24,32 @@ docker compose exec django python manage.py populate_signs_poles
 docker compose exec django python manage.py populate_edge_cases
 
 # Wait a little, then check that https://localhost/oapif/collections/signalo_core.pole/items works from your browser
+```
+
+## Tests
+
+To run all tests, launch the Compose application as shown in the [Quickstart](#quickstart). Then run
+
+    docker compose exec django python manage.py test
+
+## Authentication & permissions
+
+By default the viewsets under `signalo/core` use the `DjangoModelPermissionsOrAnonReadOnly` permissions class. You can add model permissions when registering their corresponding viewsets, as `permission_classes`. (Refer to https://www.django-rest-framework.org/api-guide/permissions/#api-reference for permission classes). Example:
+
+```python
+# models.py
+# ----------
+from rest_framework import permissions
+from django.contrib.gis.db import models
+from django_oapif.decorators import register_oapif_viewset
+
+@register_oapif_viewset(
+    custom_viewset_attrs={
+        "permission_classes": (permissions.DjangoModelPermissionsOrAnonReadOnly,)
+    }
+)
+class MyModel(models.Model):
+    ...
 ```
 
 ## Use from QGIS

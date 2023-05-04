@@ -147,12 +147,15 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Django REST Framework
 REST_FRAMEWORK = {
-    # "DEFAULT_AUTHENTICATION_CLASSES": (
-    # "oauth2_provider.contrib.rest_framework.OAuth2Authentication",
-    # "rest_framework.authentication.SessionAuthentication",
-    # "geocity.auth.InternalTokenAuthentication",
-    # ),
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        # "oauth2_provider.contrib.rest_framework.OAuth2Authentication",
+        "rest_framework.authentication.SessionAuthentication",
+        # "geocity.auth.InternalTokenAuthentication",
+    ),
     "DEFAULT_PAGINATION_CLASS": "django_oapif.pagination.OapifPagination",
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly",
+    ),
     # "DEFAULT_THROTTLE_CLASSES": [
     #     "rest_framework.throttling.ScopedRateThrottle",
     # ],
@@ -167,7 +170,7 @@ REST_FRAMEWORK = {
     #     "search": os.getenv("DRF_THROTTLE_RATE_SEARCH_API"),
     # },
     # TODO: remove in favor of whatever ends up in https://github.com/opengisch/signalo-oapif/pull/29
-    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.AllowAny",),
+    # "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.AllowAny",),
 }
 
 OAPIF_TITLE = "SIGNALO_ROADSIGNS_OAPIF"

@@ -40,7 +40,7 @@ jobs:
         cache-to: type=registry,ref=opengisch/signalo-django:latest,mode=max
         tags: opengisch/signalo-django:latest
 
-    - name: Do quickstart
+    - name: Setup Compose & run all tests
       run: |
         # copy default conf
         cp .env.example .env

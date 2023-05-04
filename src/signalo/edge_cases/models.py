@@ -1,6 +1,7 @@
 import uuid
 
 from django.contrib.gis.db import models
+from rest_framework import permissions
 
 from django_oapif.decorators import register_oapif_viewset
 
@@ -32,7 +33,7 @@ class EmptyTableGeom(models.Model):
 
 
 @register_oapif_viewset(
-    custom_serializer_attrs={"pagination_class": HighlyPaginatedPagination}
+    custom_viewset_attrs={"pagination_class": HighlyPaginatedPagination}
 )
 class HighlyPaginated(models.Model):
     """The viewset of this model has very short pages (3 items or so), so we can test the impact of pagination on components like the attribute table."""
@@ -46,4 +47,32 @@ class DifferentSrid(models.Model):
     """This model uses a different SRID from the others, allowing to check that this is properly managed by QGIS."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    geom = models.PointField(srid=2056)
+    geom = models.PointField(srid=2154)
+
+
+@register_oapif_viewset(
+    custom_viewset_attrs={"permission_classes": (permissions.AllowAny,)}
+)
+class TestPermissionAllowAny(models.Model):
+    """This model exemplifies the most permissive permission class (AllowAny)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    geom = models.PointField()
+
+
+@register_oapif_viewset()
+class TestPermissionDefaultPermissionsSettings(models.Model):
+    """This model exemplifies the 'DefaultPermissionsSettings' class."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    geom = models.PointField()
+
+
+@register_oapif_viewset(
+    custom_viewset_attrs={"permission_classes": (permissions.IsAdminUser,)}
+)
+class TestPermissionIsAdminUserModel(models.Model):
+    """This model exemplifies the 'IsAdminUserModel' class."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    geom = models.PointField()

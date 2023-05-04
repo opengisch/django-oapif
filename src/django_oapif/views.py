@@ -1,5 +1,5 @@
 from django.urls import NoReverseMatch
-from rest_framework import permissions, routers, views
+from rest_framework import exceptions, permissions, routers, views
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 
@@ -12,6 +12,7 @@ class RootView(views.APIView):
 
     title = None
     description = None
+    permission_classes = (permissions.AllowAny,)
 
     def get(self, request, *args, **kwargs):
         return Response(
@@ -86,6 +87,7 @@ class CollectionsView(routers.APIRootView):
 
     schema = None  # exclude from schema
     registry = None
+    permission_classes = (permissions.AllowAny,)
 
     def get(self, request, *args, **kwargs):
         collections = []
@@ -109,7 +111,16 @@ class CollectionsView(routers.APIRootView):
             # Instantiating the viewset
             viewset = Viewset(request=request)
 
-            collections.append(viewset._describe(request, base_url=f"collections/"))
+            # Returning only viewsets that match the request's permissions
+            try:
+                viewset.check_permissions(request)
+                collections.append(viewset._describe(request, base_url=f"collections/"))
+            except (
+                exceptions.NotAuthenticated,
+                exceptions.AuthenticationFailed,
+                exceptions.PermissionDenied,
+            ):
+                continue
 
         return Response(
             {
