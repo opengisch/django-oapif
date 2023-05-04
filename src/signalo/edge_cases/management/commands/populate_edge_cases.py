@@ -10,7 +10,6 @@ from ...models import (
     TestPermissionIsAdminUserModel,
     VariousGeom,
 )
-from ...models import DifferentSrid, HighlyPaginated, SimpleGeom, VariousGeom
 
 
 class Command(BaseCommand):
