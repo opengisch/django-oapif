@@ -99,11 +99,6 @@ status_codes_matrix = {
             Crud.destroy: 204,
         },
         Url.list: {"list": 200},
-        # """ For upcoming Pull Request """
-        # Roles.no_specific: "todo",
-        # Roles.model_specific: "todo",
-        # Roles.readonly: "todo",
-        # Roles.all_perms: "todo",
     },
 }
 
@@ -249,46 +244,3 @@ class TestViewsets(APITestCase):
             print("\n".join(failed))
 
         self.assertTrue(not failed)
-
-    # """ For an upcoming Pull Request """
-
-    # # admin
-
-    # def test_admin_versus_any(self):
-    #     self.client.force_authenticate(user=self.admin_user)
-
-    #     model = TestPermissionAllowAny
-    #     path = f"{app_models_url}.{model.__name__.lower()}"
-    #     tot, failed = traverse_matrix(self.client, Roles.anonymous, path)
-
-    #     if failed:
-    #         print(f" => Failed {len(failed)}/{tot}")
-    #         print("\n".join(failed))
-
-    #     self.assertTrue(not failed)
-
-    # def test_admin_versus_default_permissions(self):
-    #     self.client.force_authenticate(user=self.admin_user)
-
-    #     model = TestPermissionDefaultPermissionsSettings
-    #     path = f"{app_models_url}.{model.__name__.lower()}"
-    #     tot, failed = traverse_matrix(self.client, Roles.anonymous, path)
-
-    #     if failed:
-    #         print(f" => Failed {len(failed)}/{tot}")
-    #         print("\n".join(failed))
-
-    #     self.assertTrue(not failed)
-
-    # def test_admin_versus_is_admin(self):
-    #     self.client.force_authenticate(user=self.admin_user)
-
-    #     model = TestPermissionIsAdminUserModel
-    #     path = f"{app_models_url}.{model.__name__.lower()}"
-    #     tot, failed = traverse_matrix(self.client, Roles.anonymous, path)
-
-    #     if failed:
-    #         print(f" => Failed {len(failed)}/{tot}")
-    #         print("\n".join(failed))
-
-    #     self.assertTrue(not failed)
