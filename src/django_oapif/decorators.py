@@ -1,6 +1,10 @@
+from os import getenv
 from typing import Any, Callable, Dict, Optional
 
+from django.contrib.gis.geos import Polygon
 from django.db.models import Model
+from django.http import HttpResponseBadRequest
+from pyproj import CRS, Transformer
 from rest_framework import viewsets
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
@@ -71,6 +75,34 @@ def register_oapif_viewset(
             # (one day this will be retrieved automatically from the serializer)
             oapif_geom_lookup = viewset_oapif_geom_lookup
             filter_backends = [BboxFilterBackend]
+
+            def get_queryset(self):
+                # Override get_queryset to catch bbox-crs
+                queryset = super().get_queryset()
+
+                if self.request.GET.get("bbox"):
+                    coords = self.request.GET["bbox"].split(",")
+                    user_crs = self.request.GET.get("bbox-crs")
+
+                    if user_crs:
+                        try:
+                            crs_epsg = int(user_crs)
+                        except ValueError:
+                            return HttpResponseBadRequest(
+                                "This API supports only EPSG-specified CRS. Make sure to use the appropriate value for the `bbox-crs`query parameter."
+                            )
+                        user_crs = CRS.from_epsg(crs_epsg)
+                        api_crs = CRS.from_epsg(int(getenv("GEOMETRY_SRID", "2056")))
+                        transformer = Transformer.from_crs(user_crs, api_crs)
+                        transformed_coords = transformer.transform(coords)
+                        my_bbox_polygon = Polygon.from_bbox(transformed_coords)
+
+                    else:
+                        my_bbox_polygon = Polygon.from_bbox(coords)
+
+                    return queryset.filter(geom__intersects=my_bbox_polygon)
+
+                return queryset.all()
 
         # Apply custom serializer attributes
         # if viewset_serializer_class.__name__ == "AutoNoGeomSerializer":
