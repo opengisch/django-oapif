@@ -1,8 +1,5 @@
-from os import getenv
-
 from django.contrib.gis.geos import Polygon
-from django.http import HttpResponse, HttpResponseBadRequest
-from pyproj import CRS, Transformer
+from django.http import HttpResponse
 from rest_framework import viewsets
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
@@ -28,40 +25,6 @@ class PoleSerializer(GeoFeatureModelSerializer):
         model = Pole
         geo_field = "geom"
         exclude = ["_serialized"]
-
-
-class PoleViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
-    queryset = Pole.objects.all()
-    serializer_class = PoleSerializer  # used only for API route
-    oapif_title = "Poles"
-    oapif_description = "Poles layer"
-    # (one day this will be retrieved automatically from the serializer)
-    oapif_geom_lookup = "geom"
-
-    def get_queryset(self):
-        if self.request.GET.get("bbox"):
-            coords = self.request.GET["bbox"].split(",")
-            user_crs = self.request.GET.get("bbox-crs")
-
-            if user_crs:
-                try:
-                    crs_epsg = int(user_crs)
-                except ValueError:
-                    return HttpResponseBadRequest(
-                        "This API supports only EPSG-specified CRS. Make sure to use the appropriate value for the `bbox-crs`query parameter."
-                    )
-                user_crs = CRS.from_epsg(crs_epsg)
-                api_crs = CRS.from_epsg(int(getenv("GEOMETRY_SRID", "2056")))
-                transformer = Transformer.from_crs(user_crs, api_crs)
-                transformed_coords = transformer.transform(coords)
-                my_bbox_polygon = Polygon.from_bbox(transformed_coords)
-
-            else:
-                my_bbox_polygon = Polygon.from_bbox(coords)
-
-            return Pole.objects.filter(geom__intersects=my_bbox_polygon)
-
-        return Pole.objects.all()
 
 
 class PoleHighPerfViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):

@@ -2,7 +2,6 @@ from typing import Any, Callable, Dict, Optional
 
 from django.db.models import Model
 from rest_framework import viewsets
-from rest_framework.serializers import ModelSerializer
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from django_oapif.mixins import OAPIFDescribeModelViewSetMixin
@@ -45,17 +44,20 @@ def register_oapif_viewset(
                 fields = "__all__"
                 geo_field = "geom"
 
-        class AutoNoGeomSerializer(ModelSerializer):
-            class Meta:
-                model = Model
-                fields = "__all__"
+        """ ON HOLD, WAITING ON GeoFeatureModelSerializer to admit of null geometries """
+        # class AutoNoGeomSerializer(ModelSerializer):
+        #     class Meta:
+        #         model = Model
+        #         fields = "__all__"
 
-        if skip_geom:
-            viewset_serializer_class = AutoNoGeomSerializer
-            viewset_oapif_geom_lookup = None
-        else:
-            viewset_serializer_class = AutoSerializer
-            viewset_oapif_geom_lookup = "geom"  # one day this will be retrieved automatically from the serializer
+        # if skip_geom:
+        #     viewset_serializer_class = AutoNoGeomSerializer
+        #     viewset_oapif_geom_lookup = None
+        # else:
+        viewset_serializer_class = AutoSerializer
+        viewset_oapif_geom_lookup = (
+            "geom"  # one day this will be retrieved automatically from the serializer
+        )
 
         # Create the viewset
         class Viewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
