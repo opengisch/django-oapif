@@ -73,11 +73,11 @@ def register_oapif_viewset(
             filter_backends = [BboxFilterBackend]
 
         # Apply custom serializer attributes
-        if viewset_serializer_class.__name__ == "AutoNoGeomSerializer":
-            for k, v in custom_serializer_attrs.items():
-                setattr(AutoNoGeomSerializer.Meta, k, v)
+        # if viewset_serializer_class.__name__ == "AutoNoGeomSerializer":
+        #     for k, v in custom_serializer_attrs.items():
+        #         setattr(AutoNoGeomSerializer.Meta, k, v)
 
-        elif viewset_serializer_class.__name__ == "AutoSerializer":
+        if viewset_serializer_class.__name__ == "AutoSerializer":
             for k, v in custom_serializer_attrs.items():
                 setattr(AutoSerializer.Meta, k, v)
 
