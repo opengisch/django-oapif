@@ -1,5 +1,6 @@
 import os
 
+from django.contrib.gis.db import models as gis_models
 from django.core.files.storage import FileSystemStorage
 from django.db import models
 
@@ -21,6 +22,9 @@ fs = SignsFileSystemStorage(location=path_to_sign)
 @register_oapif_viewset(skip_geom=True)
 class OfficialSignType(models.Model):
     id = models.CharField(primary_key=True, max_length=10)
+    # Null geometry to satisfy the interface expected from
+    # model by GeoFeatureModelSerializer
+    geom = gis_models.PointField(null=True, blank=True)
     active = models.BooleanField(default=True)
     value_de = models.CharField(max_length=255, null=True, blank=True)
     value_fr = models.CharField(max_length=255, null=True, blank=True)
