@@ -1,5 +1,3 @@
-from typing import Dict
-
 from django.http import HttpResponse
 from rest_framework import pagination
 from rest_framework.response import Response
@@ -9,8 +7,6 @@ class OapifPagination(pagination.LimitOffsetPagination):
     """OAPIF-compatible django rest paginator"""
 
     def get_paginated_response(self, data):
-        # Some items might non-geometrical features. We need to distinguish
-        numberReturned = len(data["features"]) if isinstance(data, Dict) else len(data)
         return Response(
             {
                 "links": [
@@ -27,9 +23,9 @@ class OapifPagination(pagination.LimitOffsetPagination):
                         "href": self.get_previous_link(),
                     },
                 ],
-                "numberReturned": numberReturned,
+                "numberReturned": len(data["features"]),
                 "numberMatched": self.count,
-                "data": data,
+                **data,  # this looks to be unpacked by LimitOffsetPagination anyway
             }
         )
 
