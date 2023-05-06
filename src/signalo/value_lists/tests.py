@@ -64,4 +64,13 @@ class TestOfficialSigns(APITestCase):
             "/oapif/collections/signalo_vl.officialsigntype/items"
         )
         self.assertEqual(response.status_code, 200)
-        self.assertGreater(len(response.json()), 0)
+        result = response.json()
+        expected = {"type": "FeatureCollection", "features": []}
+
+        for k, v in result.items():
+            if k in expected:
+                if isinstance(v, str):
+                    self.assertEqual(v, expected[k])
+                elif isinstance(v, List):
+                    self.assertTrue(isinstance(expected[k], List))
+                    self.assertGreater(len(v), 0)
