@@ -1,7 +1,11 @@
-name: Pypi
+name: Publish to PyPI
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Test"]
+    branches: [main]
+    types:
+      - completed
     tags:
     - 'v*'
 

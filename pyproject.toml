@@ -22,7 +22,6 @@ homepage = "https://github.com/opengisch/django-ogcapif"
 repository = "https://github.com/opengisch/django-ogcapif"
 tracker = "https://github.com/opengisch/django-ogcapif/issues"
 
-
 [tool.setuptools_scm]
 write_to = "src/django_oapif/__version__.py"
 version_scheme = "post-release"
