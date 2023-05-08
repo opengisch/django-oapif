@@ -109,9 +109,9 @@ def register_oapif_viewset(
         #     for k, v in custom_serializer_attrs.items():
         #         setattr(AutoNoGeomSerializer.Meta, k, v)
 
-        if viewset_serializer_class.__name__ == "AutoSerializer":
-            for k, v in custom_serializer_attrs.items():
-                setattr(AutoSerializer.Meta, k, v)
+        # Apply custom serializer attributes
+        for k, v in custom_serializer_attrs.items():
+            setattr(AutoSerializer.Meta, k, v)
 
         # Apply custom viewset attributes
         for k, v in custom_viewset_attrs.items():
