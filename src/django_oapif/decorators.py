@@ -76,6 +76,9 @@ def register_oapif_viewset(
             oapif_geom_lookup = viewset_oapif_geom_lookup
             filter_backends = [BboxFilterBackend]
 
+            # Allowing '.' in urls
+            lookup_value_regex = r"[\w.]+"
+
             def get_queryset(self):
                 # Override get_queryset to catch bbox-crs
                 queryset = super().get_queryset()
