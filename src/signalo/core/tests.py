@@ -5,6 +5,7 @@ import pstats
 from itertools import islice
 from typing import Callable, Iterable, Tuple
 
+from django.contrib.auth.models import User
 from django.core.management import call_command
 from rest_framework.test import APITestCase
 
@@ -130,3 +131,45 @@ class SpeedTestSerialization(APITestCase):
         with open(os.path.join(self.path, f"{name}.txt"), "w") as fh:
             stats = pstats.Stats(path_to_bin, stream=fh)
             stats.print_stats()
+
+
+class TestBasicAuth(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("populate_vl")
+        call_command("populate_signs_poles")
+        call_command("populate_users")
+
+        cls.demo_viewer = User.objects.get(username="demo_viewer")
+        cls.admin = User.objects.get(username="admin")
+
+    def tearDown(self):
+        self.client.force_authenticate(user=None)
+
+    def test_auth_as_demo_viewer(self):
+        collections_from_anonymous = self.client.get(
+            "/oapif/collections", format="json"
+        ).json()
+        self.client.force_authenticate(user=self.demo_viewer)
+        collection_response = self.client.get("/oapif/collections", format="json")
+        oapif_response_code = self.client.get("/oapif/").status_code
+
+        self.assertEqual(oapif_response_code, 200)
+        self.assertEqual(collection_response.status_code, 200)
+        self.assertEqual(
+            len(collection_response.json()), len(collections_from_anonymous)
+        )
+
+    def test_auth_as_admin(self):
+        collections_from_anonymous = self.client.get(
+            "/oapif/collections", format="json"
+        ).json()
+        self.client.force_authenticate(user=self.admin)
+        collection_response = self.client.get("/oapif/collections", format="json")
+        oapif_response_code = self.client.get("/oapif/").status_code
+
+        self.assertEqual(oapif_response_code, 200)
+        self.assertEqual(collection_response.status_code, 200)
+        self.assertEqual(
+            len(collection_response.json()), len(collections_from_anonymous)
+        )
