@@ -74,3 +74,13 @@ class TestOfficialSigns(APITestCase):
                 elif isinstance(v, List):
                     self.assertTrue(isinstance(expected[k], List))
                     self.assertGreater(len(v), 0)
+
+    def test_dotty_dashy_url_patterns(self):
+        collection_url = "/oapif/collections/signalo_vl.officialsigntype/items"
+        ids = ["0.2-r", "1.06"]
+        urls = [f"{collection_url}/{id}" for id in ids]
+        condition = all(
+            self.client.get(url, format="json").json()["id"] == id
+            for (url, id) in zip(urls, ids)
+        )
+        self.assertTrue(condition)
