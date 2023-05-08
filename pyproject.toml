@@ -15,6 +15,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering :: GIS",
 ]
+license = { text = "MIT License" }
 dynamic = ["version", "readme", "dependencies", "optional-dependencies"]
 
 [project.urls]
@@ -22,10 +23,10 @@ homepage = "https://github.com/opengisch/django-ogcapif"
 repository = "https://github.com/opengisch/django-ogcapif"
 tracker = "https://github.com/opengisch/django-ogcapif/issues"
 
-
 [tool.setuptools_scm]
-write_to = "src/django_oapif/__version__.py"
+write_to = "django_ogcapif/__version__.py"
 version_scheme = "post-release"
+fallback_version = "0.1.6"
 
 [tool.setuptools.dynamic]
 readme = {file = ["README.md"], content-type = "text/markdown"}
