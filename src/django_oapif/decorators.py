@@ -77,7 +77,7 @@ def register_oapif_viewset(
             filter_backends = [BboxFilterBackend]
 
             # Allowing '.' in urls
-            lookup_value_regex = r"[\w.]+"
+            lookup_value_regex = r"[\w.-]+"
 
             def get_queryset(self):
                 # Override get_queryset to catch bbox-crs
