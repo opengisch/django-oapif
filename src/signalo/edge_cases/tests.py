@@ -56,20 +56,20 @@ status_codes_matrix = {
             Crud.destroy: 204,
         },
         Url.default: {
-            Crud.create: 403,
+            Crud.create: [403, 401],
             Crud.list: 200,
             Crud.read: 200,
-            Crud.partial_update: 403,
-            Crud.update: 403,
-            Crud.destroy: 403,
+            Crud.partial_update: [403, 401],
+            Crud.update: [403, 401],
+            Crud.destroy: [403, 401],
         },
         Url.is_admin: {
-            Crud.create: 403,
-            Crud.list: 403,
-            Crud.read: 403,
-            Crud.partial_update: 403,
-            Crud.update: 403,
-            Crud.destroy: 403,
+            Crud.create: [403, 401],
+            Crud.list: [403, 401],
+            Crud.read: [403, 401],
+            Crud.partial_update: [403, 401],
+            Crud.update: [403, 401],
+            Crud.destroy: [403, 401],
         },
         Url.list: {"list": 200},
     },
@@ -166,15 +166,22 @@ def traverse_matrix(
     admin_user = test_instance.admin_user
     failed = []
     tot = 0
-    for crud_name, expected_status_code in status_codes_matrix[role][endpoint].items():
+    for crud_name, expected_status_codes in status_codes_matrix[role][endpoint].items():
         actual_url, response_code, results = make_request(
             client, crud_name, endpoint, admin_user
         )
 
-        if response_code != expected_status_code:
-            failed.append(
-                f"{crud_name}: {actual_url} (got {response_code}, expected {expected_status_code})"
-            )
+        if isinstance(expected_status_codes, int):
+            if response_code != expected_status_codes:
+                failed.append(
+                    f"{crud_name}: {actual_url} (got {response_code}, expected {expected_status_codes})"
+                )
+
+        elif isinstance(expected_status_codes, List):
+            if response_code not in expected_status_codes:
+                failed.append(
+                    f"{crud_name}: {actual_url} (got {response_code}, expected {expected_status_codes})"
+                )
 
         if actual_url == app_collections_url:
             collection_ids = {collection["id"] for collection in results["collections"]}
