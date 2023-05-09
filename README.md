@@ -4,8 +4,17 @@
 
 *django-ogcapif* allows to easily expose your Django models through an OGCAPI-Features endpoint. It is based on Django REST Framework.
 
+## Table of contents
+- [Quickstart](#quickstart)
+- [Use from QGIS](#use-from-qgis)
+- [Install it as a Django app](#install-it-as-a-django-app)
+- [Authentication & permissions](#custom-authentication--permissions)
+- [Tests](#tests)
+- [OGC conformance](#ogc-conformance)
 
 ## Quickstart
+
+This lets you run the Compose application locally and demo it:
 
 ```bash
 # copy default conf
@@ -22,23 +31,50 @@ docker compose exec django python manage.py migrate --no-input
 docker compose exec django python manage.py populate_vl
 docker compose exec django python manage.py populate_signs_poles
 docker compose exec django python manage.py populate_edge_cases
-
-# Wait a little, then check that https://localhost/oapif/collections/signalo_core.pole/items works from your browser
+docker compose exec django python manage.py populate_users
 ```
+After waiting little you'll be able to access all collections at http://localhost/oapif/collections.
 
-## Tests
+Three users are provided out of the box; they can be logged in with through basic authentication; all `123` for password:
+- `demo_viewer`
+- `demo_editor`
+- `admin`
 
-To run all tests, launch the Compose application as shown in the [Quickstart](#quickstart). Then run
+As expected `admin` can access Django Admin at http://localhost/admin.
 
-    docker compose exec django python manage.py test
+## Use from QGIS
 
-## Authentication & permissions
+When up and running you can access the REST API from QGIS like this:
 
-By default the viewsets under `signalo/core` use the `DjangoModelPermissionsOrAnonReadOnly` permissions class. You can add model permissions when registering their corresponding viewsets, as `permission_classes`. (Refer to https://www.django-rest-framework.org/api-guide/permissions/#api-reference for permission classes). Example:
+- Go to `Layers` > `Add layer` > `Add WFS Layer...`
+- Create a new connection
+  - URL: `https://localhost/oapif/`
+  - Version: `OGC API - Features`
+- Click OK and ignore choose to ignore the invalid certificate error and store the exception
+- You should see the two layers in the list, select them and choose `add`.
+
+## Install it as a Django app
+
+This project is [hosted on PyPI](https://pypi.org/project/django-ogcapif/). You can install it as a Django app:
+
+```bash
+# Install with your favorite package manager
+pip3 install --user django-ogcapif
+# Edit your Django project's settings.py accordingly:
+settings.py
+-----------
+INSTALLED_APPS = [
+    ...
+    django_ogcapif
+]
+```
+## Custom authentication & permissions
+
+By default the viewsets under `signalo/core` use the `DjangoModelPermissionsOrAnonReadOnly` permissions class. You can add model permissions when registering their corresponding viewsets, as `permission_classes` [^1]. Example:
 
 ```python
-# models.py
-# ----------
+models.py
+---------
 from rest_framework import permissions
 from django.contrib.gis.db import models
 from django_oapif.decorators import register_oapif_viewset
@@ -52,18 +88,16 @@ class MyModel(models.Model):
     ...
 ```
 
-## Use from QGIS
+[^1]: Refer to https://www.django-rest-framework.org/api-guide/permissions/#api-reference for permission classes.
 
-Once up and running, you can use it from QGIS like this:
+## Tests
 
-- Go to `Layers` > `Add layer` > `Add WFS Layer...`
-- Create a new connection
-  - URL: `https://localhost/oapif/`
-  - Version: `OGC API - Features`
-- Click OK and ignore choose to ignore the invalid certificate error and store the exception
-- You should see the two layers in the list, select them and choose `add`.
+To run all tests, launch the Compose application as shown in the [Quickstart](#quickstart). Then run
 
-## Run tests
+    docker compose exec django python manage.py test
+
+
+## OGC Conformance
 
 You can run the OGC API conformance test suite like this:
 
