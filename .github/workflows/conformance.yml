@@ -17,57 +17,69 @@ jobs:
       OGCAPIF_HOST: localhost
 
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
-    - name: Login to DockerHub
-      uses: docker/login-action@v2
-      if: github.repository == 'opengisch/django-ogcapif'
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        if: github.repository == 'opengisch/django-ogcapif'
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Build Django image
-      uses: docker/build-push-action@v4
-      with:
-        context: .
-        provenance: false
-        file: docker/django/Dockerfile
-        push: ${{ github.repository == 'opengisch/django-ogcapif' }}
-        pull: true
-        cache-from: type=registry,ref=opengisch/signalo-django:latest
-        cache-to: type=registry,ref=opengisch/signalo-django:latest,mode=max
-        tags: opengisch/signalo-django:latest
+      - name: Build Django image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          provenance: false
+          file: docker/django/Dockerfile
+          push: ${{ github.repository == 'opengisch/django-ogcapif' }}
+          pull: true
+          cache-from: type=registry,ref=opengisch/signalo-django:latest
+          cache-to: type=registry,ref=opengisch/signalo-django:latest,mode=max
+          tags: opengisch/signalo-django:latest
 
-    - name: Do quickstart
-      run: |
-        # copy default conf
-        cp .env.example .env
+      - name: Do quickstart
+        run: |
+          # copy default conf
+          cp .env.example .env
 
-        # start the stack
-        docker compose up --build -d
+          # start the stack
+          docker compose up --build -d
 
-        # deploy static files and migrate database
-        docker compose exec django python manage.py collectstatic --no-input
-        docker compose exec django python manage.py migrate --no-input
-        docker compose exec django python manage.py populate_vl
-        docker compose exec django python manage.py populate_signs_poles
+          # deploy static files and migrate database
+          docker compose exec django python manage.py collectstatic --no-input
+          docker compose exec django python manage.py migrate --no-input
+          docker compose exec django python manage.py populate_vl
+          docker compose exec django python manage.py populate_signs_poles
 
-    - name: Healthcheck
-      run: wget --no-check-certificate https://localhost/oapif/collections/signalo_core.pole/items
+      - name: Healthcheck
+        run: wget --no-check-certificate https://localhost/oapif/collections/signalo_core.pole/items
 
-    - name: Run conformance test suite
-      run: docker compose run conformance_test
+      - name: Run conformance test suite
+        run: docker compose run conformance_test
 
-    - name: Archive production artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: emailable-report
-        path: |
-          ./_test_outputs/**/emailable-report.html
+      - name: Archive production artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: emailable-report
+          path: |
+            ./_test_outputs/**/emailable-report.html
 
-    - name: Failure logs
-      if: failure()
-      run: docker-compose logs
+      - name: Check baseline
+        run: |
+          pip install lxml
+          python scripts/parse_report.py _test_outputs/emailable-report.html baseline.json
+          cat baseline.json
+
+      - name: Recommit baseline
+        if: github.ref == 'refs/heads/main'
+        uses: EndBug/add-and-commit@v9
+        with:
+          add: "baseline.json"
+
+      - name: Failure logs
+        if: failure()
+        run: docker-compose logs
