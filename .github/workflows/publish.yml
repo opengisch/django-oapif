@@ -22,11 +22,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install build twine
 
-      - name: Prepare source files
-        run: ./scripts/prepare_package.sh
-
-      - name: Build
-        run: python -m build
+      - name: Prepare source files and build
+        run: ./scripts/prepare_then_build.sh
 
       - name: Publish
         env:
