@@ -111,7 +111,7 @@ class TestFlatGeoBuf(unittest.TestCase):
         }
 
     def test_decoded(self):
-        json_str = from_fgb(self.fgb_contents)
+        json_str = from_fgb(self.fgb_contents, "geojson")
         self.assertEqual(type(json_str), list)
         self.assertEqual(len(json_str), 179)
 
@@ -120,5 +120,5 @@ class TestFlatGeoBuf(unittest.TestCase):
 
     def test_encoded(self):
         data_bytes = bytes(dumps(self.data), encoding="utf-8")
-        encoded = to_fgb(data_bytes, "polygon")
+        encoded = to_fgb(data_bytes, "polygon", "geojson")
         self.assertTrue(encoded)
