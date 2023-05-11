@@ -12,7 +12,7 @@ from enum import Enum
 from itertools import islice
 from os import path
 from sys import argv, exit
-from typing import List, NamedTuple, Optional, Tuple, Union
+from typing import List, NamedTuple, Tuple, Union
 
 from lxml import etree
 
@@ -80,28 +80,13 @@ class Results(NamedTuple):
         return cls(**results)
 
     @staticmethod
-    def write(
-        current: "Results",
-        previous: Optional["Results"] = None,
-        diff: Optional["Diff"] = None,
-    ):
+    def write(current: "Results"):
         now = datetime.now().strftime(fmt)
         current = current._asdict()
-        payload = {"at": now, "results": {"last": current}}
-
-        if diff and previous:
-            payload["results"]["diff"] = diff._asdict()
-            payload["results"]["previous"] = previous._asdict()
-            info = "Latest results + payload written to disk."
-            with open(baseline_path, "r") as fh:
-                contents = json.load(fh)
-            with open(baseline_path, "w") as fh:
-                contents.append(payload)
-                json.dump(contents, fh, indent=2)
-        else:
-            info = "This is the first report. No diffing occured. Saved as 'baseline'."
-            with open(baseline_path, "w") as fh:
-                json.dump([payload], fh, indent=2)
+        payload = {"at": now, "results": current}
+        info = "Latest results written to disk."
+        with open(baseline_path, "w") as fh:
+            json.dump([payload], fh, indent=2)
         print(info)
 
     @staticmethod
@@ -109,14 +94,20 @@ class Results(NamedTuple):
         diff = Diff.compare(current, previous)
         diff_dict = diff._asdict()
         worse = [f"{v}: {k}!" for k, v in diff_dict.items() if Cmp.worse in v]
+        not_better = all(Cmp.equal in v for v in diff_dict.values())
 
         if worse:
             print(
                 f"{worse}\n\n^ Sorry, job results suggest that you didn't manage to clear the baseline. Scroll up for details. ^"
             )
             exit(1)
+        if not_better:
+            print(
+                f"{current}\n\n^ Didn't manage to extract any improvement. Results won't make it to the baseline. ^"
+            )
+            exit(2)
 
-        Results.write(current, previous, diff)
+        Results.write(current)
 
 
 class Diff(NamedTuple):

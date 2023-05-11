@@ -69,16 +69,18 @@ jobs:
             ./_test_outputs/**/emailable-report.html
 
       - name: Check baseline
+        id: baseline
         run: |
           pip install lxml
           python scripts/parse_report.py _test_outputs/emailable-report.html baseline.json
-          cat baseline.json
+          exit_code=$?
+          if [[ $exit_code -eq 0 ]]; then echo "exit_code=$exit_code" >> $GITHUB_OUTPUT; fi
 
       - name: Recommit baseline
-        if: github.ref == 'refs/heads/main'
+        if: github.event_name != 'pull_request' && ${{ steps.baseline.outputs.exit_code == 0 }}
         uses: EndBug/add-and-commit@v9
         with:
-          add: "baseline.json"
+          add: baseline.json
 
       - name: Failure logs
         if: failure()
