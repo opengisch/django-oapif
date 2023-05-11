@@ -3,7 +3,7 @@ This program writes a 'baseline.json' file to record results of conformance repo
 expects the followings paths as arguments:
 - path of the conformance report
 - path of the resulting JSON file (this doesn't need to exist; it will be created if it doesn't)
-It will fail is the current results underachieve relative to the last recorded result.
+It will fail if the current result fails to clear the baseline (namely, the previous recorded result).
 """
 
 import json
@@ -101,13 +101,13 @@ class Results(NamedTuple):
                 f"{worse}\n\n^ Sorry, job results suggest that you didn't manage to clear the baseline. Scroll up for details. ^"
             )
             exit(1)
-        if not_better:
+        elif not_better:
             print(
                 f"{current}\n\n^ Didn't manage to extract any improvement. Results won't make it to the baseline. ^"
             )
             exit(2)
-
-        Results.write(current)
+        else:
+            Results.write(current)
 
 
 class Diff(NamedTuple):
