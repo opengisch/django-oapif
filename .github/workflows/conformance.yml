@@ -74,7 +74,7 @@ jobs:
           pip install lxml
           python scripts/parse_report.py _test_outputs/emailable-report.html baseline.json
           exit_code=$?
-          if [[ $exit_code -eq 0 ]]; then echo "exit_code=$exit_code" >> $GITHUB_OUTPUT; fi
+          echo "exit_code=$exit_code" >> $GITHUB_OUTPUT
 
       - name: Recommit baseline
         if: github.event_name != 'pull_request' && ${{ steps.baseline.outputs.exit_code == 0 }}
