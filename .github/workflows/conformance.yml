@@ -76,8 +76,8 @@ jobs:
           exit_code=$?
           echo "exit_code=$exit_code" >> $GITHUB_OUTPUT
 
-      - name: Recommit baseline
-        if: github.event_name != 'pull_request' && ${{ steps.baseline.outputs.exit_code == 0 }}
+      - name: Recommit baseline if not PR and improved baseline
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && ${{ steps.baseline.outputs.exit_code == 0 }}
         uses: EndBug/add-and-commit@v9
         with:
           add: baseline.json
