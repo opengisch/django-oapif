@@ -16,6 +16,7 @@ jobs:
       COMPOSE_DOCKER_CLI_BUILD: 1
       OGCAPIF_HOST: localhost
     permissions:
+      contents: write
       pull-requests: write  # to write comment
 
     steps:
