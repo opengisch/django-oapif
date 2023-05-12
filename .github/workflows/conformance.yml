@@ -15,6 +15,8 @@ jobs:
       DOCKER_BUILDKIT: 1
       COMPOSE_DOCKER_CLI_BUILD: 1
       OGCAPIF_HOST: localhost
+    permissions:
+      pull-requests: write  # to write comment
 
     steps:
       - uses: actions/checkout@v3
@@ -78,11 +80,27 @@ jobs:
           [[ ${EXIT_CODE} -eq 1 ]] && exit 1 || :
 
       - name: Recommit baseline if not PR and improved baseline
-        if: ${{ steps.baseline.outputs.exit_code == 0 }}
+        if: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && steps.baseline.outputs.exit_code == 0 }}
         uses: EndBug/add-and-commit@v9
         with:
           add: baseline.json
-
+        
+      - name: 💬 Prepare comment
+        id: prepare_comment
+        if: ${{ steps.baseline.outputs.exit_code != 2 }}
+        run : |
+          if [[ ${{ steps.baseline.outputs.exit_code }} == 0 ]]; then
+            echo "comment='Conformance tests got better!'" >> $GITHUB_OUTPUT
+          else:
+            echo "comment='Oh no! Conformance tests got worse!'" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: 💬 Create comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        if: ${{ steps.baseline.outputs.exit_code != 2 }}
+        with:
+          message: ${{ steps.prepare_comment.outputs.comment }}
+            
       - name: Failure logs
         if: failure()
         run: docker-compose logs
