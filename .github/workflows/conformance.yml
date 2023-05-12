@@ -100,7 +100,7 @@ jobs:
         if: ${{ steps.baseline.outputs.exit_code != 2 }}
         with:
           message: ${{ steps.prepare_comment.outputs.comment }}
-            
+
       - name: Failure logs
         if: failure()
         run: docker-compose logs
