@@ -80,25 +80,26 @@ jobs:
           echo "exit_code=${EXIT_CODE}" >> $GITHUB_OUTPUT
           [[ ${EXIT_CODE} -eq 1 ]] && exit 1 || :
 
-      - name: Recommit baseline if not PR and improved baseline
-        if: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && steps.baseline.outputs.exit_code == 0 }}
-        uses: EndBug/add-and-commit@v9
+      - name: Recommit baseline if improved baseline (not for forks obvisously)
+        if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.exit_code == 0 }}
+        uses: actions-js/push@master
         with:
-          add: baseline.json
+          branch: ${{ github.event.pull_request.head.ref }}
 
       - name: 💬 Prepare comment
         id: prepare_comment
-        if: ${{ steps.baseline.outputs.exit_code != 2 }}
+        if: ${{ github.event_name == 'pull_request' && steps.baseline.outputs.exit_code != 2 }}
         run : |
           if [[ ${{ steps.baseline.outputs.exit_code }} == 0 ]]; then
-            echo "comment='Conformance tests got better!'" >> $GITHUB_OUTPUT
+
+            echo "comment=Conformance tests got better!" >> $GITHUB_OUTPUT
           else
-            echo "comment='Oh no! Conformance tests got worse!'" >> $GITHUB_OUTPUT
+            echo "comment=Oh no! Conformance tests got worse!" >> $GITHUB_OUTPUT
           fi
 
       - name: 💬 Create comment
         uses: marocchino/sticky-pull-request-comment@v2
-        if: ${{ steps.baseline.outputs.exit_code != 2 }}
+        if: ${{ github.event_name == 'pull_request' && steps.baseline.outputs.exit_code != 2 }}
         with:
           message: ${{ steps.prepare_comment.outputs.comment }}
 
