@@ -91,7 +91,7 @@ jobs:
         run : |
           if [[ ${{ steps.baseline.outputs.exit_code }} == 0 ]]; then
             echo "comment='Conformance tests got better!'" >> $GITHUB_OUTPUT
-          else:
+          else
             echo "comment='Oh no! Conformance tests got worse!'" >> $GITHUB_OUTPUT
           fi
 
