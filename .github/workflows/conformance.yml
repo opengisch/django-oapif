@@ -70,6 +70,7 @@ jobs:
 
       - name: Check baseline
         id: baseline
+        continue-on-error: true
         run: |
           pip install lxml
           python scripts/parse_report.py _test_outputs/emailable-report.html baseline.json

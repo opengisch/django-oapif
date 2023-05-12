@@ -3,7 +3,10 @@ This program writes a 'baseline.json' file to record results of conformance repo
 expects the followings paths as arguments:
 - path of the conformance report
 - path of the resulting JSON file (this doesn't need to exist; it will be created if it doesn't)
-It will fail if the current result fails to clear the baseline (namely, the previous recorded result).
+It will terminate with exit code:
+- 0 if the current result ** surpasses ** the baseline (baseline = the previous recorded result)
+- 1 if the current result is ** below ** the baseline
+- 2 if the current result is ** equal ** to the baseline.
 """
 
 import json
