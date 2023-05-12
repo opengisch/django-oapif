@@ -1,17 +1,19 @@
-from os import getenv
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Generator, Iterable, Optional
 
+from django.contrib.gis.db.models.functions import AsWKB
 from django.contrib.gis.geos import Polygon
+from django.db import connection
 from django.db.models import Model
-from django.http import HttpResponseBadRequest
+from django.http import HttpResponseBadRequest, StreamingHttpResponse
 from pyproj import CRS, Transformer
 from rest_framework import viewsets
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
-from django_oapif.mixins import OAPIFDescribeModelViewSetMixin
-from django_oapif.urls import oapif_router
+from signalo.settings import GEOMETRY_SRID
 
 from .filters import BboxFilterBackend
+from .mixins import OAPIFDescribeModelViewSetMixin
+from .urls import oapif_router
 
 
 def register_oapif_viewset(
@@ -48,16 +50,6 @@ def register_oapif_viewset(
                 fields = "__all__"
                 geo_field = "geom"
 
-        """ ON HOLD, WAITING ON GeoFeatureModelSerializer to admit of null geometries """
-        # class AutoNoGeomSerializer(ModelSerializer):
-        #     class Meta:
-        #         model = Model
-        #         fields = "__all__"
-
-        # if skip_geom:
-        #     viewset_serializer_class = AutoNoGeomSerializer
-        #     viewset_oapif_geom_lookup = None
-        # else:
         viewset_serializer_class = AutoSerializer
         viewset_oapif_geom_lookup = (
             "geom"  # one day this will be retrieved automatically from the serializer
@@ -79,9 +71,59 @@ def register_oapif_viewset(
             # Allowing '.' and '-' in urls
             lookup_value_regex = r"[\w.-]+"
 
+            def list(self, request):
+                # Override list to meet requirements for requests specifying format
+                # while providing a streaming response for decent performance
+                encoding = self.request.GET.get("encoding")
+
+                if not encoding or encoding == "json":
+                    return super().list(request)
+
+                queryset = self.get_queryset()
+
+                def make_item(
+                    it: Iterable, get_geom: Callable, get_id: Callable = None
+                ) -> Generator[Any, None, None]:
+                    return (
+                        {
+                            "id": v.id if not get_id else get_id(v),
+                            "type": "Feature",
+                            "geometry": get_geom(v),
+                            "properties": {},  # assuming no other properties for the POC
+                        }
+                        for v in it
+                    )
+
+                if encoding == "wkb":
+                    queryset = queryset.annotate(wkb=AsWKB("geom"))
+                    get_geom = lambda v: bytes(v.wkb)
+                    generator = make_item(queryset, get_geom)
+                    return StreamingHttpResponse(generator)
+
+                if encoding == "fgb":
+                    pks = tuple(queryset.values_list("id", flat=True))
+                    with connection.cursor() as cur:
+                        # FIXME: This query is almost valid!
+                        query = """
+                            WITH rows AS (SELECT ST_GeomFromText(geom, %s) FROM signalo_roads_road WHERE id IN %s)
+                            SELECT encode(ST_AsFlatGeobuf(rows), 'base64') FROM rows
+                        """
+                        cur.execute(
+                            query,
+                            (
+                                GEOMETRY_SRID,
+                                pks,
+                            ),
+                        )
+                        # Assuming we get geom, id from the cursor
+                        get_geom = lambda v: v[0]
+                        get_id = lambda v: v[1]
+                        generator = make_item(cur, get_geom, get_id)
+                        return StreamingHttpResponse(generator)
+
             def get_queryset(self):
                 # Override get_queryset to catch bbox-crs
-                queryset = super().get_queryset()
+                queryset = self.filter_queryset(super().get_queryset())
 
                 if self.request.GET.get("bbox"):
                     coords = self.request.GET["bbox"].split(",")
@@ -95,7 +137,7 @@ def register_oapif_viewset(
                                 "This API supports only EPSG-specified CRS. Make sure to use the appropriate value for the `bbox-crs`query parameter."
                             )
                         user_crs = CRS.from_epsg(crs_epsg)
-                        api_crs = CRS.from_epsg(int(getenv("GEOMETRY_SRID", "2056")))
+                        api_crs = CRS.from_epsg(GEOMETRY_SRID)
                         transformer = Transformer.from_crs(user_crs, api_crs)
                         transformed_coords = transformer.transform(coords)
                         my_bbox_polygon = Polygon.from_bbox(transformed_coords)
@@ -106,11 +148,6 @@ def register_oapif_viewset(
                     return queryset.filter(geom__intersects=my_bbox_polygon)
 
                 return queryset.all()
-
-        # Apply custom serializer attributes
-        # if viewset_serializer_class.__name__ == "AutoNoGeomSerializer":
-        #     for k, v in custom_serializer_attrs.items():
-        #         setattr(AutoNoGeomSerializer.Meta, k, v)
 
         # Apply custom serializer attributes
         for k, v in custom_serializer_attrs.items():
