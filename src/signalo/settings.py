@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "signalo.edge_cases",
     "signalo.value_lists",
     "signalo.core",
+    "signalo.roads",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
