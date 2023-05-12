@@ -84,7 +84,7 @@ jobs:
         uses: EndBug/add-and-commit@v9
         with:
           add: baseline.json
-        
+
       - name: 💬 Prepare comment
         id: prepare_comment
         if: ${{ steps.baseline.outputs.exit_code != 2 }}
@@ -94,7 +94,7 @@ jobs:
           else:
             echo "comment='Oh no! Conformance tests got worse!'" >> $GITHUB_OUTPUT
           fi
-          
+
       - name: 💬 Create comment
         uses: marocchino/sticky-pull-request-comment@v2
         if: ${{ steps.baseline.outputs.exit_code != 2 }}
