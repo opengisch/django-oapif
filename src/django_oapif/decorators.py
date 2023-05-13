@@ -1,14 +1,16 @@
-from typing import Any, Callable, Dict, Generator, Iterable, Optional
+from typing import Any, Callable, Dict, Optional
 
 from django.contrib.gis.db.models.functions import AsWKB
 from django.contrib.gis.geos import Polygon
 from django.db import connection
 from django.db.models import Model
 from django.http import HttpResponseBadRequest, StreamingHttpResponse
+from psycopg2 import sql
 from pyproj import CRS, Transformer
 from rest_framework import viewsets
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
+from django_oapif.db import mk_gen_items
 from signalo.settings import GEOMETRY_SRID
 
 from .filters import BboxFilterBackend
@@ -72,54 +74,39 @@ def register_oapif_viewset(
             lookup_value_regex = r"[\w.-]+"
 
             def list(self, request):
-                # Override list to meet requirements for requests specifying format
-                # while providing a streaming response for decent performance
+                # Override list to support downloading items with their geometric
+                # field as WKB, or alternatively, download just the geometries as FlatGeoBuf
                 encoding = self.request.GET.get("encoding")
+                download = self.request.GET.get("download")
 
                 if not encoding or encoding == "json":
+                    return super().list(request)
+                if not download or download != "fgb":
                     return super().list(request)
 
                 queryset = self.get_queryset()
 
-                def make_item(
-                    it: Iterable, get_geom: Callable, get_id: Callable = None
-                ) -> Generator[Any, None, None]:
-                    return (
-                        {
-                            "id": v.id if not get_id else get_id(v),
-                            "type": "Feature",
-                            "geometry": get_geom(v),
-                            "properties": {},  # assuming no other properties for the POC
-                        }
-                        for v in it
-                    )
-
                 if encoding == "wkb":
                     queryset = queryset.annotate(wkb=AsWKB("geom"))
                     get_geom = lambda v: bytes(v.wkb)
-                    generator = make_item(queryset, get_geom)
-                    return StreamingHttpResponse(generator)
+                    iterable = mk_gen_items(queryset, get_geom)
+                    return StreamingHttpResponse(iterable)
 
-                if encoding == "fgb":
+                if download == "fgb":
+                    table_name = Model._meta.db_table
                     pks = tuple(queryset.values_list("id", flat=True))
-                    with connection.cursor() as cur:
-                        # FIXME: This query is almost valid!
-                        query = """
-                            WITH rows AS (SELECT ST_GeomFromText(geom, %s) FROM signalo_roads_road WHERE id IN %s)
-                            SELECT encode(ST_AsFlatGeobuf(rows), 'base64') FROM rows
+                    query = sql.SQL(
                         """
-                        cur.execute(
-                            query,
-                            (
-                                GEOMETRY_SRID,
-                                pks,
-                            ),
-                        )
-                        # Assuming we get geom, id from the cursor
-                        get_geom = lambda v: v[0]
-                        get_id = lambda v: v[1]
-                        generator = make_item(cur, get_geom, get_id)
-                        return StreamingHttpResponse(generator)
+                        WITH rows AS (SELECT geom FROM {table} WHERE id IN %s)
+                        SELECT encode(ST_AsFlatGeobuf(rows), 'base64') FROM rows
+                    """
+                    ).format(table=sql.Identifier(table_name))
+
+                    with connection.cursor() as cur:
+                        cur.execute(query, (pks,))
+                        iterable = cur.fetchall()
+
+                    return StreamingHttpResponse(iterable)
 
             def get_queryset(self):
                 # Override get_queryset to catch bbox-crs
