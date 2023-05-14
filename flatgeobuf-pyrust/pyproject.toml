@@ -1,6 +1,32 @@
+[tool.poetry]
+name = "flatgeobuf-pyrust"
+version = "0.2.2"
+description = "Encoding and decoding to and from Flatgeobuf and WKB."
+authors = [ "Adrien Glauser <mrnycticorax@gmail.com>" ]
+
+[tool.poetry.dev-dependencies]
+maturin = [ {version = "^0.14", python = ">=3.7"} ]
+
 [build-system]
-requires = ["maturin>=0.14, <0.15"]
+requires = ["maturin>=0.14,<=0.15"]
 build-backend = "maturin"
+
+[project]
+name = "flatgeobuf-pyrust"
+version = "0.2.2"
+authors = [ {name = "Adrien Glauser", email = "mrnycticorax@gmail.com"} ]
+description = "Encoding and decoding to and from Flatgeobuf and WKB."
+keywords = ["flatgeobuf", "ogc", "features"]
+classifiers = [
+	"Intended Audience :: Developers",
+	"Programming Language :: Python :: 3",
+	"Topic :: Scientific/Engineering :: GIS"
+]
+
+[project.urls]
+homepage = "https://github.com/opengisch"
+repository = "https://github.com/opengisch"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
+
