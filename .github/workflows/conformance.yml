@@ -106,7 +106,7 @@ jobs:
         if: ${{ github.event_name == 'pull_request' && steps.baseline.outputs.exit_code != 2 }}
         with:
           message: ${{ steps.prepare_comment.outputs.comment }}
-          
+
       - name: Recheck baseline
         if: ${{ steps.baseline.outputs.exit_code == 0 }}
         run: |
