@@ -81,7 +81,7 @@ jobs:
           [[ ${EXIT_CODE} -eq 1 ]] && exit 1 || :
 
       - name: Recommit baseline if improved baseline (not for forks obvisously)
-        if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.exit_code == 0 }}
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.exit_code == 0 }}
         uses: actions-js/push@master
         with:
           branch: ${{ github.event.pull_request.head.ref }}
