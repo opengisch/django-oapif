@@ -89,6 +89,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           branch: ${{ github.event.pull_request.head.ref }}
+          message: update conformance baseline
 
       - name: 💬 Prepare comment
         id: prepare_comment
