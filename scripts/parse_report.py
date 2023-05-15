@@ -90,7 +90,7 @@ class Results(NamedTuple):
         info = "Latest results written to disk."
         with open(baseline_path, "w") as fh:
             json.dump([payload], fh, indent=2)
-            baseline_path.write('\n')
+            baseline_path.write("\n")
         print(info)
 
     @staticmethod
@@ -106,9 +106,7 @@ class Results(NamedTuple):
             )
             exit(2)
         elif not_better:
-            print(
-                f"{current}\n\n^ Results are similar. ^"
-            )
+            print(f"{current}\n\n^ Results are similar. ^")
             exit(0)
         else:
             Results.write(current)
