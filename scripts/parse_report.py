@@ -4,9 +4,9 @@ expects the followings paths as arguments:
 - path of the conformance report
 - path of the resulting JSON file (this doesn't need to exist; it will be created if it doesn't)
 It will terminate with exit code:
-- 0 if the current result ** surpasses ** the baseline (baseline = the previous recorded result)
-- 1 if the current result is ** below ** the baseline
-- 2 if the current result is ** equal ** to the baseline.
+- 0 if the current result is ** equal ** to the baseline (baseline = the previous recorded result).
+- 1 if the current result ** surpasses ** the baseline.
+- 2 if the current result is ** below ** the baseline.
 """
 
 import json
@@ -90,6 +90,7 @@ class Results(NamedTuple):
         info = "Latest results written to disk."
         with open(baseline_path, "w") as fh:
             json.dump([payload], fh, indent=2)
+            baseline_path.write("\n")
         print(info)
 
     @staticmethod
@@ -103,12 +104,10 @@ class Results(NamedTuple):
             print(
                 f"{worse}\n\n^ Sorry, job results suggest that you didn't manage to clear the baseline. Scroll up for details. ^"
             )
-            exit(1)
-        elif not_better:
-            print(
-                f"{current}\n\n^ Didn't manage to extract any improvement. Results won't make it to the baseline. ^"
-            )
             exit(2)
+        elif not_better:
+            print(f"{current}\n\n^ Results are similar. ^")
+            exit(0)
         else:
             Results.write(current)
 
