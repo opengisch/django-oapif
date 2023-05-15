@@ -1,14 +1,14 @@
-from typing import Any, Callable, Generator, Iterable
+from typing import Callable, Dict, Generator, Iterable
 
 
 def mk_gen_items(
     it: Iterable, get_geom: Callable, get_id: Callable = None
-) -> Generator[Any, None, None]:
+) -> Generator[Dict[str, str], None, None]:
     return (
         {
-            "id": v.id if not get_id else get_id(v),
+            "id": str(v.id if not get_id else get_id(v)),
             "type": "Feature",
-            "geometry": get_geom(v),
+            "geometry": str(get_geom(v)),
             "properties": {},  # assuming no other properties for the POC
         }
         for v in it

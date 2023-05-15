@@ -1,3 +1,4 @@
+import json
 from typing import Any, Callable, Dict, Optional
 
 from django.contrib.gis.db.models.functions import AsWKB
@@ -76,23 +77,36 @@ def register_oapif_viewset(
             def list(self, request):
                 # Override list to support downloading items with their geometric
                 # field as WKB, or alternatively, download just the geometries as FlatGeoBuf
-                encoding = self.request.GET.get("encoding")
-                download = self.request.GET.get("download")
+                geom_as = self.request.GET.get("geom_as")
+                only_geom_as = self.request.GET.get("only_geom_as")
 
-                if not encoding or encoding == "json":
+                if not geom_as and not only_geom_as:
                     return super().list(request)
-                if not download or download != "fgb":
+
+                if geom_as is not None and geom_as != "wkb":
+                    return super().list(request)
+
+                if only_geom_as is not None and only_geom_as != "fgb":
                     return super().list(request)
 
                 queryset = self.get_queryset()
+                limit = self.request.GET.get("limit")
+                offset = self.request.GET.get("offset")
 
-                if encoding == "wkb":
+                if offset:
+                    queryset = queryset[int(offset) :]
+
+                if limit:
+                    queryset = queryset[: int(limit)]
+
+                if geom_as == "wkb":
                     queryset = queryset.annotate(wkb=AsWKB("geom"))
                     get_geom = lambda v: bytes(v.wkb)
-                    iterable = mk_gen_items(queryset, get_geom)
+                    gen_items = mk_gen_items(queryset, get_geom)
+                    iterable = (json.dumps(item) for item in gen_items)
                     return StreamingHttpResponse(iterable)
 
-                if download == "fgb":
+                if only_geom_as == "fgb":
                     table_name = Model._meta.db_table
                     pks = tuple(queryset.values_list("id", flat=True))
                     query = sql.SQL(
