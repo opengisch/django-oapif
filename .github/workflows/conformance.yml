@@ -90,7 +90,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
           path: baseline-repo
 
-      - name: Commit baseline if improved | commit
+      - name: Commit baseline if improved | copy file
         if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.exit_code == 1 }}
         run: cp conformance-baseline.json baseline-repo/conformance-baseline.json
 

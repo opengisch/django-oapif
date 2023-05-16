@@ -90,7 +90,7 @@ class Results(NamedTuple):
         info = "Latest results written to disk."
         with open(baseline_path, "w") as fh:
             json.dump([payload], fh, indent=2)
-            baseline_path.write("\n")
+            fh.write("\n")
         print(info)
 
     @staticmethod
