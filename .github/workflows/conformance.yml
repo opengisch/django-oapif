@@ -99,6 +99,11 @@ jobs:
           cwd: ./baseline_repo
           message: update baseline
 
+      - run: |
+          cd baseline_repo
+          ls conformance-baseline.json
+          git status
+
       - name: 💬 Prepare comment
         id: prepare_comment
         if: ${{ github.event_name == 'pull_request' && steps.baseline.outputs.EXIT_CODE != '0' }}
