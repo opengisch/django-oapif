@@ -1,0 +1,40 @@
+[
+  {
+    "at": "16.05.23 13:21:09",
+    "results": {
+      "passed": [
+        "core.apidefinition.ApiDefinition",
+        "core.general.GeneralHttp",
+        "core.landingpage.LandingPage"
+      ],
+      "skipped": [
+        "crs.discovery.collection.DiscoveryCollectionCrsUri",
+        "crs.discovery.collection.DiscoveryCollectionDefaultCrs",
+        "crs.discovery.collection.DiscoveryCollectionStorageCrs",
+        "crs.discovery.collections.DiscoveryCollectionsCrsUri",
+        "crs.discovery.collections.DiscoveryCollectionsDefaultCrs",
+        "crs.discovery.collections.DiscoveryCollectionsStorageCrs",
+        "crs.query.bboxcrs.BBoxCrsParameter",
+        "crs.query.bboxcrs.BBoxCrsParameterDefault",
+        "crs.query.bboxcrs.BBoxCrsParameterInvalid",
+        "crs.query.crs.feature.FeatureCrsParameter",
+        "crs.query.crs.feature.FeatureCrsParameterDefault",
+        "crs.query.crs.feature.FeatureCrsParameterInvalid",
+        "crs.query.crs.feature.FeatureCrsParameterTransform",
+        "crs.query.crs.features.FeaturesCrsParameter",
+        "crs.query.crs.features.FeaturesCrsParameterDefault",
+        "crs.query.crs.features.FeaturesCrsParameterInvalid",
+        "crs.query.crs.features.FeaturesCrsParameterTransform",
+        "core.collections.FeatureCollection",
+        "core.collections.FeatureCollections"
+      ],
+      "failed": [
+        "crs.CrsRequirementClassPrecondition",
+        "core.collections.FeaturesBBox",
+        "core.collections.FeaturesLimit",
+        "core.collections.FeaturesTime",
+        "core.conformance.Conformance"
+      ]
+    }
+  }
+]
