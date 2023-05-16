@@ -95,14 +95,9 @@ jobs:
         if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE == '1' }}
         uses: EndBug/add-and-commit@v9
         with:
-          add: baseline.json
+          add: conformance-baseline.json
           cwd: ./baseline_repo
           message: update baseline
-
-      - run: |
-          cd baseline_repo
-          ls conformance-baseline.json
-          git status
 
       - name: 💬 Prepare comment
         id: prepare_comment
