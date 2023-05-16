@@ -82,6 +82,12 @@ jobs:
           python scripts/parse_report.py _test_outputs/emailable-report.html conformance-baseline.json || EXIT_CODE=$?
           echo "EXIT_CODE=${EXIT_CODE}" >> $GITHUB_OUTPUT
 
+      - run: |
+          echo "code: ${{ steps.baseline.outputs.EXIT_CODE }}"
+          echo "event: ${{ github.event_name }}"
+          echo "repo: ${{ github.event.pull_request.head.repo.full_name }}"
+          echo "repo: ${{ github.repository }}"
+
       - name: Commit baseline if improved | checkout
         uses: actions/checkout@v3
         if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE == '1' }}
