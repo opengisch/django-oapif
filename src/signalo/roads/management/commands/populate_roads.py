@@ -7,18 +7,20 @@ from ...models import Road
 
 
 def make_roads_batches(fh: Iterable) -> Generator[List[Road], None, None]:
-    roads = []
-    counter = 0
+    def batch():
+        roads = []
+        while len(roads) < 10000:
+            line = next(fh, None)
+            if line:
+                geom, _ = line.rsplit(",", 1)
+                geom = geom.strip('""')
+                roads.append(Road(geom=geom))
+            else:
+                break
+        return roads
 
-    for line in fh:
-        geom, _ = line.rsplit(",", 1)
-        geom = geom.strip('""')
-        roads.append(Road(geom=geom))
-        counter += 1
-
-    if counter == 1000 or next(fh, None) is None:
-        yield roads
-        counter = 0
+    while True:
+        yield batch()
 
 
 class Command(BaseCommand):
@@ -29,7 +31,14 @@ class Command(BaseCommand):
         with open(roads_csv, "r") as fh:
             next(fh)
             total = 0
+
             for batch in make_roads_batches(fh):
-                Road.objects.bulk_create(batch)
-            total += len(batch)
+                if batch:
+                    Road.objects.bulk_create(batch)
+                    len_batch = len(batch)
+                    total += len(batch)
+                    print(f"{len_batch} more roads...")
+                else:
+                    break
+
         print(f"🛣️ Added {total} roads!")
