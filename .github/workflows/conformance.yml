@@ -9,7 +9,7 @@ on:
       - main
 
 jobs:
-  test-quickstart:
+  conformance:
     runs-on: ubuntu-latest
     env:
       DOCKER_BUILDKIT: 1
