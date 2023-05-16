@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 This program writes a json file to record results of conformance reports. It
 expects the followings paths as arguments:
@@ -17,9 +18,6 @@ from sys import argv, exit
 from typing import List, NamedTuple, Tuple, Union
 
 from lxml import etree
-
-report_path = path.relpath(argv[1])
-baseline_path = path.relpath(argv[2])
 
 
 class Cmp(str, Enum):
@@ -118,7 +116,10 @@ class Diff(NamedTuple):
         return cls(passed, skipped, failed)
 
 
-def main():
+if __name__ == "__main__":
+    report_path = path.relpath(argv[1])
+    baseline_path = path.relpath(argv[2])
+
     assert path.exists(report_path)
     current = Results.parse(report_path)
 
@@ -128,7 +129,4 @@ def main():
 
     previous = Results.get_latest(baseline_path)
     cmp = Results.pass_verdict(current, previous)
-    exit(cmp.value)
-
-
-main()
+    exit(int(cmp.value))
