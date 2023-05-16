@@ -1,10 +1,10 @@
 """
-This program writes a 'conformance-baseline.json' file to record results of conformance reports. It
+This program writes a json file to record results of conformance reports. It
 expects the followings paths as arguments:
 - path of the conformance report
 - path of the resulting JSON file (this doesn't need to exist; it will be created if it doesn't)
 It will terminate with exit code:
-- 0 if the current result is ** EQUAL ** to the baseline (baseline = the previous recorded result).
+- 0 if the current result is ** equal ** to the baseline (baseline = the previous recorded result).
 - 1 if the current result ** surpasses ** the baseline.
 - 2 if the current result is ** below ** the baseline.
 """
