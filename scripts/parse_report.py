@@ -131,11 +131,11 @@ def main():
 
     if not path.exists(baseline_path):
         Results.write(current)
-        exit(Cmp.BETTER)
+        exit(Cmp.BETTER.value)
 
     previous = Results.get_latest(baseline_path)
-    exit_code = Results.pass_verdict(current, previous)
-    exit(exit_code)
+    cmp = Results.pass_verdict(current, previous)
+    exit(cmp.value)
 
 
 main()
