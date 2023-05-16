@@ -84,18 +84,18 @@ jobs:
 
       - name: Commit baseline if improved | checkout
         uses: actions/checkout@v3
-        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE == "1" }}
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE == '1' }}
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
           path: baseline-repo
 
       - name: Commit baseline if improved | copy file
-        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE == "1" }}
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE == '1' }}
         run: cp conformance-baseline.json baseline-repo/conformance-baseline.json
 
       - name: Commit baseline if improved | commit
-        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE == "1" }}
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE == '1' }}
         uses: EndBug/add-and-commit@v9
         with:
           add: baseline.json
@@ -103,7 +103,7 @@ jobs:
 
       - name: 💬 Prepare comment
         id: prepare_comment
-        if: ${{ github.event_name == 'pull_request' && steps.baseline.outputs.EXIT_CODE != "0" }}
+        if: ${{ github.event_name == 'pull_request' && steps.baseline.outputs.EXIT_CODE != '0' }}
         run : |
           if [[ ${{ steps.baseline.outputs.EXIT_CODE }} == 1 ]]; then
             echo "comment=Conformance tests got better! (update baseline if the job fails)" >> $GITHUB_OUTPUT
@@ -113,7 +113,7 @@ jobs:
 
       - name: 💬 Create comment
         uses: marocchino/sticky-pull-request-comment@v2
-        if: ${{ github.event_name == 'pull_request' && steps.baseline.outputs.EXIT_CODE != "0" }}
+        if: ${{ github.event_name == 'pull_request' && steps.baseline.outputs.EXIT_CODE != '0' }}
         with:
           message: ${{ steps.prepare_comment.outputs.comment }}
 
