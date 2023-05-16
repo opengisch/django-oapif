@@ -1,5 +1,5 @@
 """
-This program writes a 'baseline.json' file to record results of conformance reports. It
+This program writes a 'conformance-baseline.json' file to record results of conformance reports. It
 expects the followings paths as arguments:
 - path of the conformance report
 - path of the resulting JSON file (this doesn't need to exist; it will be created if it doesn't)
