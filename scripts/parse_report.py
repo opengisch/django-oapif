@@ -110,6 +110,7 @@ class Results(NamedTuple):
             exit(0)
         else:
             Results.write(current)
+            exit(1)
 
 
 class Diff(NamedTuple):
