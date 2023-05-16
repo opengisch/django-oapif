@@ -4,7 +4,7 @@ expects the followings paths as arguments:
 - path of the conformance report
 - path of the resulting JSON file (this doesn't need to exist; it will be created if it doesn't)
 It will terminate with exit code:
-- 0 if the current result is ** equal ** to the baseline (baseline = the previous recorded result).
+- 0 if the current result is ** EQUAL ** to the baseline (baseline = the previous recorded result).
 - 1 if the current result ** surpasses ** the baseline.
 - 2 if the current result is ** below ** the baseline.
 """
@@ -26,19 +26,19 @@ fmt = "%d.%m.%y %H:%M:%S"
 
 
 class Cmp(str, Enum):
-    worse = "worse"
-    equal = "equal"
-    better = "better"
+    EQUAL = 0
+    BETTER = 1
+    WORSE = 2
 
     @classmethod
     def tell(cls, x: Union[int, List], y: Union[int, List]) -> "Cmp":
         if isinstance(x, List) and isinstance(y, List):
             x, y = len(x), len(y)
         if x > y:
-            return cls.better
+            return cls.BETTER
         if x == y:
-            return cls.equal
-        return cls.worse
+            return cls.EQUAL
+        return cls.WORSE
 
 
 class Results(NamedTuple):
@@ -95,22 +95,21 @@ class Results(NamedTuple):
 
     @staticmethod
     def pass_verdict(current: "Results", previous: "Results"):
-        diff = Diff.compare(current, previous)
-        diff_dict = diff._asdict()
-        worse = [f"{v}: {k}!" for k, v in diff_dict.items() if Cmp.worse in v]
-        not_better = all(Cmp.equal in v for v in diff_dict.values())
+        diff = Diff.compare(current, previous)._asdict()
+        worse = [f"{v}: {k}!" for k, v in diff.items() if Cmp.WORSE in v]
+        not_better = all(Cmp.EQUAL in v for v in diff.values())
 
         if worse:
             print(
                 f"{worse}\n\n^ Sorry, job results suggest that you didn't manage to clear the baseline. Scroll up for details. ^"
             )
-            exit(2)
+            return Cmp.WORSE
         elif not_better:
             print(f"{current}\n\n^ Results are similar. ^")
-            exit(0)
+            return Cmp.EQUAL
         else:
             Results.write(current)
-            exit(1)
+            return Cmp.BETTER
 
 
 class Diff(NamedTuple):
@@ -135,7 +134,8 @@ def main():
         return
 
     previous = Results.get_latest(baseline_path)
-    Results.pass_verdict(current, previous)
+    exit_code = Results.pass_verdict(current, previous)
+    exit(exit_code)
 
 
 main()
