@@ -10,7 +10,6 @@ It will terminate with exit code:
 """
 
 import json
-from datetime import datetime
 from enum import Enum
 from itertools import islice
 from os import path
@@ -21,8 +20,6 @@ from lxml import etree
 
 report_path = path.relpath(argv[1])
 baseline_path = path.relpath(argv[2])
-
-fmt = "%d.%m.%y %H:%M:%S"
 
 
 class Cmp(str, Enum):
@@ -49,8 +46,7 @@ class Results(NamedTuple):
     @classmethod
     def get_latest(cls, path) -> "Results":
         with open(path, "r") as fh:
-            item = json.load(fh)[-1]
-        results = {k: v for k, v in item["results"]["last"].items() if k in cls._fields}
+            results = json.load(fh)
         return cls(**results)
 
     @classmethod
@@ -84,14 +80,11 @@ class Results(NamedTuple):
 
     @staticmethod
     def write(current: "Results"):
-        now = datetime.now().strftime(fmt)
         current = current._asdict()
-        payload = {"at": now, "results": current}
-        info = "Latest results written to disk."
         with open(baseline_path, "w") as fh:
-            json.dump([payload], fh, indent=2)
+            json.dump(current, fh, indent=2)
             fh.write("\n")
-        print(info)
+        print("Results written to disk.")
 
     @staticmethod
     def pass_verdict(current: "Results", previous: "Results"):
