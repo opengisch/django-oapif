@@ -87,7 +87,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
           path: baseline-repo
 
-      - name: Commit baseline if improved | copy file
+      - name: Commit baseline if improved | copy baseline file
         if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE == '1' }}
         run: cp conformance-baseline.json baseline-repo/conformance-baseline.json
 
@@ -96,7 +96,8 @@ jobs:
         uses: EndBug/add-and-commit@v9
         with:
           add: baseline.json
-          cwd: baseline-repo
+          cwd: ./baseline-repo
+          message: update baseline
 
       - name: 💬 Prepare comment
         id: prepare_comment
