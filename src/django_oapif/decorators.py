@@ -1,3 +1,4 @@
+import re
 from os import getenv
 from typing import Any, Callable, Dict, Optional
 
@@ -12,6 +13,59 @@ from django_oapif.mixins import OAPIFDescribeModelViewSetMixin
 from django_oapif.urls import oapif_router
 
 from .filters import BboxFilterBackend
+
+# taken from https://github.com/geopython/pygeoapi/blob/953b6fa74d2ce292d8f566c4f4d3bcb4161d6e95/pygeoapi/util.py#L90
+CRS_AUTHORITY = [
+    "AUTO",
+    "EPSG",
+    "OGC",
+]
+
+CRS_URI_PATTERN = re.compile(
+    (
+        rf"^http://www.opengis\.net/def/crs/"
+        rf"(?P<auth>{'|'.join(CRS_AUTHORITY)})/"
+        rf"[\d|\.]+?/(?P<code>\w+?)$"
+    )
+)
+
+
+# taken from
+def get_crs_from_uri(uri: str) -> CRS:
+    """
+    Get a `pyproj.CRS` instance from a CRS URI.
+    Author: @MTachon
+
+    :param uri: Uniform resource identifier of the coordinate
+        reference system.
+    :type uri: str
+
+    :raises `CRSError`: Error raised if no CRS could be identified from the
+        URI.
+
+    :returns: `pyproj.CRS` instance matching the input URI.
+    :rtype: `pyproj.CRS`
+    """
+
+    try:
+        crs = CRS.from_authority(*CRS_URI_PATTERN.search(uri).groups())
+    except RuntimeError:
+        msg = (
+            f"CRS could not be identified from URI {uri!r} "
+            f"(Authority: {CRS_URI_PATTERN.search(uri).group('auth')!r}, "
+            f"Code: {CRS_URI_PATTERN.search(uri).group('code')!r})."
+        )
+        raise RuntimeError(msg)
+    except AttributeError:
+        msg = (
+            f"CRS could not be identified from URI {uri!r}. CRS URIs must "
+            "follow the format "
+            "'http://www.opengis.net/def/crs/{authority}/{version}/{code}' "
+            "(see https://docs.opengeospatial.org/is/18-058r1/18-058r1.html#crs-overview)."  # noqa
+        )
+        raise AttributeError(msg)
+    else:
+        return crs
 
 
 def register_oapif_viewset(
@@ -89,16 +143,18 @@ def register_oapif_viewset(
 
                     if user_crs:
                         try:
-                            crs_epsg = int(user_crs)
-                        except ValueError:
+                            user_crs = get_crs_from_uri(user_crs)
+                        except:
                             return HttpResponseBadRequest(
                                 "This API supports only EPSG-specified CRS. Make sure to use the appropriate value for the `bbox-crs`query parameter."
                             )
-                        user_crs = CRS.from_epsg(crs_epsg)
                         api_crs = CRS.from_epsg(int(getenv("GEOMETRY_SRID", "2056")))
                         transformer = Transformer.from_crs(user_crs, api_crs)
-                        transformed_coords = transformer.transform(coords)
-                        my_bbox_polygon = Polygon.from_bbox(transformed_coords)
+                        LL = transformer.transform(coords[0], coords[1])
+                        UR = transformer.transform(coords[2], coords[3])
+                        my_bbox_polygon = Polygon.from_bbox(
+                            [LL[0], LL[1], UR[0], UR[1]]
+                        )
 
                     else:
                         my_bbox_polygon = Polygon.from_bbox(coords)
