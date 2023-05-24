@@ -49,9 +49,7 @@ class OAPIFDescribeModelViewSetMixin:
                         "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
                     },
                 }
-                response["storageCrs"] = (
-                    f"http://www.opengis.net/def/crs/EPSG/0/{srid}",
-                )
+                response["storageCrs"] = f"http://www.opengis.net/def/crs/EPSG/0/{srid}"
 
         # return the oapif layer description as an object
         return {
