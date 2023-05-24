@@ -1,4 +1,5 @@
 from django.contrib.gis.db.models import Extent
+from pyproj import CRS, Transformer
 from rest_framework.response import Response
 
 from django_oapif.urls import oapif_router
@@ -31,20 +32,26 @@ class OAPIFDescribeModelViewSetMixin:
 
         if geom_lookup:
             srid = meta_model.get_field(geom_lookup).srid
-            extents = self.get_queryset().aggregate(e=Extent(geom_lookup))[
-                "e"
-            ]  # if we wanted to force extents from srid: `or pyproj.CRS(srid).area_of_use.bounds`
+            extents = self.get_queryset().aggregate(e=Extent(geom_lookup))["e"]
 
             if extents:
+                transformer = Transformer.from_crs(CRS.from_epsg(srid), "OGC:CRS84")
+                LL = transformer.transform(extents[0], extents[1])
+                UR = transformer.transform(extents[2], extents[3])
+
                 response["crs"] = [
-                    f"http://www.opengis.net/def/crs/EPSG/0/{srid}",  # seems this isn't recognized by QGIS ?
+                    "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                    f"http://www.opengis.net/def/crs/EPSG/0/{srid}",
                 ]
                 response["extent"] = {
                     "spatial": {
-                        "bbox": [extents],
-                        "crs": f"http://www.opengis.net/def/crs/EPSG/0/{srid}",  # seems this isn't recognized by QGIS ?
+                        "bbox": [LL[0], LL[1], UR[0], UR[1]],
+                        "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
                     },
                 }
+                response["storageCrs"] = (
+                    f"http://www.opengis.net/def/crs/EPSG/0/{srid}",
+                )
 
         # return the oapif layer description as an object
         return {
