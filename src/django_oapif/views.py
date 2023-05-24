@@ -72,7 +72,7 @@ class ConformanceView(views.APIView):
                     "http://www.opengis.net/spec/ogcapi-common-1/1.0/conf/core",
                     "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/core",
                     # additionnal
-                    "http://www.opengis.net/spec/ogcapi-features-2/1.0/req/crs",
+                    "http://www.opengis.net/spec/ogcapi-features-2/1.0/conf/crs",
                 ]
             }
         )
