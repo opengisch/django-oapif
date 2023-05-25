@@ -1,6 +1,6 @@
 django>=4
 django-computedfields
-psycopg2
+psycopg2-binary
 transifex-client
 djangorestframework
 djangorestframework-gis

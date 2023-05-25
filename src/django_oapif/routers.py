@@ -19,7 +19,6 @@ class OAPIFRouter(routers.SimpleRouter):
     """
 
     include_format_suffixes = True
-    # default_schema_renderers = None
     APISchemaView = SchemaView
     SchemaGenerator = SchemaGenerator
 
