@@ -45,7 +45,7 @@ class OAPIFDescribeModelViewSetMixin:
                 ]
                 response["extent"] = {
                     "spatial": {
-                        "bbox": [LL[0], LL[1], UR[0], UR[1]],
+                        "bbox": [[LL[0], LL[1], UR[0], UR[1]]],
                         "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
                     },
                 }
