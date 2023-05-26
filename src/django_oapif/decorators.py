@@ -155,7 +155,7 @@ def register_oapif_viewset(
                             return HttpResponseBadRequest(
                                 "This API supports only EPSG-specified CRS. Make sure to use the appropriate value for the `bbox-crs`query parameter."
                             )
-                        transformer = Transformer.from_crs(user_crs, api_crs)
+                        transformer = Transformer.from_crs(bbox_crs, api_crs)
                         LL = transformer.transform(coords[0], coords[1])
                         UR = transformer.transform(coords[2], coords[3])
                         my_bbox_polygon = Polygon.from_bbox(
