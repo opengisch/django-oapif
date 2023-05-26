@@ -137,18 +137,24 @@ def register_oapif_viewset(
                 # Override get_queryset to catch bbox-crs
                 queryset = super().get_queryset()
 
-                if self.request.GET.get("bbox"):
-                    coords = self.request.GET["bbox"].split(",")
-                    user_crs = self.request.GET.get("bbox-crs")
+                api_crs = CRS.from_epsg(int(getenv("GEOMETRY_SRID", "2056")))
 
-                    if user_crs:
+                crs = self.request.GET.get(
+                    "crs", "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+                )
+                do_transform = crs != api_crs
+
+                if self.request.GET["bbox"]:
+                    coords = self.request.GET["bbox"].split(",")
+                    bbox_crs = self.request.GET.get("bbox-crs")
+
+                    if bbox_crs:
                         try:
-                            user_crs = get_crs_from_uri(user_crs)
+                            bbox_crs = get_crs_from_uri(bbox_crs)
                         except:
                             return HttpResponseBadRequest(
                                 "This API supports only EPSG-specified CRS. Make sure to use the appropriate value for the `bbox-crs`query parameter."
                             )
-                        api_crs = CRS.from_epsg(int(getenv("GEOMETRY_SRID", "2056")))
                         transformer = Transformer.from_crs(user_crs, api_crs)
                         LL = transformer.transform(coords[0], coords[1])
                         UR = transformer.transform(coords[2], coords[3])
@@ -159,9 +165,17 @@ def register_oapif_viewset(
                     else:
                         my_bbox_polygon = Polygon.from_bbox(coords)
 
-                    return queryset.filter(geom__intersects=my_bbox_polygon)
+                    if do_transform:
+                        return queryset.filter(
+                            geom__intersects=my_bbox_polygon
+                        ).transform(srid=crs)
+                    else:
+                        return queryset.filter(geom__intersects=my_bbox_polygon)
 
-                return queryset.all()
+                if do_transform:
+                    return queryset.all().transform(srid=crs)
+                else:
+                    return queryset.all()
 
         # Apply custom serializer attributes
         # if viewset_serializer_class.__name__ == "AutoNoGeomSerializer":
