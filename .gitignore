@@ -14,3 +14,4 @@ src/django_oapif/__version__.py
 static
 media
 _test_outputs
+unit_tests_outputs

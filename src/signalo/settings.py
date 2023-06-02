@@ -46,12 +46,15 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.postgres",
+    "psqlextra",
     "django.contrib.gis",
     "rest_framework",
     "rest_framework_gis",
     "computedfields",
     "debug_toolbar",
 ]
+
 
 MIDDLEWARE = [
     "debug_toolbar.middleware.DebugToolbarMiddleware",
@@ -90,7 +93,7 @@ WSGI_APPLICATION = "signalo.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.contrib.gis.db.backends.postgis",
+        "ENGINE": "psqlextra.backend",
         "NAME": "postgres",
         "HOST": "postgres",
         "PORT": 5432,
@@ -98,6 +101,8 @@ DATABASES = {
         "PASSWORD": os.getenv("POSTGRES_PASSWORD"),
     }
 }
+
+POSTGRES_EXTRA_DB_BACKEND_BASE = "django.contrib.db.backends.postgis"
 
 
 # Password validation

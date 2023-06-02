@@ -4,6 +4,7 @@ psycopg2
 transifex-client
 djangorestframework
 djangorestframework-gis
+django-postgres-extra
 pyyaml
 uritemplate
 pyproj

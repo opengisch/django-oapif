@@ -1,9 +1,11 @@
 from os import getenv
 from typing import Any, Callable, Dict, Optional
 
+from django.contrib.gis.db.models import Model
+from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import Polygon
-from django.db.models import Model
 from django.http import HttpResponseBadRequest
+from psqlextra.models import PostgresModel
 from pyproj import CRS, Transformer
 from rest_framework import viewsets
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
@@ -66,12 +68,12 @@ def register_oapif_viewset(
 
         # Create the viewset
         class Viewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
-            queryset = Model.objects.all()
+            queryset = PostgresModel.objects.all()
             serializer_class = viewset_serializer_class
 
             # TODO: these should probably be moved to the mixin
-            oapif_title = Model._meta.verbose_name
-            oapif_description = Model.__doc__
+            oapif_title = PostgresModel._meta.verbose_name
+            oapif_description = PostgresModel.__doc__
 
             # (one day this will be retrieved automatically from the serializer)
             oapif_geom_lookup = viewset_oapif_geom_lookup
@@ -84,19 +86,26 @@ def register_oapif_viewset(
                 # Override get_queryset to catch bbox-crs
                 queryset = super().get_queryset()
 
-                if self.request.GET.get("bbox"):
-                    coords = self.request.GET["bbox"].split(",")
-                    user_crs = self.request.GET.get("bbox-crs")
+                api_crs = CRS.from_epsg(int(getenv("GEOMETRY_SRID", "2056")))
 
-                    if user_crs:
+                crs = self.request.GET.get(
+                    "crs", "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+                )
+                bbox = self.request.GET.get("bbox")
+                do_transform = crs != api_crs
+
+                if bbox:
+                    coords = self.request.GET["bbox"].split(",")
+                    bbox_crs = self.request.GET.get("bbox-crs")
+
+                    if bbox_crs:
                         try:
-                            user_crs = get_crs_from_uri(user_crs)
+                            bbox_crs = get_crs_from_uri(bbox_crs)
                         except:
                             return HttpResponseBadRequest(
                                 "This API supports only EPSG-specified CRS. Make sure to use the appropriate value for the `bbox-crs`query parameter."
                             )
-                        api_crs = CRS.from_epsg(int(getenv("GEOMETRY_SRID", "2056")))
-                        transformer = Transformer.from_crs(user_crs, api_crs)
+                        transformer = Transformer.from_crs(bbox_crs, api_crs)
                         LL = transformer.transform(coords[0], coords[1])
                         UR = transformer.transform(coords[2], coords[3])
                         my_bbox_polygon = Polygon.from_bbox(
@@ -106,9 +115,23 @@ def register_oapif_viewset(
                     else:
                         my_bbox_polygon = Polygon.from_bbox(coords)
 
-                    return queryset.filter(geom__intersects=my_bbox_polygon)
+                    if do_transform:
+                        return (
+                            queryset.filter(geom__intersects=my_bbox_polygon)
+                            .annotate(geom2=Transform("geom", 4326))
+                            .rename_annotation(geom="geom2")
+                        )
+                    else:
+                        return queryset.filter(geom__intersects=my_bbox_polygon)
 
-                return queryset.all()
+                if do_transform:
+                    return (
+                        queryset.all()
+                        .annotate(geom2=Transform("geom", 4326))
+                        .rename_annotation(geom="geom2")
+                    )
+                else:
+                    return queryset.all()
 
         # Apply custom serializer attributes
         # if viewset_serializer_class.__name__ == "AutoNoGeomSerializer":
