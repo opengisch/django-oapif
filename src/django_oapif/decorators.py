@@ -11,7 +11,7 @@ from rest_framework_gis.serializers import GeoFeatureModelSerializer
 from django_oapif.mixins import OAPIFDescribeModelViewSetMixin
 from django_oapif.urls import oapif_router
 
-from .crs_ultis import get_crs_from_uri
+from .crs_utils import get_crs_from_uri
 from .filters import BboxFilterBackend
 
 
