@@ -102,7 +102,7 @@ DATABASES = {
     }
 }
 
-POSTGRES_EXTRA_DB_BACKEND_BASE = "django.contrib.db.backends.postgis"
+POSTGRES_EXTRA_DB_BACKEND_BASE = "django.contrib.gis.db.backends.postgis"
 
 
 # Password validation
