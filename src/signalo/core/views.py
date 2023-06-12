@@ -32,7 +32,6 @@ class PoleHighPerfViewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet)
     pagination_class = HighPerfPagination
     oapif_title = "Poles (high perf)"
     oapif_description = "Poles layer - including high performance optimization"
-    # (one day this will be retrieved automatically from the serializer)
     oapif_geom_lookup = "geom"
 
     def list(self, request, *args, **kwargs):

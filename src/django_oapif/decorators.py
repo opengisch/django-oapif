@@ -1,17 +1,12 @@
-from os import getenv
 from typing import Any, Callable, Dict, Optional
 
-from django.contrib.gis.geos import Polygon
 from django.db.models import Model
-from django.http import HttpResponseBadRequest
-from pyproj import CRS, Transformer
 from rest_framework import viewsets
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from django_oapif.mixins import OAPIFDescribeModelViewSetMixin
 from django_oapif.urls import oapif_router
 
-from .crs_utils import get_crs_from_uri
 from .filters import BboxFilterBackend
 
 
@@ -49,16 +44,17 @@ def register_oapif_viewset(
                 fields = "__all__"
                 geo_field = "geom"
 
-        """ ON HOLD, WAITING ON GeoFeatureModelSerializer to admit of null geometries """
-        # class AutoNoGeomSerializer(ModelSerializer):
-        #     class Meta:
-        #         model = Model
-        #         fields = "__all__"
-
-        # if skip_geom:
-        #     viewset_serializer_class = AutoNoGeomSerializer
-        #     viewset_oapif_geom_lookup = None
-        # else:
+        # ON HOLD, WAITING ON GeoFeatureModelSerializer to admit of null geometries
+        """
+        class AutoNoGeomSerializer(ModelSerializer):
+            class Meta:
+                model = Model
+                fields = "__all__
+        if skip_geom:
+            viewset_serializer_class = AutoNoGeomSerializer
+            viewset_oapif_geom_lookup = None
+        else:
+        """
         viewset_serializer_class = AutoSerializer
         viewset_oapif_geom_lookup = (
             "geom"  # one day this will be retrieved automatically from the serializer
@@ -80,41 +76,13 @@ def register_oapif_viewset(
             # Allowing '.' and '-' in urls
             lookup_value_regex = r"[\w.-]+"
 
-            def get_queryset(self):
-                # Override get_queryset to catch bbox-crs
-                queryset = super().get_queryset()
-
-                if self.request.GET.get("bbox"):
-                    coords = self.request.GET["bbox"].split(",")
-                    user_crs = self.request.GET.get("bbox-crs")
-
-                    if user_crs:
-                        try:
-                            user_crs = get_crs_from_uri(user_crs)
-                        except:
-                            return HttpResponseBadRequest(
-                                "This API supports only EPSG-specified CRS. Make sure to use the appropriate value for the `bbox-crs`query parameter."
-                            )
-                        api_crs = CRS.from_epsg(int(getenv("GEOMETRY_SRID", "2056")))
-                        transformer = Transformer.from_crs(user_crs, api_crs)
-                        LL = transformer.transform(coords[0], coords[1])
-                        UR = transformer.transform(coords[2], coords[3])
-                        my_bbox_polygon = Polygon.from_bbox(
-                            [LL[0], LL[1], UR[0], UR[1]]
-                        )
-
-                    else:
-                        my_bbox_polygon = Polygon.from_bbox(coords)
-
-                    return queryset.filter(geom__intersects=my_bbox_polygon)
-
-                return queryset.all()
-
+        # ON HOLD, WAITING ON GeoFeatureModelSerializer to admit of null geometries
+        """
         # Apply custom serializer attributes
-        # if viewset_serializer_class.__name__ == "AutoNoGeomSerializer":
-        #     for k, v in custom_serializer_attrs.items():
-        #         setattr(AutoNoGeomSerializer.Meta, k, v)
-
+        if viewset_serializer_class.__name__ == "AutoNoGeomSerializer":
+             for k, v in custom_serializer_attrs.items():
+                 setattr(AutoNoGeomSerializer.Meta, k, v)
+        """
         # Apply custom serializer attributes
         for k, v in custom_serializer_attrs.items():
             setattr(AutoSerializer.Meta, k, v)

@@ -25,7 +25,7 @@ class OapifPagination(pagination.LimitOffsetPagination):
                 ],
                 "numberReturned": len(data["features"]),
                 "numberMatched": self.count,
-                **data,  # this looks to be unpacked by LimitOffsetPagination anyway
+                **data,
             }
         )
 

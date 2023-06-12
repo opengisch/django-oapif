@@ -36,7 +36,7 @@ class Command(BaseCommand):
                 if batch:
                     Road.objects.bulk_create(batch)
                     len_batch = len(batch)
-                    total += len(batch)
+                    total += len_batch
                     print(f"{len_batch} more roads...")
                 else:
                     break

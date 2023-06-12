@@ -3,6 +3,7 @@ requires = ["setuptools>=45", "setuptools_scm[toml]==7.*"]
 build-backend = "setuptools.build_meta"
 
 [project]
+requires-python = ">=3.9"
 name = "django-ogcapif"
 authors = [
     {name = "OPENGIS.ch", email = "info@opengis.ch"},
@@ -30,4 +31,4 @@ root = ".."
 [tool.setuptools.dynamic]
 readme = {file = ["README.md"], content-type = "text/markdown"}
 dependencies = {file = ["requirements.txt"]}
-optional-dependencies.dev = {file = ["requirements-dev.txt"]}
+optional-dependencies = {file = ["requirements-dev.txt"]}
