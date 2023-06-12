@@ -3,7 +3,7 @@ requires = ["setuptools>=45", "setuptools_scm[toml]==7.*"]
 build-backend = "setuptools.build_meta"
 
 [project]
-requires-python = ">3.9.6"
+requires-python = ">=3.9"
 name = "django-ogcapif"
 authors = [
     {name = "OPENGIS.ch", email = "info@opengis.ch"},
