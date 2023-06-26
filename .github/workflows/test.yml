@@ -41,7 +41,7 @@ jobs:
         cache-to: type=registry,ref=opengisch/signalo-django:latest,mode=max
         tags: opengisch/signalo-django:latest
 
-    - name: Setup Compose & run all tests
+    - name: Setup Compose
       run: |
         # copy default conf
         cp .env.example .env
@@ -53,11 +53,15 @@ jobs:
         docker compose exec django python manage.py collectstatic --no-input
         docker compose exec django python manage.py migrate --no-input
 
-        # run tests
+    - name: Run unit tests
+      run: |
         docker compose exec django python manage.py test signalo.value_lists
         docker compose exec django python manage.py test signalo.core
         docker compose exec django python manage.py test signalo.edge_cases
         docker compose exec django python manage.py test signalo.roads
+
+    - name: Run integration tests
+      run: docker compose run integration_tests
 
     - name: Failure logs
       if: failure()

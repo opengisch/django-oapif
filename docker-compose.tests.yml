@@ -9,3 +9,10 @@ services:
       - ./docker/conformance-tests/test-run-props.xml:/build/run/test-run-props.xml
     profiles:
       - testing
+
+  integration_tests:
+    build: ./docker/integration-tests
+    volumes:
+      - ./docker/integration-tests/test_auth_from_qgis.py:/test_auth_from_qgis.py:ro
+    profiles:
+      - testing
