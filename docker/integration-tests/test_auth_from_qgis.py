@@ -3,7 +3,7 @@ from qgis.core import QgsProject, QgsVectorLayer
 
 ROOT_URL = "http://django:8000/oapif/"
 COLLECTIONS_URL = "http://django:8000/oapif/collections"
-POLES_URL = "http://django:8000/oapif/collections/signalo_core.pole/items"
+POLES_URL = "http://django:8000/oapif/collections/signalo_core.pole"
 
 
 def test_that_endpoints_respond_ok():
@@ -29,7 +29,14 @@ def test_many_poles():
 
 
 def test_load_layer():
-    layer = QgsVectorLayer(POLES_URL, "poles", "WFS")
+    # params = {
+    #     "service": "WFS",
+    #     "request": "GetFeature",
+    #     "version": "1.1.0",
+    #     "typename": "signalo_core.pole"
+    # }
+    # quoted_params = urllib.parse.unquote(urllib.parse.urlencode(params))
+    layer = QgsVectorLayer(COLLECTIONS_URL, "/signalo_core.pole", "WFS")
     assert layer.isValid()
 
     project = QgsProject.instance()
