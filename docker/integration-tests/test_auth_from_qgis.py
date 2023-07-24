@@ -1,12 +1,12 @@
 import requests
-from qgis.core import QgsProject, QgsVectorLayer
+from qgis.core import QgsDataSourceUri, QgsProject, QgsVectorLayer
 
 ROOT_URL = "http://django:8000/oapif/"
 COLLECTIONS_URL = "http://django:8000/oapif/collections"
 POLES_URL = "http://django:8000/oapif/collections/signalo_core.pole"
 
 
-def test_that_endpoints_respond_ok():
+def test_endpoint_ok():
     root_response = requests.get(ROOT_URL)
     collections_response = requests.get(COLLECTIONS_URL)
     poles_response = requests.get(POLES_URL)
@@ -29,15 +29,14 @@ def test_many_poles():
 
 
 def test_load_layer():
-    # params = {
-    #     "service": "WFS",
-    #     "request": "GetFeature",
-    #     "version": "1.1.0",
-    #     "typename": "signalo_core.pole"
-    # }
-    # quoted_params = urllib.parse.unquote(urllib.parse.urlencode(params))
-    layer = QgsVectorLayer(COLLECTIONS_URL, "/signalo_core.pole", "WFS")
+    uri = QgsDataSourceUri()
+    uri.setParam("service", "wfs")
+    uri.setParam("version", "1.1.0")
+    uri.setParam("url", ROOT_URL)
+
+    layer = QgsVectorLayer(uri.uri(), "signalo_core.pole", "WFS")
     assert layer.isValid()
 
     project = QgsProject.instance()
     project.addLayer(layer)
+    assert len(project.mapLayers().values()) > 0
