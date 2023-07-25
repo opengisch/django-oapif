@@ -11,8 +11,8 @@ services:
       - testing
 
   integration_tests:
-    build: ./docker/integration-tests
+    build: ./docker/tests
     volumes:
-      - ./docker/integration-tests/test_auth_from_qgis.py:/test_auth_from_qgis.py:ro
+      - ./docker/integration-tests:/integration-tests:ro
     profiles:
       - testing
