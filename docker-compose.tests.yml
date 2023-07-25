@@ -12,7 +12,7 @@ services:
 
   integration_tests:
     build: ./docker/integration-tests
-    command: bash -c 'xvfb-run python3 -m unittest discover'
+    command: sh -c 'xvfb-run python3 -m unittest discover'
     tty: true
     volumes:
       - ./docker/integration-tests:/integration-tests
