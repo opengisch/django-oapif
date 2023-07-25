@@ -1,6 +1,6 @@
+import requests
 from qgis.core import QgsDataSourceUri, QgsProject, QgsVectorLayer
 from qgis.testing import start_app, unittest
-import requests
 
 start_app()
 
@@ -10,6 +10,13 @@ POLES_URL = "http://django:8000/oapif/collections/signalo_core.pole"
 
 
 class TestStack(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.project = QgsProject.instance()
+        cls.user = "admin"
+        cls.password = "123"
+
     def test_endpoint_ok(self):
         root_response = requests.get(ROOT_URL)
         collections_response = requests.get(COLLECTIONS_URL)
@@ -38,6 +45,19 @@ class TestStack(unittest.TestCase):
         layer = QgsVectorLayer(uri.uri(), "pole", "OAPIF")
         self.assertTrue(layer.isValid())
 
-        project = QgsProject.instance()
-        project.addMapLayer(layer)
-        self.assertTrue(len(project.mapLayers().values()) > 0)
+        self.project.addMapLayer(layer)
+        self.assertTrue(len(self.project.mapLayers().values()) > 0)
+
+    def test_load_with_basic_auth(self):
+        uri = QgsDataSourceUri()
+        uri.setParam("service", "wfs")
+        uri.setParam("typename", "signalo_core.pole")
+        uri.setParam("url", ROOT_URL)
+        uri.setPassword(self.password)
+        uri.setUsername(self.user)
+
+        layer = QgsVectorLayer(uri.uri(), "pole", "OAPIF")
+        self.assertTrue(layer.isValid())
+
+        self.project.addMapLayer(layer)
+        self.assertTrue(len(self.project.mapLayers().values()) > 0)
