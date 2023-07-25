@@ -49,7 +49,7 @@ jobs:
         file: docker/integration-tests/Dockerfile
         push: ${{ github.repository == 'opengisch/django-ogcapif' }}
         pull: true
-        cache-from: type=gha,
+        cache-from: type=gha
         cache-to: type=gha,mode=max
 
     - name: Setup Compose
