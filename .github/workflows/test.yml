@@ -51,6 +51,7 @@ jobs:
         pull: true
         cache-from: type=gha
         cache-to: type=gha,mode=max
+        tags: opengisch/signalo-django-integrations-tests:latest
 
     - name: Setup Compose
       run: |
