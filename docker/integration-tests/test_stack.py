@@ -1,5 +1,5 @@
 import requests
-from qgis.core import QgsDataSourceUri, QgsProject, QgsVectorLayer
+from qgis.core import QgsDataSourceUri, QgsFeature, QgsProject, QgsVectorLayer
 from qgis.testing import start_app, unittest
 
 start_app()
@@ -58,6 +58,10 @@ class TestStack(unittest.TestCase):
 
         layer = QgsVectorLayer(uri.uri(), "pole", "OAPIF")
         self.assertTrue(layer.isValid())
+        layer = self.project.addMapLayer(layer)
+        self.assertIsNotNone(layer)
 
-        self.project.addMapLayer(layer)
-        self.assertTrue(len(self.project.mapLayers().values()) > 0)
+        f = None
+        for f in layer.getFeatures("name='1-1'"):
+            pass
+        self.assertIsInstance(f, QgsFeature)
