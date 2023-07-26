@@ -41,18 +41,6 @@ jobs:
         cache-to: type=registry,ref=opengisch/signalo-django:latest,mode=max
         tags: opengisch/signalo-django:latest
 
-    - name: Build integration tests image
-      uses: docker/build-push-action@v4
-      with:
-        context: .
-        provenance: false
-        file: docker/integration-tests/Dockerfile
-        push: ${{ github.repository == 'opengisch/django-ogcapif' }}
-        pull: true
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-        tags: opengisch/signalo-django-integrations-tests:latest
-
     - name: Setup Compose
       run: |
         # copy default conf

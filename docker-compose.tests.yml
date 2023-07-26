@@ -11,10 +11,11 @@ services:
       - testing
 
   integration_tests:
-    build: ./docker/integration-tests
+    image: opengisch/qgis:latest
     command: sh -c 'xvfb-run python3 -m unittest discover'
     tty: true
     volumes:
       - ./docker/integration-tests:/integration-tests
+    working_dir: /integration-tests
     profiles:
       - testing
