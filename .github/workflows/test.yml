@@ -52,6 +52,9 @@ jobs:
         # deploy static files and migrate database
         docker compose exec django python manage.py collectstatic --no-input
         docker compose exec django python manage.py migrate --no-input
+        docker-compose exec django python manage.py populate_users
+        docker-compose exec django python manage.py populate_vl
+        docker-compose exec django python manage.py populate_signs_poles
 
     - name: Run unit tests
       run: |
