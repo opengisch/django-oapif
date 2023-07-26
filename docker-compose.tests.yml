@@ -9,3 +9,13 @@ services:
       - ./docker/conformance-tests/test-run-props.xml:/build/run/test-run-props.xml
     profiles:
       - testing
+
+  integration_tests:
+    image: opengisch/qgis:latest
+    command: sh -c 'xvfb-run python3 -m unittest discover'
+    tty: true
+    volumes:
+      - ./docker/integration-tests:/integration-tests
+    working_dir: /integration-tests
+    profiles:
+      - testing
