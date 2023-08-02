@@ -8,9 +8,6 @@ from django.db.models import Model
 from django.http import HttpResponseBadRequest, StreamingHttpResponse
 from psycopg2 import sql
 from pyproj import CRS, Transformer
-from typing import Any, Callable, Dict, Optional
-
-from django.db.models import Model
 from rest_framework import viewsets
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
