@@ -1,4 +1,3 @@
-from django.contrib.gis.db.models.functions import AsWKB
 from django.core.management import call_command
 from django.db import connection
 from psycopg2 import sql
@@ -16,21 +15,6 @@ class TestRoads(APITestCase):
         query = "SELECT ST_IsValid(geom) FROM signalo_roads_road"
         with connection.cursor() as cur:
             cur.execute(query)
-
-    def test_geom_wkb_with_geodjango(self):
-        wkbs = Road.objects.annotate(wkb=AsWKB("geom")).values_list("wkb", flat=True)
-        self.assertGreater(len(wkbs), 1000)
-
-    def test_geom_wkb(self):
-        instances = Road.objects.all()[:1000]
-        ids = tuple([instance.id for instance in instances])
-        with connection.cursor() as cur:
-            query = sql.SQL(
-                "SELECT ST_AsBinary(geom) FROM {table} WHERE id IN %s"
-            ).format(table=sql.Identifier(Road._meta.db_table))
-            cur.execute(query, (ids,))
-            entries = cur.fetchall()
-            self.assertEqual(len(entries), 1000)
 
     def test_geom_fgb(self):
         instances = Road.objects.all()[:1000]

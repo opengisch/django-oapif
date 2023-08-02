@@ -1,16 +1,11 @@
-import json
 from typing import Any, Callable, Dict, Optional
 
-from django.contrib.gis.db.models.functions import AsWKB
 from django.db import connection
 from django.db.models import Model
 from django.http import StreamingHttpResponse
 from psycopg2 import sql
 from rest_framework import viewsets
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
-
-from django_oapif.db import mk_gen_items
-from django_oapif.pagination import OapifPagination
 
 from .filters import BboxFilterBackend
 from .mixins import OAPIFDescribeModelViewSetMixin
@@ -82,43 +77,30 @@ def register_oapif_viewset(
             # Handling BBOX requirements
             filter_backends = [BboxFilterBackend]
 
-            # Pagination
-            pagination_class = OapifPagination
-
             # Allowing '.' and '-' in urls
             lookup_value_regex = r"[\w.-]+"
 
             def list(self, request):
-                # Override list to support downloading items with their geometric
-                # field as WKB, or alternatively, download just the geometries as FlatGeoBuf
-                format = self.request.GET.get("format")
+                # Override list to support downloading geometry
+                # in items as FlatGeoBuf
+                output = self.request.GET.get("output")
 
-                if not format or format == "json":
+                if output != "fgb":
                     return super().list(request)
 
-                queryset = self.get_queryset()
-
-                if format == "wkb":
-                    queryset = queryset.annotate(wkb=AsWKB("geom"))
-                    get_geom = lambda v: bytes(v.wkb)
-                    gen_items = mk_gen_items(queryset, get_geom)
-                    iterable = (json.dumps(item) for item in gen_items)
-
-                elif format == "fgb":
-                    table_name = Model._meta.db_table
-                    pks = tuple(queryset.values_list("id", flat=True))
-                    query = sql.SQL(
-                        """
-                        WITH rows AS (SELECT geom FROM {table} WHERE id IN %s)
-                        SELECT encode(ST_AsFlatGeobuf(rows), 'base64') FROM rows
+                queryset = self.filter_queryset(self.get_queryset())
+                table_name = Model._meta.db_table
+                pks = tuple(queryset.values_list("id", flat=True))
+                query = sql.SQL(
                     """
-                    ).format(table=sql.Identifier(table_name))
+                    WITH rows AS (SELECT geom FROM {table} WHERE id IN %s)
+                    SELECT encode(ST_AsFlatGeobuf(rows), 'base64') FROM rows
+                """
+                ).format(table=sql.Identifier(table_name))
 
-                    with connection.cursor() as cur:
-                        cur.execute(query, (pks,))
-                        iterable = cur.fetchall()
-
-                return StreamingHttpResponse(iterable)
+                with connection.cursor() as cur:
+                    cur.execute(query, (pks,))
+                    return StreamingHttpResponse(cur.fetchall())
 
         # Apply custom serializer attributes
         for k, v in custom_serializer_attrs.items():
