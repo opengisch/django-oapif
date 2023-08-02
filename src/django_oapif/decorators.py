@@ -1,7 +1,7 @@
 from typing import Any, Callable, Dict, Optional
 
 from django.db.models import Model
-from rest_framework import response, viewsets
+from rest_framework import viewsets
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from django_oapif.metadata import OAPIFMetadata
@@ -80,11 +80,15 @@ def register_oapif_viewset(
             # Metadata
             metadata_class = OAPIFMetadata
 
-            def options(self, request, *args, **kwargs) -> response.Response:
-                allowed_actions = self.metadata_class().determine_actions(request, self)
-                allowed_actions = ", ".join(allowed_actions.keys())
-                data = self.metadata_class().determine_metadata(request, self)
-                return response.Response(data, headers={"Allow": allowed_actions})
+            def finalize_response(self, request, response, *args, **kwargs):
+                response = super().finalize_response(request, response, *args, **kwargs)
+                if request.method == "OPTIONS":
+                    allowed_actions = self.metadata_class().determine_actions(
+                        request, self
+                    )
+                    allowed_actions = ", ".join(allowed_actions.keys())
+                    response.headers["Allow"] = allowed_actions
+                return response
 
         # ON HOLD, WAITING ON GeoFeatureModelSerializer to admit of null geometries
         """
