@@ -17,48 +17,55 @@ jobs:
       OGCAPIF_HOST: localhost
 
     steps:
-      - uses: actions/checkout@v3
+    - uses: actions/checkout@v3
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
 
-      - name: Login to DockerHub
-        if: github.repository == 'opengisch/django-ogcapif'
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: Login to DockerHub
+      if: github.repository == 'opengisch/django-ogcapif'
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build Django image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          provenance: false
-          file: docker/django/Dockerfile
-          push: ${{ github.repository == 'opengisch/django-ogcapif' }}
-          pull: true
-          cache-from: type=registry,ref=opengisch/signalo-django:latest
-          cache-to: type=registry,ref=opengisch/signalo-django:latest,mode=max
-          tags: opengisch/signalo-django:latest
+    - name: Build Django image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        provenance: false
+        file: docker/django/Dockerfile
+        push: ${{ github.repository == 'opengisch/django-ogcapif' }}
+        pull: true
+        cache-from: type=registry,ref=opengisch/signalo-django:latest
+        cache-to: type=registry,ref=opengisch/signalo-django:latest,mode=max
+        tags: opengisch/signalo-django:latest
 
-      - name: Setup Compose & run all tests
-        run: |
-          # copy default conf
-          cp .env.example .env
+    - name: Setup Compose
+      run: |
+        # copy default conf
+        cp .env.example .env
 
-          # start the stack
-          docker compose up --build -d
+        # start the stack
+        docker compose up --build -d
 
-          # deploy static files and migrate database
-          docker compose exec django python manage.py collectstatic --no-input
-          docker compose exec django python manage.py migrate --no-input
+        # deploy static files and migrate database
+        docker compose exec django python manage.py collectstatic --no-input
+        docker compose exec django python manage.py migrate --no-input
+        docker-compose exec -T django python manage.py populate_users
+        docker-compose exec -T django python manage.py populate_vl
+        docker-compose exec -T django python manage.py populate_signs_poles
 
-          # run tests
-          docker compose exec django python manage.py test signalo.value_lists
-          docker compose exec django python manage.py test signalo.core
-          docker compose exec django python manage.py test signalo.edge_cases
-          docker compose exec django python manage.py test signalo.roads
+    - name: Run unit tests
+      run: |
+        docker compose exec django python manage.py test signalo.value_lists
+        docker compose exec django python manage.py test signalo.core
+        docker compose exec django python manage.py test signalo.edge_cases
+        docker compose exec django python manage.py test signalo.roads
 
-      - name: Failure logs
-        if: failure()
-        run: docker-compose logs
+    - name: Run integration tests
+      run: docker compose run integration_tests
+
+    - name: Failure logs
+      if: failure()
+      run: docker-compose logs
