@@ -2,17 +2,15 @@ import json
 from typing import Any, Callable, Dict, Optional
 
 from django.contrib.gis.db.models.functions import AsWKB
-from django.contrib.gis.geos import Polygon
 from django.db import connection
 from django.db.models import Model
-from django.http import HttpResponseBadRequest, StreamingHttpResponse
+from django.http import StreamingHttpResponse
 from psycopg2 import sql
-from pyproj import CRS, Transformer
 from rest_framework import viewsets
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from django_oapif.db import mk_gen_items
-from signalo.settings import GEOMETRY_SRID
+from django_oapif.pagination import OapifPagination
 
 from .filters import BboxFilterBackend
 from .mixins import OAPIFDescribeModelViewSetMixin
@@ -80,7 +78,12 @@ def register_oapif_viewset(
 
             # (one day this will be retrieved automatically from the serializer)
             oapif_geom_lookup = viewset_oapif_geom_lookup
+
+            # Handling BBOX requirements
             filter_backends = [BboxFilterBackend]
+
+            # Pagination
+            pagination_class = OapifPagination
 
             # Allowing '.' and '-' in urls
             lookup_value_regex = r"[\w.-]+"
@@ -88,36 +91,20 @@ def register_oapif_viewset(
             def list(self, request):
                 # Override list to support downloading items with their geometric
                 # field as WKB, or alternatively, download just the geometries as FlatGeoBuf
-                geom_as = self.request.GET.get("geom_as")
-                only_geom_as = self.request.GET.get("only_geom_as")
+                format = self.request.GET.get("format")
 
-                if not geom_as and not only_geom_as:
-                    return super().list(request)
-
-                if geom_as is not None and geom_as != "wkb":
-                    return super().list(request)
-
-                if only_geom_as is not None and only_geom_as != "fgb":
+                if not format or format == "json":
                     return super().list(request)
 
                 queryset = self.get_queryset()
-                limit = self.request.GET.get("limit")
-                offset = self.request.GET.get("offset")
 
-                if offset:
-                    queryset = queryset[int(offset) :]
-
-                if limit:
-                    queryset = queryset[: int(limit)]
-
-                if geom_as == "wkb":
+                if format == "wkb":
                     queryset = queryset.annotate(wkb=AsWKB("geom"))
                     get_geom = lambda v: bytes(v.wkb)
                     gen_items = mk_gen_items(queryset, get_geom)
                     iterable = (json.dumps(item) for item in gen_items)
-                    return StreamingHttpResponse(iterable)
 
-                if only_geom_as == "fgb":
+                elif format == "fgb":
                     table_name = Model._meta.db_table
                     pks = tuple(queryset.values_list("id", flat=True))
                     query = sql.SQL(
@@ -131,35 +118,7 @@ def register_oapif_viewset(
                         cur.execute(query, (pks,))
                         iterable = cur.fetchall()
 
-                    return StreamingHttpResponse(iterable)
-
-            def get_queryset(self):
-                # Override get_queryset to catch bbox-crs
-                queryset = self.filter_queryset(super().get_queryset())
-
-                if self.request.GET.get("bbox"):
-                    coords = self.request.GET["bbox"].split(",")
-                    user_crs = self.request.GET.get("bbox-crs")
-
-                    if user_crs:
-                        try:
-                            crs_epsg = int(user_crs)
-                        except ValueError:
-                            return HttpResponseBadRequest(
-                                "This API supports only EPSG-specified CRS. Make sure to use the appropriate value for the `bbox-crs`query parameter."
-                            )
-                        user_crs = CRS.from_epsg(crs_epsg)
-                        api_crs = CRS.from_epsg(GEOMETRY_SRID)
-                        transformer = Transformer.from_crs(user_crs, api_crs)
-                        transformed_coords = transformer.transform(coords)
-                        my_bbox_polygon = Polygon.from_bbox(transformed_coords)
-
-                    else:
-                        my_bbox_polygon = Polygon.from_bbox(coords)
-
-                    return queryset.filter(geom__intersects=my_bbox_polygon)
-
-                return queryset.all()
+                return StreamingHttpResponse(iterable)
 
         # Apply custom serializer attributes
         for k, v in custom_serializer_attrs.items():
