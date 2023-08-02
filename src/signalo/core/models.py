@@ -102,6 +102,10 @@ class Sign(ComputedFieldsModel):
         ],
     )
     def offset_px(self) -> int:
+        """
+        Recalculates offset whenever a new Sign instance
+        occurs on the same pole
+        """
         default_padding_px = 5
         previous_signs_on_pole = Sign.objects.filter(
             azimuth__pole__id=self.azimuth.pole.id, order__lt=self.order

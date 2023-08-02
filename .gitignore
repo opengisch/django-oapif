@@ -10,8 +10,8 @@ build
 dist
 *.egg-info
 src/django_oapif/__version__.py
-docker-compose.override.yml
 
 static
 media
 _test_outputs
+.vscode/

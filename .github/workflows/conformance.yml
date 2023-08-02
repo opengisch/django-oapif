@@ -9,7 +9,7 @@ on:
       - main
 
 jobs:
-  test-quickstart:
+  conformance:
     runs-on: ubuntu-latest
     env:
       DOCKER_BUILDKIT: 1
@@ -76,31 +76,49 @@ jobs:
         run: |
           pip install lxml
           EXIT_CODE=0
-          python scripts/parse_report.py _test_outputs/emailable-report.html baseline.json  || EXIT_CODE=$?
-          echo "exit_code=${EXIT_CODE}" >> $GITHUB_OUTPUT
-          [[ ${EXIT_CODE} -eq 1 ]] && exit 1 || :
+          python scripts/parse_report.py _test_outputs/emailable-report.html conformance-baseline.json || EXIT_CODE=$?
+          echo "EXIT_CODE=${EXIT_CODE}" >> $GITHUB_OUTPUT
 
-      - name: Recommit baseline if not PR and improved baseline
-        if: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && steps.baseline.outputs.exit_code == 0 }}
+      - name: Commit baseline if improved | checkout
+        uses: actions/checkout@v3
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE == '1' }}
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+          path: ./baseline_repo
+
+      - name: Commit baseline if improved | copy baseline file
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE == '1' }}
+        run: cp conformance-baseline.json baseline_repo/conformance-baseline.json
+
+      - name: Commit baseline if improved | commit
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE == '1' }}
         uses: EndBug/add-and-commit@v9
         with:
-          add: baseline.json
+          add: conformance-baseline.json
+          cwd: ./baseline_repo
+          message: update baseline
 
       - name: 💬 Prepare comment
         id: prepare_comment
-        if: ${{ steps.baseline.outputs.exit_code != 2 }}
+        if: ${{ github.event_name == 'pull_request' && steps.baseline.outputs.EXIT_CODE != '0' }}
         run : |
-          if [[ ${{ steps.baseline.outputs.exit_code }} == 0 ]]; then
-            echo "comment='Conformance tests got better!'" >> $GITHUB_OUTPUT
+          if [[ ${{ steps.baseline.outputs.EXIT_CODE }} == 1 ]]; then
+            echo "comment=Conformance tests got better! (update baseline if the job fails)" >> $GITHUB_OUTPUT
           else
-            echo "comment='Oh no! Conformance tests got worse!'" >> $GITHUB_OUTPUT
+            echo "comment=Oh no! Conformance tests got worse!" >> $GITHUB_OUTPUT
           fi
 
       - name: 💬 Create comment
         uses: marocchino/sticky-pull-request-comment@v2
-        if: ${{ steps.baseline.outputs.exit_code != 2 }}
+        if: ${{ github.event_name == 'pull_request' && steps.baseline.outputs.EXIT_CODE != '0' }}
         with:
           message: ${{ steps.prepare_comment.outputs.comment }}
+
+      - name: Recheck baseline
+        run: |
+          pip install lxml
+          python scripts/parse_report.py _test_outputs/emailable-report.html conformance-baseline.json
 
       - name: Failure logs
         if: failure()

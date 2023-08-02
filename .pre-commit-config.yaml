@@ -11,7 +11,7 @@ repos:
 
   # Remove unused imports/variables
   - repo: https://github.com/myint/autoflake
-    rev: v2.0.2
+    rev: v2.2.0
     hooks:
       - id: autoflake
         args:
@@ -28,7 +28,7 @@ repos:
 
   # Black formatting
   - repo: https://github.com/psf/black
-    rev: 23.3.0
+    rev: 23.7.0
     hooks:
       - id: black
         exclude: migrations/
