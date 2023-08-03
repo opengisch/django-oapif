@@ -1,5 +1,12 @@
 import requests
-from qgis.core import QgsDataSourceUri, QgsFeature, QgsProject, QgsVectorLayer
+from qgis.core import (
+    QgsDataSourceUri,
+    QgsFeature,
+    QgsProject,
+    QgsVectorDataProvider,
+    QgsVectorLayer,
+    edit,
+)
 from qgis.testing import start_app, unittest
 
 start_app()
@@ -45,8 +52,20 @@ class TestStack(unittest.TestCase):
         layer = QgsVectorLayer(uri.uri(), "pole", "OAPIF")
         self.assertTrue(layer.isValid())
 
-        self.project.addMapLayer(layer)
-        self.assertTrue(len(self.project.mapLayers().values()) > 0)
+        layer = self.project.addMapLayer(layer)
+        self.assertIsNotNone(layer)
+
+        f = None
+        for f in layer.getFeatures("name='1-1'"):
+            pass
+        self.assertIsInstance(f, QgsFeature)
+
+        self.assertFalse(
+            bool(
+                layer.dataProvider().capabilities()
+                & QgsVectorDataProvider.Capability.AddFeatures
+            )
+        )
 
     def test_load_with_basic_auth(self):
         uri = QgsDataSourceUri()
@@ -61,7 +80,23 @@ class TestStack(unittest.TestCase):
         layer = self.project.addMapLayer(layer)
         self.assertIsNotNone(layer)
 
+        self.assertTrue(
+            bool(
+                layer.dataProvider().capabilities()
+                & QgsVectorDataProvider.Capability.AddFeatures
+            )
+        )
+
         f = None
         for f in layer.getFeatures("name='1-1'"):
+            pass
+        self.assertIsInstance(f, QgsFeature)
+
+        f["name"] = "xyz"
+        with edit(layer):
+            layer.updateFeature(f)
+
+        f = None
+        for f in layer.getFeatures("name='xyz'"):
             pass
         self.assertIsInstance(f, QgsFeature)
