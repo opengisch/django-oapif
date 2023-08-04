@@ -4,6 +4,7 @@ from django.db.models import Model
 from rest_framework import viewsets
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
+from django_oapif.metadata import OAPIFMetadata
 from django_oapif.mixins import OAPIFDescribeModelViewSetMixin
 from django_oapif.urls import oapif_router
 
@@ -75,6 +76,19 @@ def register_oapif_viewset(
 
             # Allowing '.' and '-' in urls
             lookup_value_regex = r"[\w.-]+"
+
+            # Metadata
+            metadata_class = OAPIFMetadata
+
+            def finalize_response(self, request, response, *args, **kwargs):
+                response = super().finalize_response(request, response, *args, **kwargs)
+                if request.method == "OPTIONS":
+                    allowed_actions = self.metadata_class().determine_actions(
+                        request, self
+                    )
+                    allowed_actions = ", ".join(allowed_actions.keys())
+                    response.headers["Allow"] = allowed_actions
+                return response
 
         # ON HOLD, WAITING ON GeoFeatureModelSerializer to admit of null geometries
         """

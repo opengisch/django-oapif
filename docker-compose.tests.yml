@@ -11,7 +11,7 @@ services:
       - testing
 
   integration_tests:
-    image: opengisch/qgis:latest
+    image: opengisch/qgis:nightly
     command: sh -c 'xvfb-run python3 -m unittest discover'
     tty: true
     volumes:
