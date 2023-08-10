@@ -43,5 +43,5 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
         run: |
           cd flatgeobuf-pyrust
-          maturing build --release
+          maturin build --release
           twine upload ./dist/* --verbose
