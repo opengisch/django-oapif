@@ -3,14 +3,14 @@ from typing import Union
 
 from django.contrib.gis.db import models
 from django.utils.translation import gettext as _
-from rest_framework import pagination
 
 from django_oapif.decorators import register_oapif_viewset
+from django_oapif.pagination import OapifPagination
 from signalo.settings import GEOMETRY_SRID
 
 
-class Limit1000(pagination.LimitOffsetPagination):
-    default_limit = 1000
+class Limit1000(OapifPagination):
+    default_limit = 100
 
 
 @register_oapif_viewset(custom_viewset_attrs={"pagination_class": Limit1000})
