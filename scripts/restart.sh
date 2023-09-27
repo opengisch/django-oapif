@@ -10,15 +10,16 @@ FULL=$1
 
 export COMPOSE_FILE=docker-compose.dev.yml:docker-compose.yml
 
-docker-compose down --volumes || true
+docker compose down --volumes || true
 
-docker-compose up --build -d
+docker compose up --build -d
 sleep 5
 
 if [[ $FULL == "reset" ]];then
-  docker-compose exec django python manage.py makemigrations
-  docker-compose exec django python manage.py migrate
+  docker compose exec django python manage.py makemigrations
+  docker compose exec django python manage.py migrate
 fi
 
-docker-compose exec django python manage.py collectstatic --no-input
-docker-compose exec django python manage.py populate
+docker compose exec django python manage.py collectstatic --no-input
+docker compose exec django python manage.py populate_users
+docker compose exec django python manage.py populate_data
