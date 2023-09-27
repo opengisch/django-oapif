@@ -10,7 +10,7 @@ from signalo.settings import GEOMETRY_SRID
 
 
 class Limit1000(OapifPagination):
-    default_limit = 100
+    default_limit = 1000
 
 
 @register_oapif_viewset(custom_viewset_attrs={"pagination_class": Limit1000})

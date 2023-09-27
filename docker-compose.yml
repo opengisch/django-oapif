@@ -20,12 +20,12 @@ services:
       - 443:443
 
   django:
-    image: opengisch/signalo-oapif:latest
+    image: opengisch/django-oapif:latest
     build:
       context: .
       dockerfile: docker/django/Dockerfile
       cache_from:
-        - opengisch/signalo-oapif:latest
+        - opengisch/django-oapif:latest
     restart: unless-stopped
     depends_on:
       postgres:

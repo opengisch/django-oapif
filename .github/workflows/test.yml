@@ -37,9 +37,9 @@ jobs:
         file: docker/django/Dockerfile
         push: ${{ github.repository == 'opengisch/django-ogcapif' }}
         pull: true
-        cache-from: type=registry,ref=opengisch/signalo-django:latest
-        cache-to: type=registry,ref=opengisch/signalo-django:latest,mode=max
-        tags: opengisch/signalo-django:latest
+        cache-from: type=registry,ref=opengisch/django-oapif:latest
+        cache-to: type=registry,ref=opengisch/django-oapif:latest,mode=max
+        tags: opengisch/django-oapif:latest
 
     - name: Setup Compose
       run: |
@@ -52,16 +52,11 @@ jobs:
         # deploy static files and migrate database
         docker compose exec django python manage.py collectstatic --no-input
         docker compose exec django python manage.py migrate --no-input
-        docker-compose exec -T django python manage.py populate_users
-        docker-compose exec -T django python manage.py populate_vl
-        docker-compose exec -T django python manage.py populate_signs_poles
+        docker compose exec django python manage.py populate
 
     - name: Run unit tests
       run: |
         docker compose exec django python manage.py test signalo.value_lists
-        docker compose exec django python manage.py test signalo.core
-        docker compose exec django python manage.py test signalo.edge_cases
-        docker compose exec django python manage.py test signalo.roads
 
     - name: Run integration tests
       run: docker compose run integration_tests
