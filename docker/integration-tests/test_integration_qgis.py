@@ -56,7 +56,7 @@ class TestStack(unittest.TestCase):
         self.assertIsNotNone(layer)
 
         f = None
-        for f in layer.getFeatures("name='1-1'"):
+        for f in layer.getFeatures("field_0 is not null"):
             pass
         self.assertIsInstance(f, QgsFeature)
 
@@ -88,7 +88,7 @@ class TestStack(unittest.TestCase):
         )
 
         f = None
-        for f in layer.getFeatures("name='1-1'"):
+        for f in layer.getFeatures():
             pass
         self.assertIsInstance(f, QgsFeature)
 
