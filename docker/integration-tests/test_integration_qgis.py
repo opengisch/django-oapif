@@ -47,7 +47,7 @@ class TestStack(unittest.TestCase):
     def test_load_layer(self):
         uri = QgsDataSourceUri()
         uri.setParam("service", "wfs")
-        uri.setParam("typename", "tests_points")
+        uri.setParam("typename", "tests.point_2056_10fields")
         uri.setParam("url", ROOT_URL)
         layer = QgsVectorLayer(uri.uri(), "point", "OAPIF")
         self.assertTrue(layer.isValid())
@@ -70,7 +70,7 @@ class TestStack(unittest.TestCase):
     def test_load_with_basic_auth(self):
         uri = QgsDataSourceUri()
         uri.setParam("service", "wfs")
-        uri.setParam("typename", "tests_points")
+        uri.setParam("typename", "tests.point_2056_10fields")
         uri.setParam("url", ROOT_URL)
         uri.setPassword(self.password)
         uri.setUsername(self.user)
