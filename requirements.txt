@@ -3,7 +3,7 @@ django-computedfields
 psycopg2-binary
 transifex-client
 djangorestframework
-djangorestframework-gis
+git+https://github.com/3nids/django-rest-framework-gis@patch-1
 pyyaml
 uritemplate
 pyproj
