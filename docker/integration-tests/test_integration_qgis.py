@@ -36,7 +36,7 @@ class TestStack(unittest.TestCase):
     def test_collection_exists(self):
         res = requests.get(COLLECTIONS_URL).json()
         self.assertTrue(
-            "tests.Point_2056_10fields"
+            "tests.point_2056_10fields"
             in [collection["id"] for collection in res["collections"]]
         )
 
