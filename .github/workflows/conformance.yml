@@ -55,11 +55,10 @@ jobs:
           # deploy static files and migrate database
           docker compose exec django python manage.py collectstatic --no-input
           docker compose exec django python manage.py migrate --no-input
-          docker compose exec django python manage.py populate_vl
-          docker compose exec django python manage.py populate_signs_poles
+          docker compose exec django python manage.py populate_data
 
       - name: Healthcheck
-        run: wget --no-check-certificate https://localhost/oapif/collections/signalo_core.pole/items
+        run: wget --no-check-certificate https://localhost/oapif/collections/tests.point_2056_10fields/items
 
       - name: Run conformance test suite
         run: docker compose run conformance_test
