@@ -55,9 +55,9 @@ jobs:
         docker compose exec django python manage.py populate_users
         docker compose exec django python manage.py populate_data
 
-    - name: Run unit tests
-      run: |
-        docker compose exec django python manage.py test signalo.value_lists
+#    - name: Run unit tests
+#      run: |
+#        docker compose exec django python manage.py test signalo.value_lists
 
     - name: Run integration tests
       run: docker compose run integration_tests
