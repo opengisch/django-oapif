@@ -13,7 +13,7 @@ class Command(BaseCommand):
         modifying = []
         viewing = []
 
-        for model in ("point_2056_10fields", "nogeom_10fields"):
+        for model in ("point_2056_10fields", "nogeom_10fields", "line_2056_10fields"):
             adding.append(Permission.objects.get(codename=f"add_{model}"))
             modifying.append(Permission.objects.get(codename=f"change_{model}"))
             viewing.append(Permission.objects.get(codename=f"view_{model}"))
@@ -22,6 +22,7 @@ class Command(BaseCommand):
 
         editors, _ = Group.objects.get_or_create(name="editors")
         viewers, _ = Group.objects.get_or_create(name="viewers")
+        viewers_wo_lines, _ = Group.objects.get_or_create(name="viewers_without_lines")
 
         editors.save()
         viewers.save()
@@ -29,19 +30,20 @@ class Command(BaseCommand):
         editors.permissions.set(editing)
         viewers.permissions.set(viewing)
 
-        a_viewer, _ = User.objects.get_or_create(username="demo_viewer")
-        a_viewer.set_password("123")
-        an_editor, _ = User.objects.get_or_create(username="demo_editor")
-        an_editor.set_password("123")
-        a_super_user = User.objects.create_superuser(username="admin", is_staff=True)
-        a_super_user.set_password("123")
+        viewer, _ = User.objects.get_or_create(username="demo_viewer")
+        viewer_wo_lines, _ = User.objects.get_or_create(
+            username="demo_viewer_without_lines"
+        )
+        editor, _ = User.objects.get_or_create(username="demo_editor")
+        super_user = User.objects.create_superuser(username="admin", is_staff=True)
 
-        a_viewer.save()
-        an_editor.save()
-        a_super_user.save()
+        for user in (viewer, viewer_wo_lines, editor, super_user):
+            user.set_password("123")
+            user.save()
 
-        an_editor.groups.add(editors)
-        a_viewer.groups.add(viewers)
+        editor.groups.add(editors)
+        viewer.groups.add(viewers)
+        viewer_wo_lines.groups.add(viewers_wo_lines)
 
         print(
             f"👥 added users 'demo_editor' & 'demo_viewer' to group 'editors' and 'viewers' respectively. Permissions set accordingly."
