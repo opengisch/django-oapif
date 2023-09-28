@@ -22,6 +22,7 @@ class Command(BaseCommand):
 
         editors, _ = Group.objects.get_or_create(name="editors")
         viewers, _ = Group.objects.get_or_create(name="viewers")
+
         editors.save()
         viewers.save()
 
