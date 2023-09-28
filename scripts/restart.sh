@@ -12,7 +12,7 @@ export COMPOSE_FILE=docker-compose.dev.yml:docker-compose.yml
 
 docker compose down --volumes || true
 
-docker compose up --build -d
+docker compose up --build --force-recreate -d
 sleep 5
 
 if [[ $FULL == "reset" ]];then
