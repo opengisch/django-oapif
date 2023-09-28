@@ -23,11 +23,11 @@ services:
       - ./unit_tests_outputs/:/unit_tests_outputs
     ports:
       # making django directly accessible for debugging
-      - 8000:8000
+      - ${DJANGO_DEV_PORT:?}:8000
       # debugpy
-      - 5678:5678
+      - ${DEBUGPY_PORT:?}:5678
     command: python3 -m debugpy --listen 0.0.0.0:5678 manage.py runserver 0.0.0.0:8000
 
   postgres:
     ports:
-      - 5432:5432
+      - ${HOST_POSTGRES_PORT:?}:5432
