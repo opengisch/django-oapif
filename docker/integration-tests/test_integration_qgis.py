@@ -13,7 +13,7 @@ start_app()
 
 ROOT_URL = "http://django:8000/oapif/"
 COLLECTIONS_URL = "http://django:8000/oapif/collections"
-POLES_URL = "http://django:8000/oapif/collections/signalo_core.pole"
+POINTS_URL = "http://django:8000/oapif/collections/tests.point_2056_10fields"
 
 
 class TestStack(unittest.TestCase):
@@ -27,36 +27,36 @@ class TestStack(unittest.TestCase):
     def test_endpoint_ok(self):
         root_response = requests.get(ROOT_URL)
         collections_response = requests.get(COLLECTIONS_URL)
-        poles_response = requests.get(POLES_URL)
+        points_response = requests.get(POINTS_URL)
 
         self.assertTrue(root_response.status_code == 200)
         self.assertTrue(collections_response.status_code == 200)
-        self.assertTrue(poles_response.status_code == 200)
+        self.assertTrue(points_response.status_code == 200)
 
     def test_collection_exists(self):
         res = requests.get(COLLECTIONS_URL).json()
         self.assertTrue(
-            "signalo_core.pole"
+            "tests.point_2056_10fields"
             in [collection["id"] for collection in res["collections"]]
         )
 
-    def test_many_poles(self):
-        poles = requests.get(POLES_URL).json()
-        self.assertTrue(len(poles) > 1)
+    def test_many_points(self):
+        points = requests.get(POINTS_URL).json()
+        self.assertTrue(len(points) > 1)
 
     def test_load_layer(self):
         uri = QgsDataSourceUri()
         uri.setParam("service", "wfs")
-        uri.setParam("typename", "signalo_core.pole")
+        uri.setParam("typename", "tests.point_2056_10fields")
         uri.setParam("url", ROOT_URL)
-        layer = QgsVectorLayer(uri.uri(), "pole", "OAPIF")
+        layer = QgsVectorLayer(uri.uri(), "point", "OAPIF")
         self.assertTrue(layer.isValid())
 
         layer = self.project.addMapLayer(layer)
         self.assertIsNotNone(layer)
 
         f = None
-        for f in layer.getFeatures("name='1-1'"):
+        for f in layer.getFeatures("field_0 is not null"):
             pass
         self.assertIsInstance(f, QgsFeature)
 
@@ -70,12 +70,12 @@ class TestStack(unittest.TestCase):
     def test_load_with_basic_auth(self):
         uri = QgsDataSourceUri()
         uri.setParam("service", "wfs")
-        uri.setParam("typename", "signalo_core.pole")
+        uri.setParam("typename", "tests.point_2056_10fields")
         uri.setParam("url", ROOT_URL)
         uri.setPassword(self.password)
         uri.setUsername(self.user)
 
-        layer = QgsVectorLayer(uri.uri(), "pole", "OAPIF")
+        layer = QgsVectorLayer(uri.uri(), "point", "OAPIF")
         self.assertTrue(layer.isValid())
         layer = self.project.addMapLayer(layer)
         self.assertIsNotNone(layer)
@@ -88,15 +88,15 @@ class TestStack(unittest.TestCase):
         )
 
         f = None
-        for f in layer.getFeatures("name='1-1'"):
+        for f in layer.getFeatures():
             pass
         self.assertIsInstance(f, QgsFeature)
 
-        f["name"] = "xyz"
+        f["field_1"] = "xyz"
         with edit(layer):
             layer.updateFeature(f)
 
         f = None
-        for f in layer.getFeatures("name='xyz'"):
+        for f in layer.getFeatures("field_1='xyz'"):
             pass
         self.assertIsInstance(f, QgsFeature)

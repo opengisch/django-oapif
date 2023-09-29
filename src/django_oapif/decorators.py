@@ -90,7 +90,7 @@ def register_oapif_viewset(
             oapif_description = Model.__doc__
 
             # (one day this will be retrieved automatically from the serializer)
-            oapif_geom_lookup = viewset_oapif_geom_lookup
+            oapif_geom_lookup = _viewset_oapif_geom_lookup
             filter_backends = [BboxFilterBackend]
 
             # Allowing '.' and '-' in urls

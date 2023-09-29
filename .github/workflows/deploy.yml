@@ -30,10 +30,7 @@ jobs:
             docker-compose exec django python manage.py migrate --no-input
             docker-compose exec django python manage.py collectstatic --no-input
             docker-compose exec django python manage.py populate_users
-            docker-compose exec django python manage.py populate_vl
-            docker-compose exec django python manage.py populate_signs_poles
-            docker-compose exec django python manage.py populate_edge_cases
-            docker-compose exec django python manage.py populate_roads
+            docker-compose exec django python manage.py populate_data
 
       - name: Failure logs
         if: failure()

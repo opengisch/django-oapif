@@ -6,6 +6,8 @@ from rest_framework.response import Response
 class OapifPagination(pagination.LimitOffsetPagination):
     """OAPIF-compatible django rest paginator"""
 
+    default_limit = 1000
+
     def get_paginated_response(self, data):
         return Response(
             {

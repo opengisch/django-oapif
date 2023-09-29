@@ -4,7 +4,6 @@ from typing import Union
 from django.contrib.gis.db import models
 from django.utils.translation import gettext as _
 
-from django_oapif.pagination import OapifPagination
 from django_oapif.decorators import register_oapif_viewset
 from django_oapif.pagination import OapifPagination
 from signalo.settings import GEOMETRY_SRID
