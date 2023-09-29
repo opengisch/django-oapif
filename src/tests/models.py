@@ -11,7 +11,7 @@ from django_oapif.decorators import register_oapif_viewset
 logger = logging.getLogger(__name__)
 
 
-@register_oapif_viewset(skip_geom=False)
+@register_oapif_viewset()
 class Point_2056_10fields(ComputedFieldsModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     geom = models.PointField(srid=2056, verbose_name=_("Geometry"))
@@ -27,7 +27,7 @@ class Point_2056_10fields(ComputedFieldsModel):
     field_9 = models.CharField(max_length=255, verbose_name=_("Field 9"))
 
 
-@register_oapif_viewset(skip_geom=True)
+@register_oapif_viewset(geom_field=None)
 class NoGeom_10fields(ComputedFieldsModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     field_0 = models.CharField(max_length=255, verbose_name=_("Field 0"))
@@ -43,7 +43,6 @@ class NoGeom_10fields(ComputedFieldsModel):
 
 
 @register_oapif_viewset(
-    skip_geom=False,
     custom_viewset_attrs={"permission_classes": (permissions.DjangoModelPermissions,)},
 )
 class Line_2056_10fields(ComputedFieldsModel):

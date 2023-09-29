@@ -3,7 +3,6 @@ from typing import Any, Callable, Dict, Optional
 from django.db import models
 from django.db.models.functions import Cast
 from rest_framework import serializers, viewsets
-from rest_framework.serializers import ModelSerializer
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from django_oapif.metadata import OAPIFMetadata
@@ -13,13 +12,11 @@ from django_oapif.urls import oapif_router
 from .filters import BboxFilterBackend
 from .functions import AsGeoJSON
 
-USE_PG_GEOJSON = False
-USE_PG_GEOJSON = True
-
 
 def register_oapif_viewset(
     key: Optional[str] = None,
-    skip_geom: Optional[bool] = False,
+    geom_db_serializer: Optional[bool] = True,
+    geom_field: [str] = "geom",
     custom_serializer_attrs: Dict[str, Any] = None,
     custom_viewset_attrs: Dict[str, Any] = None,
 ) -> Callable[[Any], models.Model]:
@@ -28,6 +25,8 @@ def register_oapif_viewset(
     a model to the default OAPIF endpoint.
 
     - key: allows to pass a custom name for the collection (defaults to the model's label)
+    - geom_db_serializer: delegate the geometry serialization to the DB
+    - geo_field: the geometry field name. If None, a null geometry is produced
     - custom_serializer_attrs: allows to pass custom attributes to set to the serializer's Meta (e.g. custom fields)
     - custom_viewset_attrs: allows to pass custom attributes to set to the viewset (e.g. custom pagination class)
     """
@@ -46,42 +45,26 @@ def register_oapif_viewset(
         """
 
         _viewset_oapif_geom_lookup = "geom"  # one day this will be retrieved automatically from the serializer
-        _geo_field = "geom"
-        if skip_geom:
+        if not geom_field:
             _viewset_oapif_geom_lookup = None
-            _geo_field = None
 
-        if USE_PG_GEOJSON:
+        if geom_db_serializer and geom_field:
 
-            class AutoSerializer(ModelSerializer):
+            class AutoSerializer(GeoFeatureModelSerializer):
                 geojson = serializers.JSONField()
 
                 class Meta:
                     model = Model
-                    fields = [
-                        "id",
-                        "geojson",
-                        "field_0",
-                        "field_1",
-                        "field_2",
-                        "field_3",
-                        "field_4",
-                        "field_5",
-                        "field_6",
-                        "field_7",
-                        "field_8",
-                        "field_9",
-                    ]
+                    fields = "__all__"
+                    geo_field = None
 
         else:
 
             class AutoSerializer(GeoFeatureModelSerializer):
                 class Meta:
-                    nonlocal _geo_field
-
                     model = Model
                     fields = "__all__"
-                    geo_field = _geo_field
+                    geo_field = geom_field
 
         # Create the viewset
         class Viewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
@@ -113,9 +96,7 @@ def register_oapif_viewset(
             def get_queryset(self):
                 qs = super().get_queryset()
 
-                if USE_PG_GEOJSON:
-                    # NOTE the defer should not be needed, as the field should be skipped already when we define `Serializer.Meta.Fields` without the `geom` col
-                    qs = qs.defer("geom")
+                if geom_db_serializer and geom_field:
                     qs = qs.annotate(geojson=Cast(AsGeoJSON("geom", False, False), models.JSONField()))
 
                 return qs
