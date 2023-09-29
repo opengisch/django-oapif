@@ -100,8 +100,6 @@ def register_oapif_viewset(
                 if request.query_params.get("format") == "json":
                     if request.query_params.get("streaming", "").casefold() == "true":
                         self.renderer_classes = [JSONStreamingRenderer]
-                elif request.query_params.get("format") == "fgb":
-                    self.renderer_classes = [FGBRenderer]
                 return super().list(request, *args, **kwargs)
 
         # Apply custom serializer attributes
