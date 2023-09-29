@@ -1,7 +1,6 @@
 import cProfile
 import inspect
 import io
-import json
 import logging
 import os
 import pstats
