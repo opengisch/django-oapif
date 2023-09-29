@@ -40,30 +40,7 @@ def register_oapif_viewset(
         1 for viewsets for models without (aka 'non-geometric features').
         """
 
-        class AutoSerializer(GeoFeatureModelSerializer):
-            class Meta:
-                model = Model
-                fields = "__all__"
-                geo_field = "geom"
-
-        # ON HOLD, WAITING ON GeoFeatureModelSerializer to admit of null geometries
-        """
-        class AutoNoGeomSerializer(ModelSerializer):
-            class Meta:
-                model = Model
-                fields = "__all__
-        if skip_geom:
-            viewset_serializer_class = AutoNoGeomSerializer
-            viewset_oapif_geom_lookup = None
-        else:
-        """
-        viewset_serializer_class = AutoSerializer
-        viewset_renderer_classes = [
-            renderers.JSONRenderer,
-            FGBRenderer,
-            JSONStreamingRenderer,
-        ]
-        viewset_oapif_geom_lookup = (
+        _viewset_oapif_geom_lookup = (
             "geom"  # one day this will be retrieved automatically from the serializer
         )
         _geo_field = "geom"
@@ -82,15 +59,19 @@ def register_oapif_viewset(
         # Create the viewset
         class Viewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
             queryset = Model.objects.all()
-            serializer_class = viewset_serializer_class
-            renderer_classes = viewset_renderer_classes
+            serializer_class = AutoSerializer
+            renderer_classes = [
+                renderers.JSONRenderer,
+                JSONStreamingRenderer,
+                FGBRenderer,
+            ]
 
             # TODO: these should probably be moved to the mixin
             oapif_title = Model._meta.verbose_name
             oapif_description = Model.__doc__
 
             # (one day this will be retrieved automatically from the serializer)
-            oapif_geom_lookup = viewset_oapif_geom_lookup
+            oapif_geom_lookup = _viewset_oapif_geom_lookup
             filter_backends = [BboxFilterBackend]
 
             # Allowing '.' and '-' in urls
@@ -123,13 +104,6 @@ def register_oapif_viewset(
                     self.renderer_classes = [FGBRenderer]
                 return super().list(request, *args, **kwargs)
 
-        # ON HOLD, WAITING ON GeoFeatureModelSerializer to admit of null geometries
-        """
-        # Apply custom serializer attributes
-        if viewset_serializer_class.__name__ == "AutoNoGeomSerializer":
-             for k, v in custom_serializer_attrs.items():
-                 setattr(AutoNoGeomSerializer.Meta, k, v)
-        """
         # Apply custom serializer attributes
         for k, v in custom_serializer_attrs.items():
             setattr(AutoSerializer.Meta, k, v)
