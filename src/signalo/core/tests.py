@@ -290,7 +290,7 @@ class TestFGB(APITestCase):
     @classmethod
     def tearDownClass(cls):
         super().tearDownClass()
-        p = os.path.abspath("/unit_tests_outputs/rendering_performance.json")
+        p = os.path.abspath("/unit_tests_outputs/rendering_performance.txt")
         with open(p, "a+") as fh:
             for k, v in cls.timings.items():
                 fh.write(f"{k}: {v}")
