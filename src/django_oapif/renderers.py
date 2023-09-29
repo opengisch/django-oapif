@@ -15,13 +15,9 @@ class FGBRenderer(renderers.BaseRenderer):
     # FIXME: This should be sent by the model.
     schema = {"geometry": "Point", "properties": {"name": "str", "_serialized": "str"}}
 
-    def render(
-        self, data: OrderedDict, accepted_media_type=None, renderer_context=None
-    ) -> StreamingHttpResponse:
+    def render(self, data: OrderedDict, accepted_media_type=None, renderer_context=None) -> StreamingHttpResponse:
         """Renders pre-serialized Python objects as a flatgeobuf binary stream"""
-        features_data = (
-            data["features"] if "features" in data else data["results"]["features"]
-        )
+        features_data = data["features"] if "features" in data else data["results"]["features"]
         features = (fiona.Feature.from_dict(obj) for obj in features_data)
         buffer_wrapper = io.BytesIO()
 
@@ -43,12 +39,8 @@ class JSONStreamingRenderer(renderers.BaseRenderer):
     format = "json"
     media_type = "application/x-ndjson"
 
-    def render(
-        self, data: OrderedDict, accepted_media_type=None, renderer_context=None
-    ) -> StreamingHttpResponse:
+    def render(self, data: OrderedDict, accepted_media_type=None, renderer_context=None) -> StreamingHttpResponse:
         """Renders JSON encoded stream."""
-        features_data = (
-            data["features"] if "features" in data else data["results"]["features"]
-        )
+        features_data = data["features"] if "features" in data else data["results"]["features"]
         generate = json_generator(feature for feature in features_data)
         return StreamingHttpResponse(generate)
