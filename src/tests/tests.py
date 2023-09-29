@@ -31,7 +31,15 @@ class TestBasicAuth(APITestCase):
 
     def test_post_as_editor(self):
         self.client.force_authenticate(user=self.demo_editor)
-        data = {"geom": "Point(1300000 600000)", "field_0": "test123"}
+        data = {
+            "geometry": {
+                "type": "Point",
+                "coordinates": [2508500.0, 1152000.0],
+                "crs": {"type": "name", "properties": {"name": "urn:ogc:def:crs:EPSG::2056"}},
+            },
+            "properties": {"field_0": "test123"},
+        }
+
         for layer in ("tests.point_2056_10fields_local_json", "tests.point_2056_10fields"):
             url = f"{collections_url}/{layer}/items"
             post_to_items = self.client.post(url, data, format="json")
