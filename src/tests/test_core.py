@@ -9,8 +9,8 @@ from django.contrib.auth.models import User
 from django.core.management import call_command
 from rest_framework.test import APITestCase
 
-from signalo.core.views import PoleSerializer
 from signalo.core.models import Azimuth, Pole, Sign
+from signalo.core.views import PoleSerializer
 
 logger = logging.getLogger(__name__)
 
