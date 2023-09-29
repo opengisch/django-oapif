@@ -37,7 +37,7 @@ class TestBasicAuth(APITestCase):
                 "coordinates": [2508500.0, 1152000.0],
                 "crs": {"type": "name", "properties": {"name": "urn:ogc:def:crs:EPSG::2056"}},
             },
-            "properties": {"field_0": "test123"},
+            "properties": {"field_0": "test123456"},
         }
 
         for layer in ("tests.point_2056_10fields_local_json", "tests.point_2056_10fields"):

@@ -1,5 +1,7 @@
+import json
 from typing import Any, Callable, Dict, Optional
 
+from django.contrib.gis.geos import GEOSGeometry
 from django.db import models
 from django.db.models.functions import Cast
 from rest_framework import serializers, viewsets
@@ -50,12 +52,19 @@ def register_oapif_viewset(
         if geom_db_serializer and geom_field:
 
             class AutoSerializer(GeoFeatureModelSerializer):
-                _geom_json_db = serializers.JSONField(required=False, read_only=True)
+                _geom_json_db = serializers.JSONField(required=False, allow_null=True, read_only=True)
 
                 class Meta:
                     model = Model
                     exclude = [geom_field]
                     geo_field = "_geom_json_db"
+
+                def to_internal_value(self, data):
+                    # TODO: this needs improvement!!!
+                    geo = data["geometry"]
+                    data = super().to_internal_value(data)
+                    data[geom_field] = GEOSGeometry(json.dumps(geo))
+                    return data
 
         else:
 
