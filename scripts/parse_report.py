@@ -52,9 +52,7 @@ class Results(NamedTuple):
         ids = {"0", "1"}
         statuses = {"failed", "passed", "skipped"}
         xpaths_statuses = {
-            (f'//tbody[@id="t{id}"]/tr[contains(@class, "{status}")]', status)
-            for id in ids
-            for status in statuses
+            (f'//tbody[@id="t{id}"]/tr[contains(@class, "{status}")]', status) for id in ids for status in statuses
         }
         results = {k: [] for k in statuses}
 
@@ -68,11 +66,7 @@ class Results(NamedTuple):
             trs = root.xpath(xp)
             for tr in trs:
                 children = tr.getchildren()
-                found = [
-                    relevant_slice(e.text)
-                    for e in islice(children, 2)
-                    if has_dots(e.text)
-                ]
+                found = [relevant_slice(e.text) for e in islice(children, 2) if has_dots(e.text)]
                 results[status] += found
         return cls(**results)
 

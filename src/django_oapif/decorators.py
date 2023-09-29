@@ -45,9 +45,7 @@ def register_oapif_viewset(
         1 for viewsets for models without (aka 'non-geometric features').
         """
 
-        _viewset_oapif_geom_lookup = (
-            "geom"  # one day this will be retrieved automatically from the serializer
-        )
+        _viewset_oapif_geom_lookup = "geom"  # one day this will be retrieved automatically from the serializer
         _geo_field = "geom"
         if skip_geom:
             _viewset_oapif_geom_lookup = None
@@ -107,9 +105,7 @@ def register_oapif_viewset(
             def finalize_response(self, request, response, *args, **kwargs):
                 response = super().finalize_response(request, response, *args, **kwargs)
                 if request.method == "OPTIONS":
-                    allowed_actions = self.metadata_class().determine_actions(
-                        request, self
-                    )
+                    allowed_actions = self.metadata_class().determine_actions(request, self)
                     allowed_actions = ", ".join(allowed_actions.keys())
                     response.headers["Allow"] = allowed_actions
                 return response
@@ -120,11 +116,7 @@ def register_oapif_viewset(
                 if USE_PG_GEOJSON:
                     # NOTE the defer should not be needed, as the field should be skipped already when we define `Serializer.Meta.Fields` without the `geom` col
                     qs = qs.defer("geom")
-                    qs = qs.annotate(
-                        geojson=Cast(
-                            AsGeoJSON("geom", False, False), models.JSONField()
-                        )
-                    )
+                    qs = qs.annotate(geojson=Cast(AsGeoJSON("geom", False, False), models.JSONField()))
 
                 return qs
 
@@ -137,9 +129,7 @@ def register_oapif_viewset(
             setattr(Viewset, k, v)
 
         # Register the model
-        oapif_router.register(
-            key or Model._meta.label_lower, Viewset, key or Model._meta.label_lower
-        )
+        oapif_router.register(key or Model._meta.label_lower, Viewset, key or Model._meta.label_lower)
 
         return Model
 

@@ -31,9 +31,7 @@ class Command(BaseCommand):
         viewers.permissions.set(viewing)
 
         viewer, _ = User.objects.get_or_create(username="demo_viewer")
-        viewer_wo_lines, _ = User.objects.get_or_create(
-            username="demo_viewer_without_lines"
-        )
+        viewer_wo_lines, _ = User.objects.get_or_create(username="demo_viewer_without_lines")
         editor, _ = User.objects.get_or_create(username="demo_editor")
         super_user = User.objects.create_superuser(username="admin", is_staff=True)
 

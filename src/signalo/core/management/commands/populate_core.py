@@ -19,11 +19,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
         defaults = {"data", "users"}
-        commands = {
-            user_options[key]
-            for key in kwargs
-            if key in user_options and (key in defaults or kwargs[key])
-        }
+        commands = {user_options[key] for key in kwargs if key in user_options and (key in defaults or kwargs[key])}
 
         for cmd in commands:
             cmd()

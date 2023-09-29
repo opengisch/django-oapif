@@ -33,9 +33,7 @@ class Pole(ComputedFieldsModel):
 class Azimuth(ComputedFieldsModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     value = models.SmallIntegerField(default=0, null=False, blank=False)
-    pole = models.ForeignKey(
-        Pole, on_delete=models.CASCADE, blank=False, null=False, related_name="azimuths"
-    )
+    pole = models.ForeignKey(Pole, on_delete=models.CASCADE, blank=False, null=False, related_name="azimuths")
 
     @computed(
         models.PointField(
@@ -59,9 +57,7 @@ class Sign(ComputedFieldsModel):
         null=True,
         related_name="official_sign",
     )
-    azimuth = models.ForeignKey(
-        Azimuth, models.CASCADE, blank=False, null=False, related_name="signs"
-    )
+    azimuth = models.ForeignKey(Azimuth, models.CASCADE, blank=False, null=False, related_name="signs")
     order = models.IntegerField(null=False, blank=False)
 
     def save(self, *args, **kwargs):
@@ -73,10 +69,7 @@ class Sign(ComputedFieldsModel):
             pole_id = self.azimuth.pole.id
             signs_on_pole = Sign.objects.filter(azimuth__pole__id=pole_id)
             other_signs_on_pole = signs_on_pole.exclude(id=self.id)
-            self.order = (
-                other_signs_on_pole.filter(azimuth__value=self.azimuth.value).count()
-                + 1
-            )
+            self.order = other_signs_on_pole.filter(azimuth__value=self.azimuth.value).count() + 1
 
         super().save(*args, **kwargs)
 
@@ -107,20 +100,9 @@ class Sign(ComputedFieldsModel):
         occurs on the same pole
         """
         default_padding_px = 5
-        previous_signs_on_pole = Sign.objects.filter(
-            azimuth__pole__id=self.azimuth.pole.id, order__lt=self.order
-        )
-        sum_heights = (
-            previous_signs_on_pole.aggregate(height=Sum("sign_type__img_height"))[
-                "height"
-            ]
-            or 0
-        )
-        return (
-            previous_signs_on_pole.count() * default_padding_px
-            + default_padding_px
-            + sum_heights
-        )
+        previous_signs_on_pole = Sign.objects.filter(azimuth__pole__id=self.azimuth.pole.id, order__lt=self.order)
+        sum_heights = previous_signs_on_pole.aggregate(height=Sum("sign_type__img_height"))["height"] or 0
+        return previous_signs_on_pole.count() * default_padding_px + default_padding_px + sum_heights
 
 
 @receiver(signals.pre_delete, sender=Sign)
@@ -133,9 +115,7 @@ def ensure_sign_order_on_delete(sender, instance, *args, **kwargs):
     signs_on_pole = Sign.objects.filter(azimuth__pole__id=pole_id)
 
     signs_to_update = []
-    for new_order, sign in enumerate(
-        signs_on_pole.exclude(id=instance.id).order_by("order"), 1
-    ):
+    for new_order, sign in enumerate(signs_on_pole.exclude(id=instance.id).order_by("order"), 1):
         sign.order = new_order
         signs_to_update.append(sign)
 

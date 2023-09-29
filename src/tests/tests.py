@@ -20,16 +20,12 @@ class TestBasicAuth(APITestCase):
         self.client.force_authenticate(user=None)
 
     def test_get_as_viewer(self):
-        collections_from_anonymous = self.client.get(
-            collections_url, format="json"
-        ).json()
+        collections_from_anonymous = self.client.get(collections_url, format="json").json()
         self.client.force_authenticate(user=self.demo_viewer)
         collection_response = self.client.get(collections_url, format="json")
 
         self.assertEqual(collection_response.status_code, 200)
-        self.assertEqual(
-            len(collection_response.json()), len(collections_from_anonymous)
-        )
+        self.assertEqual(len(collection_response.json()), len(collections_from_anonymous))
 
     def test_post_as_admin(self):
         self.client.force_authenticate(user=self.admin)

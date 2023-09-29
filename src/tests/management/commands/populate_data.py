@@ -40,9 +40,7 @@ class Command(BaseCommand):
 
                 fields = {}
                 for f in range(10):
-                    fields[f"field_{f}"] = "".join(
-                        random.choice(letters) for i in range(10)
-                    )
+                    fields[f"field_{f}"] = "".join(random.choice(letters) for i in range(10))
 
                 no_geom = NoGeom_10fields(**fields)
                 no_geoms.append(no_geom)
