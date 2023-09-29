@@ -1,9 +1,11 @@
 django>=4
 django-computedfields
-psycopg2-binary
-transifex-client
-djangorestframework
 djangorestframework-gis
-pyyaml
-uritemplate
+djangorestframework
+fiona
+json-stream-generator
+psycopg2-binary
 pyproj
+pyyaml
+transifex-client
+uritemplate

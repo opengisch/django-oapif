@@ -1,14 +1,21 @@
 import cProfile
+import inspect
+import io
+import json
 import logging
 import os
 import pstats
 from itertools import islice
+from operator import itemgetter
+from timeit import default_timer
 from typing import Callable, Iterable, Tuple
 
+import fiona
 from django.contrib.auth.models import User
 from django.core.management import call_command
 from rest_framework.test import APITestCase
 
+from django_oapif.renderers import FGBRenderer
 from signalo.core.views import PoleSerializer
 
 from .models import Azimuth, Pole, Sign
@@ -189,3 +196,118 @@ class TestBasicAuth(APITestCase):
 
         self.assertEqual(allowed_body, expected)
         self.assertEqual(allowed_headers, allowed_body)
+
+
+class TestRenderers(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("populate_vl")
+        call_command("populate_signs_poles")
+
+        cls.collection_url = collections_url + "/signalo_core.pole"
+        cls.items_url = cls.collection_url + "/items"
+
+    def test_flatgeobuf(self):
+        json_features = self.client.get(self.items_url, {"format": "json"}).json()[
+            "features"
+        ]
+        json_coordinates = [
+            tuple(json_feature["geometry"]["coordinates"])
+            for json_feature in json_features
+        ]
+        output_stream = io.BytesIO(
+            self.client.get(self.items_url, {"format": "fgb"}, streaming=True).content
+        )
+
+        with fiona.open(
+            output_stream, mode="r", driver="FlatGeobuf", schema=FGBRenderer.schema
+        ) as fgb_features:
+            fgb_coordinates = [
+                fgb_feature.geometry["coordinates"] for fgb_feature in fgb_features
+            ]
+
+        self.assertEqual(
+            set(fgb_coordinates),
+            set(json_coordinates),
+            msg="The two sources map to the same set of coordinates.",
+        )
+
+        fgb_coordinates.sort(key=itemgetter(0, 1))
+        json_coordinates.sort(key=itemgetter(0, 1))
+
+        self.assertEqual(
+            fgb_coordinates,
+            json_coordinates,
+            msg="Once sorted, the two sources map to the same list of coordinates.",
+        )
+
+
+class TestJSON(APITestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.timings = {}
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        p = os.path.abspath("/unit_tests_outputs/rendering_performance.txt")
+        with open(p, "a+") as fh:
+            for k, v in cls.timings.items():
+                fh.write(f"{k}: {v}")
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("populate_roads")
+        cls.collection_url = collections_url + "/signalo_roads.road"
+        cls.items_url = cls.collection_url + "/items"
+
+    def test_roads_json(self):
+        t0 = default_timer()
+        response_content = self.client.get(self.items_url, {"format": "json"}).content
+        t1 = default_timer()
+
+        self.assertTrue(response_content)
+        self.timings[inspect.currentframe().f_code.co_name] = round(t1 - t0, 2)
+
+    def test_roads_json_streaming(self):
+        t0 = default_timer()
+        response_content = self.client.get(
+            self.items_url, {"format": "json", "streaming": True}, streaming=True
+        ).content
+        t1 = default_timer()
+
+        self.assertTrue(response_content)
+        self.timings[inspect.currentframe().f_code.co_name] = round(t1 - t0, 2)
+
+
+class TestFGB(APITestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.timings = {}
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        p = os.path.abspath("/unit_tests_outputs/rendering_performance.json")
+        with open(p, "a+") as fh:
+            for k, v in cls.timings.items():
+                fh.write(f"{k}: {v}")
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("populate_roads")
+        cls.collection_url = collections_url + "/signalo_roads.road"
+        cls.items_url = cls.collection_url + "/items"
+
+    def test_roads_fgb(self):
+        t0 = default_timer()
+        FGBRenderer.schema = {"geometry": "MultiLineString", "properties": {}}
+        response_content = self.client.get(
+            self.items_url, {"format": "fgb"}, streaming=True
+        ).content
+        t1 = default_timer()
+
+        self.assertTrue(response_content)
+        self.timings[inspect.currentframe().f_code.co_name] = round(t1 - t0, 2)
