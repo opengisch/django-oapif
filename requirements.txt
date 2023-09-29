@@ -1,6 +1,7 @@
 django>=4
 django-computedfields
 djangorestframework-gis
+git+https://github.com/3nids/django-rest-framework-gis@patch-1
 djangorestframework
 fiona
 json-stream-generator
