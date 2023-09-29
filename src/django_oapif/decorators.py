@@ -74,10 +74,7 @@ def register_oapif_viewset(
             oapif_title = Model._meta.verbose_name
             oapif_description = Model.__doc__
 
-            if geom_db_serializer and geom_field:
-                oapif_geom_lookup = "_geom_json_db"
-            else:
-                oapif_geom_lookup = geom_field
+            oapif_geom_lookup = geom_field
 
             filter_backends = [BboxFilterBackend]
 
@@ -99,11 +96,7 @@ def register_oapif_viewset(
                 qs = super().get_queryset()
 
                 if geom_db_serializer and geom_field:
-                    qs = qs.annotate(
-                        _geom_json_db=Cast(
-                            AsGeoJSON(geom_field, False, False), models.JSONField()
-                        )
-                    )
+                    qs = qs.annotate(_geom_json_db=Cast(AsGeoJSON(geom_field, False, False), models.JSONField()))
 
                 return qs
 

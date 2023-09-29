@@ -17,8 +17,6 @@ class TestBasicAuth(APITestCase):
 
         cls.demo_viewer = User.objects.get(username="demo_viewer")
         cls.demo_editor = User.objects.get(username="demo_editor")
-        cls.collection_url = collections_url + "/tests.point_2056_10fields"
-        cls.items_url = cls.collection_url + "/items"
 
     def tearDown(self):
         self.client.force_authenticate(user=None)
@@ -34,28 +32,34 @@ class TestBasicAuth(APITestCase):
     def test_post_as_editor(self):
         self.client.force_authenticate(user=self.demo_editor)
         data = {"geom": "Point(1300000 600000)", "field_0": "test123"}
-        post_to_items = self.client.post(self.items_url, data, format="json")
-        self.assertIn(post_to_items.status_code, (200, 201))
+        for layer in ("tests.point_2056_10fields_local_json", "tests.point_2056_10fields"):
+            url = f"{collections_url}/{layer}/items"
+            post_to_items = self.client.post(url, data, format="json")
+            self.assertIn(post_to_items.status_code, (200, 201), url)
 
     def test_anonymous_items_options(self):
         # Anonymous user
         expected = {"GET", "OPTIONS", "HEAD"}
-        response = self.client.options(self.items_url)
+        for layer in ("tests.point_2056_10fields_local_json", "tests.point_2056_10fields"):
+            url = f"{collections_url}/{layer}/items"
+            response = self.client.options(url)
 
-        allowed_headers = set(s.strip() for s in response.headers["Allow"].split(","))
-        allowed_body = set(response.json()["actions"].keys())
+            allowed_headers = set(s.strip() for s in response.headers["Allow"].split(","))
+            allowed_body = set(response.json()["actions"].keys())
 
-        self.assertEqual(allowed_body, expected)
-        self.assertEqual(allowed_headers, allowed_body)
+            self.assertEqual(allowed_body, expected)
+            self.assertEqual(allowed_headers, allowed_body)
 
     def test_editor_items_options(self):
         # Authenticated user with editing permissions
         expected = {"POST", "GET", "OPTIONS", "HEAD"}
         self.client.force_authenticate(user=self.demo_editor)
-        response = self.client.options(self.items_url)
+        for layer in ("tests.point_2056_10fields_local_json", "tests.point_2056_10fields"):
+            url = f"{collections_url}/{layer}/items"
+            response = self.client.options(url)
 
-        allowed_headers = set(s.strip() for s in response.headers["Allow"].split(","))
-        allowed_body = set(response.json()["actions"].keys())
+            allowed_headers = set(s.strip() for s in response.headers["Allow"].split(","))
+            allowed_body = set(response.json()["actions"].keys())
 
-        self.assertEqual(allowed_body, expected)
-        self.assertEqual(allowed_headers, allowed_body)
+            self.assertEqual(allowed_body, expected)
+            self.assertEqual(allowed_headers, allowed_body)
