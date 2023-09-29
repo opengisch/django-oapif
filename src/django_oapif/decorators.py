@@ -10,6 +10,9 @@ from django_oapif.mixins import OAPIFDescribeModelViewSetMixin
 from django_oapif.urls import oapif_router
 
 from .filters import BboxFilterBackend
+
+# this should be be switched to contrib
+# when https://code.djangoproject.com/ticket/34882#ticket is fixed
 from .functions import AsGeoJSON
 
 
