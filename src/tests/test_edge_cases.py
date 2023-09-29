@@ -6,11 +6,9 @@ from django.core.management import call_command
 from django.test import Client
 from rest_framework.test import APITestCase
 
-from .models import (
-    TestPermissionAllowAny,
-    TestPermissionDefaultPermissionsSettings,
-    TestPermissionIsAdminUserModel,
-)
+from signalo.edge_cases.models import (
+    TestPermissionAllowAny, TestPermissionDefaultPermissionsSettings,
+    TestPermissionIsAdminUserModel)
 
 # API urls
 app_collections_url = "/oapif/collections"

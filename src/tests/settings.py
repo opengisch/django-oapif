@@ -37,6 +37,10 @@ ALLOWED_HOSTS = ["localhost", "django", os.getenv("OGCAPIF_HOST", "")]
 
 INSTALLED_APPS = [
     "tests",
+    "signalo.core",
+    "signalo.value_lists",
+    "signalo.edge_cases",
+    "signalo.roads",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -172,6 +176,9 @@ REST_FRAMEWORK = {
 
 OAPIF_TITLE = "DJANGO_OAPIF"
 OAPIF_DESCRIPTION = "Django OAPIF tests"
+
+# Geometry's SRID. This can only be changed prior to initializing the database.
+GEOMETRY_SRID = int(os.environ.get("GEOMETRY_SRID", "2056"))
 
 INTERNAL_IPS = [
     "127.0.0.1",  # so that Django toolbar is displayed to localhost

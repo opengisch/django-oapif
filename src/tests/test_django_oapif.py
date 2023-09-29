@@ -1,6 +1,7 @@
 import logging
 
 from django.contrib.auth.models import User
+from django.core.management import call_command
 from rest_framework.test import APITestCase
 
 logger = logging.getLogger(__name__)
@@ -11,6 +12,9 @@ collections_url = "/oapif/collections"
 class TestBasicAuth(APITestCase):
     @classmethod
     def setUpTestData(cls):
+        call_command("populate_data")
+        call_command("populate_users")
+
         cls.demo_viewer = User.objects.get(username="demo_viewer")
         cls.admin = User.objects.get(username="admin")
         cls.collection_url = collections_url + "/tests.point_2056_10fields"
