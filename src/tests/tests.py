@@ -35,7 +35,7 @@ class TestBasicAuth(APITestCase):
         for layer in ("tests.point_2056_10fields_local_json", "tests.point_2056_10fields"):
             url = f"{collections_url}/{layer}/items"
             post_to_items = self.client.post(url, data, format="json")
-            self.assertIn(post_to_items.status_code, (200, 201), url)
+            self.assertIn(post_to_items.status_code, (200, 201), (url, post_to_items.data))
 
     def test_anonymous_items_options(self):
         # Anonymous user

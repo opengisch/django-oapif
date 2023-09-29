@@ -50,7 +50,7 @@ def register_oapif_viewset(
         if geom_db_serializer and geom_field:
 
             class AutoSerializer(GeoFeatureModelSerializer):
-                _geom_json_db = serializers.JSONField()
+                _geom_json_db = serializers.JSONField(required=False)
 
                 class Meta:
                     model = Model
