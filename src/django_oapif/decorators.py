@@ -29,7 +29,7 @@ def register_oapif_viewset(
 
     - key: allows to pass a custom name for the collection (defaults to the model's label)
     - geom_db_serializer: delegate the geometry serialization to the DB
-    - geo_field: the geometry field name. If None, a null geometry is produced
+    - geom_field: the geometry field name. If None, a null geometry is produced
     - custom_serializer_attrs: allows to pass custom attributes to set to the serializer's Meta (e.g. custom fields)
     - custom_viewset_attrs: allows to pass custom attributes to set to the viewset (e.g. custom pagination class)
     """
@@ -50,12 +50,12 @@ def register_oapif_viewset(
         if geom_db_serializer and geom_field:
 
             class AutoSerializer(GeoFeatureModelSerializer):
-                geojson = serializers.JSONField()
+                _geom_json_db = serializers.JSONField()
 
                 class Meta:
                     model = Model
-                    fields = "__all__"
-                    geo_field = None
+                    exclude = [geom_field]
+                    geo_field = "_geom_json_db"
 
         else:
 
@@ -74,8 +74,11 @@ def register_oapif_viewset(
             oapif_title = Model._meta.verbose_name
             oapif_description = Model.__doc__
 
-            # (one day this will be retrieved automatically from the serializer)
-            oapif_geom_lookup = geom_field
+            if geom_db_serializer and geom_field:
+                oapif_geom_lookup = "_geom_json_db"
+            else:
+                oapif_geom_lookup = geom_field
+
             filter_backends = [BboxFilterBackend]
 
             # Allowing '.' and '-' in urls
@@ -96,7 +99,11 @@ def register_oapif_viewset(
                 qs = super().get_queryset()
 
                 if geom_db_serializer and geom_field:
-                    qs = qs.annotate(geojson=Cast(AsGeoJSON("geom", False, False), models.JSONField()))
+                    qs = qs.annotate(
+                        _geom_json_db=Cast(
+                            AsGeoJSON(geom_field, False, False), models.JSONField()
+                        )
+                    )
 
                 return qs
 
