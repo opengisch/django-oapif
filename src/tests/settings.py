@@ -37,6 +37,10 @@ ALLOWED_HOSTS = ["localhost", "django", os.getenv("OGCAPIF_HOST", "")]
 
 INSTALLED_APPS = [
     "tests",
+    "signalo.core",
+    "signalo.value_lists",
+    "signalo.edge_cases",
+    "signalo.roads",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -88,10 +92,10 @@ WSGI_APPLICATION = "tests.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.contrib.gis.db.backends.postgis",
-        "NAME": "postgres",
-        "HOST": "postgres",
-        "PORT": 5432,
-        "USER": "postgres",
+        "NAME": os.getenv("POSTGRES_DB"),
+        "HOST": os.getenv("POSTGRES_HOST"),
+        "PORT": os.getenv("POSTGRES_PORT"),
+        "USER": os.getenv("POSTGRES_USER"),
         "PASSWORD": os.getenv("POSTGRES_PASSWORD"),
     }
 }
@@ -152,9 +156,7 @@ REST_FRAMEWORK = {
         # "geocity.auth.InternalTokenAuthentication",
     ),
     "DEFAULT_PAGINATION_CLASS": "django_oapif.pagination.OapifPagination",
-    "DEFAULT_PERMISSION_CLASSES": (
-        "rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly",
-    ),
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly",),
     # "DEFAULT_THROTTLE_CLASSES": [
     #     "rest_framework.throttling.ScopedRateThrottle",
     # ],
@@ -172,6 +174,9 @@ REST_FRAMEWORK = {
 
 OAPIF_TITLE = "DJANGO_OAPIF"
 OAPIF_DESCRIPTION = "Django OAPIF tests"
+
+# Geometry's SRID. This can only be changed prior to initializing the database.
+GEOMETRY_SRID = int(os.environ.get("GEOMETRY_SRID", "2056"))
 
 INTERNAL_IPS = [
     "127.0.0.1",  # so that Django toolbar is displayed to localhost

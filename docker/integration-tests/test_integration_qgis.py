@@ -35,10 +35,7 @@ class TestStack(unittest.TestCase):
 
     def test_collection_exists(self):
         res = requests.get(COLLECTIONS_URL).json()
-        self.assertTrue(
-            "tests.point_2056_10fields"
-            in [collection["id"] for collection in res["collections"]]
-        )
+        self.assertTrue("tests.point_2056_10fields" in [collection["id"] for collection in res["collections"]])
 
     def test_many_points(self):
         points = requests.get(POINTS_URL).json()
@@ -60,12 +57,7 @@ class TestStack(unittest.TestCase):
             pass
         self.assertIsInstance(f, QgsFeature)
 
-        self.assertFalse(
-            bool(
-                layer.dataProvider().capabilities()
-                & QgsVectorDataProvider.Capability.AddFeatures
-            )
-        )
+        self.assertFalse(bool(layer.dataProvider().capabilities() & QgsVectorDataProvider.Capability.AddFeatures))
 
     def test_load_with_basic_auth(self):
         uri = QgsDataSourceUri()
@@ -80,12 +72,7 @@ class TestStack(unittest.TestCase):
         layer = self.project.addMapLayer(layer)
         self.assertIsNotNone(layer)
 
-        self.assertTrue(
-            bool(
-                layer.dataProvider().capabilities()
-                & QgsVectorDataProvider.Capability.AddFeatures
-            )
-        )
+        self.assertTrue(bool(layer.dataProvider().capabilities() & QgsVectorDataProvider.Capability.AddFeatures))
 
         f = None
         for f in layer.getFeatures():

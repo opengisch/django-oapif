@@ -24,9 +24,7 @@ class TestOfficialSigns(APITestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        path_to_official_signs = os.path.relpath(
-            "signalo/value_lists/data/official-signs.json"
-        )
+        path_to_official_signs = os.path.relpath("signalo/value_lists/data/official-signs.json")
         cls.path_to_signs_images = os.path.abspath("/media_volume/official_signs")
 
         with open(path_to_official_signs, "r") as fh:
@@ -50,9 +48,7 @@ class TestOfficialSigns(APITestCase):
         self.assertEqual(len(self.unique_official_names), 340)
 
     def test_exact_files(self):
-        self.assertEqual(
-            self.unique_official_names, set(os.listdir(self.path_to_signs_images))
-        )
+        self.assertEqual(self.unique_official_names, set(os.listdir(self.path_to_signs_images)))
 
     def test_official_signs_collection(self):
         response = self.client.get("/oapif/collections/signalo_vl.officialsigntype")
@@ -60,9 +56,7 @@ class TestOfficialSigns(APITestCase):
         self.assertGreater(len(response.json()), 0)
 
     def test_official_signs_items(self):
-        response = self.client.get(
-            "/oapif/collections/signalo_vl.officialsigntype/items"
-        )
+        response = self.client.get("/oapif/collections/signalo_vl.officialsigntype/items")
         self.assertEqual(response.status_code, 200)
         result = response.json()
         expected = {"type": "FeatureCollection", "features": []}
@@ -79,8 +73,5 @@ class TestOfficialSigns(APITestCase):
         collection_url = "/oapif/collections/signalo_vl.officialsigntype/items"
         ids = ["0.2-r", "1.06"]
         urls = [f"{collection_url}/{id}" for id in ids]
-        condition = all(
-            self.client.get(url, format="json").json()["id"] == id
-            for (url, id) in zip(urls, ids)
-        )
+        condition = all(self.client.get(url, format="json").json()["id"] == id for (url, id) in zip(urls, ids))
         self.assertTrue(condition)

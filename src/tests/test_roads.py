@@ -1,7 +1,7 @@
 from django.core.management import call_command
 from rest_framework.test import APITestCase
 
-from .models import Road
+from signalo.roads.models import Road
 
 
 class TestRoads(APITestCase):

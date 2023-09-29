@@ -1,6 +1,7 @@
 from django.http import HttpResponse
 from rest_framework import pagination
 from rest_framework.response import Response
+from rest_framework.utils.serializer_helpers import ReturnList
 
 
 class OapifPagination(pagination.LimitOffsetPagination):
@@ -9,6 +10,14 @@ class OapifPagination(pagination.LimitOffsetPagination):
     default_limit = 1000
 
     def get_paginated_response(self, data):
+        if isinstance(data, ReturnList):
+            number_returned = len(data)
+
+            extra_params = {"features": [*data]}
+        else:
+            number_returned = len(data["features"])
+            extra_params = {**data}
+
         return Response(
             {
                 "links": [
@@ -25,9 +34,9 @@ class OapifPagination(pagination.LimitOffsetPagination):
                         "href": self.get_previous_link(),
                     },
                 ],
-                "numberReturned": len(data["features"]),
+                "numberReturned": number_returned,
                 "numberMatched": self.count,
-                **data,
+                **extra_params,
             }
         )
 

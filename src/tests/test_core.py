@@ -15,9 +15,8 @@ from django.core.management import call_command
 from rest_framework.test import APITestCase
 
 from django_oapif.renderers import FGBRenderer
+from signalo.core.models import Azimuth, Pole, Sign
 from signalo.core.views import PoleSerializer
-
-from .models import Azimuth, Pole, Sign
 
 logger = logging.getLogger(__name__)
 
@@ -58,13 +57,9 @@ class TestValuesListSignsPoles(APITestCase):
             azimuths_ids_on_pole = azimuths.filter(pole=pole).values_list("pk")
             signs_on_pole = signs.filter(azimuth__id__in=azimuths_ids_on_pole)
             signs_orders_on_pole = signs_on_pole.values_list("order")
-            order = sorted(
-                [o[0] if isinstance(o, Tuple) else o for o in signs_orders_on_pole]
-            )
+            order = sorted([o[0] if isinstance(o, Tuple) else o for o in signs_orders_on_pole])
             if not is_dense_partial_order(order):
-                raise self.failureException(
-                    f"{pole} does not have a dense order: {order}"
-                )
+                raise self.failureException(f"{pole} does not have a dense order: {order}")
 
     def test_deletion_preserves_order_density_first(self):
         poles = Pole.objects.all()
@@ -108,9 +103,7 @@ class TestValuesListSignsPoles(APITestCase):
         self.test_dense_orders_signs()
 
 
-def serialize_with_profile(
-    objects, serializer: Callable
-) -> Tuple[cProfile.Profile, str]:
+def serialize_with_profile(objects, serializer: Callable) -> Tuple[cProfile.Profile, str]:
     with cProfile.Profile() as profile:
         for object in objects:
             _ = serializer(object).data
@@ -156,16 +149,12 @@ class TestBasicAuth(APITestCase):
         self.client.force_authenticate(user=None)
 
     def test_get_as_viewer(self):
-        collections_from_anonymous = self.client.get(
-            collections_url, format="json"
-        ).json()
+        collections_from_anonymous = self.client.get(collections_url, format="json").json()
         self.client.force_authenticate(user=self.demo_viewer)
         collection_response = self.client.get(collections_url, format="json")
 
         self.assertEqual(collection_response.status_code, 200)
-        self.assertEqual(
-            len(collection_response.json()), len(collections_from_anonymous)
-        )
+        self.assertEqual(len(collection_response.json()), len(collections_from_anonymous))
 
     def test_post_as_admin(self):
         self.client.force_authenticate(user=self.admin)
@@ -207,23 +196,12 @@ class TestRenderers(APITestCase):
         cls.items_url = cls.collection_url + "/items"
 
     def test_flatgeobuf(self):
-        json_features = self.client.get(self.items_url, {"format": "json"}).json()[
-            "features"
-        ]
-        json_coordinates = [
-            tuple(json_feature["geometry"]["coordinates"])
-            for json_feature in json_features
-        ]
-        output_stream = io.BytesIO(
-            self.client.get(self.items_url, {"format": "fgb"}, streaming=True).content
-        )
+        json_features = self.client.get(self.items_url, {"format": "json"}).json()["features"]
+        json_coordinates = [tuple(json_feature["geometry"]["coordinates"]) for json_feature in json_features]
+        output_stream = io.BytesIO(self.client.get(self.items_url, {"format": "fgb"}, streaming=True).content)
 
-        with fiona.open(
-            output_stream, mode="r", driver="FlatGeobuf", schema=FGBRenderer.schema
-        ) as fgb_features:
-            fgb_coordinates = [
-                fgb_feature.geometry["coordinates"] for fgb_feature in fgb_features
-            ]
+        with fiona.open(output_stream, mode="r", driver="FlatGeobuf", schema=FGBRenderer.schema) as fgb_features:
+            fgb_coordinates = [fgb_feature.geometry["coordinates"] for fgb_feature in fgb_features]
 
         self.assertEqual(
             set(fgb_coordinates),
@@ -303,9 +281,7 @@ class TestFGB(APITestCase):
     def test_roads_fgb(self):
         t0 = default_timer()
         FGBRenderer.schema = {"geometry": "MultiLineString", "properties": {}}
-        response_content = self.client.get(
-            self.items_url, {"format": "fgb"}, streaming=True
-        ).content
+        response_content = self.client.get(self.items_url, {"format": "fgb"}, streaming=True).content
         t1 = default_timer()
 
         self.assertTrue(response_content)

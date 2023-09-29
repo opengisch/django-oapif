@@ -1,6 +1,7 @@
 import logging
 
 from django.contrib.auth.models import User
+from django.core.management import call_command
 from rest_framework.test import APITestCase
 
 logger = logging.getLogger(__name__)
@@ -11,6 +12,9 @@ collections_url = "/oapif/collections"
 class TestBasicAuth(APITestCase):
     @classmethod
     def setUpTestData(cls):
+        call_command("populate_data")
+        call_command("populate_users")
+
         cls.demo_viewer = User.objects.get(username="demo_viewer")
         cls.admin = User.objects.get(username="admin")
         cls.collection_url = collections_url + "/tests.point_2056_10fields"
@@ -20,16 +24,12 @@ class TestBasicAuth(APITestCase):
         self.client.force_authenticate(user=None)
 
     def test_get_as_viewer(self):
-        collections_from_anonymous = self.client.get(
-            collections_url, format="json"
-        ).json()
+        collections_from_anonymous = self.client.get(collections_url, format="json").json()
         self.client.force_authenticate(user=self.demo_viewer)
         collection_response = self.client.get(collections_url, format="json")
 
         self.assertEqual(collection_response.status_code, 200)
-        self.assertEqual(
-            len(collection_response.json()), len(collections_from_anonymous)
-        )
+        self.assertEqual(len(collection_response.json()), len(collections_from_anonymous))
 
     def test_post_as_admin(self):
         self.client.force_authenticate(user=self.admin)
