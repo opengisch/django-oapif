@@ -1,5 +1,3 @@
-from os import getenv
-
 from django.contrib.gis.geos import Polygon
 from pyproj import CRS, Transformer
 from rest_framework.filters import BaseFilterBackend
@@ -19,7 +17,7 @@ class BboxFilterBackend(BaseFilterBackend):
 
         if user_crs:
             user_crs = get_crs_from_uri(user_crs)
-            api_crs = CRS.from_epsg(int(getenv("GEOMETRY_SRID", "2056")))
+            api_crs = CRS.from_epsg(queryset.model.crs)  # TODO support CRS84, not only EPSG codes
             transformer = Transformer.from_crs(user_crs, api_crs)
             LL = transformer.transform(coords[0], coords[1])
             UR = transformer.transform(coords[2], coords[3])

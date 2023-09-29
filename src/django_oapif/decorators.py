@@ -22,6 +22,7 @@ def register_oapif_viewset(
     key: Optional[str] = None,
     geom_db_serializer: Optional[bool] = True,
     geom_field: [str] = "geom",
+    crs: Optional[int] = None,
     custom_serializer_attrs: Dict[str, Any] = None,
     custom_viewset_attrs: Dict[str, Any] = None,
 ) -> Callable[[Any], models.Model]:
@@ -32,6 +33,7 @@ def register_oapif_viewset(
     - key: allows to pass a custom name for the collection (defaults to the model's label)
     - geom_db_serializer: delegate the geometry serialization to the DB
     - geom_field: the geometry field name. If None, a null geometry is produced
+    - crs: the EPSG code, if empty CRS84 is assumed
     - custom_serializer_attrs: allows to pass custom attributes to set to the serializer's Meta (e.g. custom fields)
     - custom_viewset_attrs: allows to pass custom attributes to set to the viewset (e.g. custom pagination class)
     """
@@ -45,8 +47,6 @@ def register_oapif_viewset(
     def inner(Model):
         """
         Create the serializers
-        1 for viewsets for models with a geometry and
-        1 for viewsets for models without (aka 'non-geometric features').
         """
 
         if geom_db_serializer and geom_field:
@@ -61,9 +61,15 @@ def register_oapif_viewset(
 
                 def to_internal_value(self, data):
                     # TODO: this needs improvement!!!
-                    geo = data["geometry"]
+                    geo = None
+                    if "geometry" in data:
+                        geo = data["geometry"]
+                        if crs not in geo:
+                            geo["crs"] = {"type": "name", "properties": {"name": f"urn:ogc:def:crs:EPSG::{Model.crs}"}}
                     data = super().to_internal_value(data)
-                    data[geom_field] = GEOSGeometry(json.dumps(geo))
+                    print(543534534, data)
+                    if geo:
+                        data[geom_field] = GEOSGeometry(json.dumps(geo))
                     return data
 
         else:
@@ -73,6 +79,18 @@ def register_oapif_viewset(
                     model = Model
                     fields = "__all__"
                     geo_field = geom_field
+
+                def to_internal_value(self, data):
+                    # TODO: this needs improvement!!!
+                    if "geometry" in data and "crs" not in data["geometry"]:
+                        data["geometry"]["crs"] = {
+                            "type": "name",
+                            "properties": {"name": f"urn:ogc:def:crs:EPSG::{Model.crs}"},
+                        }
+                    print(data)
+                    data = super().to_internal_value(data)
+                    print(12344555, data)
+                    return data
 
         # Create the viewset
         class Viewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
@@ -108,6 +126,8 @@ def register_oapif_viewset(
                     qs = qs.annotate(_geom_json_db=Cast(AsGeoJSON(geom_field, False, False), models.JSONField()))
 
                 return qs
+
+        setattr(Model, "crs", crs)
 
         # Apply custom serializer attributes
         for k, v in custom_serializer_attrs.items():
