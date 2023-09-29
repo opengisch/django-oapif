@@ -44,10 +44,6 @@ def register_oapif_viewset(
         1 for viewsets for models without (aka 'non-geometric features').
         """
 
-        _viewset_oapif_geom_lookup = "geom"  # one day this will be retrieved automatically from the serializer
-        if not geom_field:
-            _viewset_oapif_geom_lookup = None
-
         if geom_db_serializer and geom_field:
 
             class AutoSerializer(GeoFeatureModelSerializer):
@@ -76,7 +72,7 @@ def register_oapif_viewset(
             oapif_description = Model.__doc__
 
             # (one day this will be retrieved automatically from the serializer)
-            oapif_geom_lookup = _viewset_oapif_geom_lookup
+            oapif_geom_lookup = geom_field
             filter_backends = [BboxFilterBackend]
 
             # Allowing '.' and '-' in urls
