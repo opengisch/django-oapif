@@ -18,9 +18,7 @@ app_models_url = f"{app_collections_url}/signalo_edge_cases"
 # Enums to build test matrix
 class Url(str, Enum):
     allow_any = f"{app_models_url}.{TestPermissionAllowAny.__name__.lower()}"
-    default = (
-        f"{app_models_url}.{TestPermissionDefaultPermissionsSettings.__name__.lower()}"
-    )
+    default = f"{app_models_url}.{TestPermissionDefaultPermissionsSettings.__name__.lower()}"
     is_admin = f"{app_models_url}.{TestPermissionIsAdminUserModel.__name__.lower()}"
     list = f"{app_collections_url}"
 
@@ -107,9 +105,7 @@ def extract_ids_from_items(contents: Dict[str, Any]) -> List[str]:
 
 
 # Helper to make requests
-def make_request(
-    client: Client, crud_type: Crud, url: str, admin_user: Optional[User] = None
-) -> Tuple[str, int, Any]:
+def make_request(client: Client, crud_type: Crud, url: str, admin_user: Optional[User] = None) -> Tuple[str, int, Any]:
     items_url = f"{url}/items"
     params = {"geom": "Point(2600000 1200000)"}
     data = {"geom": "Point(1300000 600000)"}
@@ -165,21 +161,15 @@ def traverse_matrix(
     failed = []
     tot = 0
     for crud_name, expected_status_codes in status_codes_matrix[role][endpoint].items():
-        actual_url, response_code, results = make_request(
-            client, crud_name, endpoint, admin_user
-        )
+        actual_url, response_code, results = make_request(client, crud_name, endpoint, admin_user)
 
         if isinstance(expected_status_codes, int):
             if response_code != expected_status_codes:
-                failed.append(
-                    f"{crud_name}: {actual_url} (got {response_code}, expected {expected_status_codes})"
-                )
+                failed.append(f"{crud_name}: {actual_url} (got {response_code}, expected {expected_status_codes})")
 
         elif isinstance(expected_status_codes, List):
             if response_code not in expected_status_codes:
-                failed.append(
-                    f"{crud_name}: {actual_url} (got {response_code}, expected {expected_status_codes})"
-                )
+                failed.append(f"{crud_name}: {actual_url} (got {response_code}, expected {expected_status_codes})")
 
         if actual_url == app_collections_url:
             collection_ids = {collection["id"] for collection in results["collections"]}
@@ -189,9 +179,7 @@ def traverse_matrix(
 
         tot += 1
 
-    print(
-        f"{role} traversed {endpoint}. To filter out: {len(to_filter_out) if to_filter_out else 0}"
-    )
+    print(f"{role} traversed {endpoint}. To filter out: {len(to_filter_out) if to_filter_out else 0}")
     return (tot, failed)
 
 
@@ -213,9 +201,7 @@ class TestViewsets(APITestCase):
 
     def test_objects_domain(self):
         allow_any = TestPermissionAllowAny.objects.all().count()
-        default_settings = (
-            TestPermissionDefaultPermissionsSettings.objects.all().count()
-        )
+        default_settings = TestPermissionDefaultPermissionsSettings.objects.all().count()
         is_admin = TestPermissionIsAdminUserModel.objects.all().count()
         self.assertGreater(allow_any, 0)
         self.assertGreater(default_settings, 0)

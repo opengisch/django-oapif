@@ -48,11 +48,7 @@ class Command(BaseCommand):
 
             # Create data for models whose permissions we are testing against
             TestPermissionAllowAny.objects.create(geom=f"Point({x+i*step} {y+i*step})")
-            TestPermissionDefaultPermissionsSettings.objects.create(
-                geom=f"Point({x+i*step} {y+i*step})"
-            )
-            TestPermissionIsAdminUserModel.objects.create(
-                geom=f"Point({x+i*step} {y+i*step})"
-            )
+            TestPermissionDefaultPermissionsSettings.objects.create(geom=f"Point({x+i*step} {y+i*step})")
+            TestPermissionIsAdminUserModel.objects.create(geom=f"Point({x+i*step} {y+i*step})")
 
         print(f"🐻 Edge cases test data added too!")

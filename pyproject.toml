@@ -32,3 +32,9 @@ root = ".."
 readme = {file = ["README.md"], content-type = "text/markdown"}
 dependencies = {file = ["requirements.txt"]}
 optional-dependencies = {file = ["requirements-dev.txt"]}
+
+[tool.isort]
+profile = "black"
+
+[tool.black]
+line-length = 120

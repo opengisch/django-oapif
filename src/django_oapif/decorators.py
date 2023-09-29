@@ -1,7 +1,9 @@
 from typing import Any, Callable, Dict, Optional
 
-from django.db.models import Model
-from rest_framework import viewsets
+from django.db import models
+from django.db.models.functions import Cast
+from rest_framework import serializers, viewsets
+from rest_framework.serializers import ModelSerializer
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from django_oapif.metadata import OAPIFMetadata
@@ -9,6 +11,10 @@ from django_oapif.mixins import OAPIFDescribeModelViewSetMixin
 from django_oapif.urls import oapif_router
 
 from .filters import BboxFilterBackend
+from .functions import AsGeoJSON
+
+USE_PG_GEOJSON = False
+USE_PG_GEOJSON = True
 
 
 def register_oapif_viewset(
@@ -16,7 +22,7 @@ def register_oapif_viewset(
     skip_geom: Optional[bool] = False,
     custom_serializer_attrs: Dict[str, Any] = None,
     custom_viewset_attrs: Dict[str, Any] = None,
-) -> Callable[[Any], Model]:
+) -> Callable[[Any], models.Model]:
     """
     This decorator takes care of all boilerplate code (creating a serializer, a viewset and registering it) to register
     a model to the default OAPIF endpoint.
@@ -39,21 +45,43 @@ def register_oapif_viewset(
         1 for viewsets for models without (aka 'non-geometric features').
         """
 
-        _viewset_oapif_geom_lookup = (
-            "geom"  # one day this will be retrieved automatically from the serializer
-        )
+        _viewset_oapif_geom_lookup = "geom"  # one day this will be retrieved automatically from the serializer
         _geo_field = "geom"
         if skip_geom:
             _viewset_oapif_geom_lookup = None
             _geo_field = None
 
-        class AutoSerializer(GeoFeatureModelSerializer):
-            class Meta:
-                nonlocal _geo_field
+        if USE_PG_GEOJSON:
 
-                model = Model
-                fields = "__all__"
-                geo_field = _geo_field
+            class AutoSerializer(ModelSerializer):
+                geojson = serializers.JSONField()
+
+                class Meta:
+                    model = Model
+                    fields = [
+                        "id",
+                        "geojson",
+                        "field_0",
+                        "field_1",
+                        "field_2",
+                        "field_3",
+                        "field_4",
+                        "field_5",
+                        "field_6",
+                        "field_7",
+                        "field_8",
+                        "field_9",
+                    ]
+
+        else:
+
+            class AutoSerializer(GeoFeatureModelSerializer):
+                class Meta:
+                    nonlocal _geo_field
+
+                    model = Model
+                    fields = "__all__"
+                    geo_field = _geo_field
 
         # Create the viewset
         class Viewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
@@ -77,12 +105,20 @@ def register_oapif_viewset(
             def finalize_response(self, request, response, *args, **kwargs):
                 response = super().finalize_response(request, response, *args, **kwargs)
                 if request.method == "OPTIONS":
-                    allowed_actions = self.metadata_class().determine_actions(
-                        request, self
-                    )
+                    allowed_actions = self.metadata_class().determine_actions(request, self)
                     allowed_actions = ", ".join(allowed_actions.keys())
                     response.headers["Allow"] = allowed_actions
                 return response
+
+            def get_queryset(self):
+                qs = super().get_queryset()
+
+                if USE_PG_GEOJSON:
+                    # NOTE the defer should not be needed, as the field should be skipped already when we define `Serializer.Meta.Fields` without the `geom` col
+                    qs = qs.defer("geom")
+                    qs = qs.annotate(geojson=Cast(AsGeoJSON("geom", False, False), models.JSONField()))
+
+                return qs
 
         # Apply custom serializer attributes
         for k, v in custom_serializer_attrs.items():
@@ -93,9 +129,7 @@ def register_oapif_viewset(
             setattr(Viewset, k, v)
 
         # Register the model
-        oapif_router.register(
-            key or Model._meta.label_lower, Viewset, key or Model._meta.label_lower
-        )
+        oapif_router.register(key or Model._meta.label_lower, Viewset, key or Model._meta.label_lower)
 
         return Model
 

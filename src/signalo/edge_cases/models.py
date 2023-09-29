@@ -32,9 +32,7 @@ class EmptyTableGeom(models.Model):
     geom = models.PointField()
 
 
-@register_oapif_viewset(
-    custom_viewset_attrs={"pagination_class": HighlyPaginatedPagination}
-)
+@register_oapif_viewset(custom_viewset_attrs={"pagination_class": HighlyPaginatedPagination})
 class HighlyPaginated(models.Model):
     """The viewset of this model has very short pages (3 items or so), so we can test the impact of pagination on components like the attribute table."""
 
@@ -50,9 +48,7 @@ class DifferentSrid(models.Model):
     geom = models.PointField(srid=2154)
 
 
-@register_oapif_viewset(
-    custom_viewset_attrs={"permission_classes": (permissions.AllowAny,)}
-)
+@register_oapif_viewset(custom_viewset_attrs={"permission_classes": (permissions.AllowAny,)})
 class TestPermissionAllowAny(models.Model):
     """This model exemplifies the most permissive permission class (AllowAny)."""
 
@@ -68,9 +64,7 @@ class TestPermissionDefaultPermissionsSettings(models.Model):
     geom = models.PointField()
 
 
-@register_oapif_viewset(
-    custom_viewset_attrs={"permission_classes": (permissions.IsAdminUser,)}
-)
+@register_oapif_viewset(custom_viewset_attrs={"permission_classes": (permissions.IsAdminUser,)})
 class TestPermissionIsAdminUserModel(models.Model):
     """This model exemplifies the 'IsAdminUserModel' class."""
 

@@ -41,13 +41,9 @@ class Command(BaseCommand):
                 lang_path = {k: v for k, v in row.items() if k in langs}
                 for lang, path_to_img in lang_path.items():
                     if path_to_img not in saved_files:
-                        with open(
-                            f"{path_to_images}/../../data/images/official/original/{row[lang]}"
-                        ) as fi:
+                        with open(f"{path_to_images}/../../data/images/official/original/{row[lang]}") as fi:
                             data = fi.read()
-                            getattr(sign_instance, lang).save(
-                                row[lang], ContentFile(data)
-                            )
+                            getattr(sign_instance, lang).save(row[lang], ContentFile(data))
                             saved_files.add(path_to_img)
 
         try:

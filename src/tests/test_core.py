@@ -51,13 +51,9 @@ class TestValuesListSignsPoles(APITestCase):
             azimuths_ids_on_pole = azimuths.filter(pole=pole).values_list("pk")
             signs_on_pole = signs.filter(azimuth__id__in=azimuths_ids_on_pole)
             signs_orders_on_pole = signs_on_pole.values_list("order")
-            order = sorted(
-                [o[0] if isinstance(o, Tuple) else o for o in signs_orders_on_pole]
-            )
+            order = sorted([o[0] if isinstance(o, Tuple) else o for o in signs_orders_on_pole])
             if not is_dense_partial_order(order):
-                raise self.failureException(
-                    f"{pole} does not have a dense order: {order}"
-                )
+                raise self.failureException(f"{pole} does not have a dense order: {order}")
 
     def test_deletion_preserves_order_density_first(self):
         poles = Pole.objects.all()
@@ -101,9 +97,7 @@ class TestValuesListSignsPoles(APITestCase):
         self.test_dense_orders_signs()
 
 
-def serialize_with_profile(
-    objects, serializer: Callable
-) -> Tuple[cProfile.Profile, str]:
+def serialize_with_profile(objects, serializer: Callable) -> Tuple[cProfile.Profile, str]:
     with cProfile.Profile() as profile:
         for object in objects:
             _ = serializer(object).data
@@ -149,16 +143,12 @@ class TestBasicAuth(APITestCase):
         self.client.force_authenticate(user=None)
 
     def test_get_as_viewer(self):
-        collections_from_anonymous = self.client.get(
-            collections_url, format="json"
-        ).json()
+        collections_from_anonymous = self.client.get(collections_url, format="json").json()
         self.client.force_authenticate(user=self.demo_viewer)
         collection_response = self.client.get(collections_url, format="json")
 
         self.assertEqual(collection_response.status_code, 200)
-        self.assertEqual(
-            len(collection_response.json()), len(collections_from_anonymous)
-        )
+        self.assertEqual(len(collection_response.json()), len(collections_from_anonymous))
 
     def test_post_as_admin(self):
         self.client.force_authenticate(user=self.admin)

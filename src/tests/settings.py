@@ -92,10 +92,10 @@ WSGI_APPLICATION = "tests.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.contrib.gis.db.backends.postgis",
-        "NAME": "postgres",
-        "HOST": "postgres",
-        "PORT": 5432,
-        "USER": "postgres",
+        "NAME": os.getenv("POSTGRES_DB"),
+        "HOST": os.getenv("POSTGRES_HOST"),
+        "PORT": os.getenv("POSTGRES_PORT"),
+        "USER": os.getenv("POSTGRES_USER"),
         "PASSWORD": os.getenv("POSTGRES_PASSWORD"),
     }
 }
@@ -156,9 +156,7 @@ REST_FRAMEWORK = {
         # "geocity.auth.InternalTokenAuthentication",
     ),
     "DEFAULT_PAGINATION_CLASS": "django_oapif.pagination.OapifPagination",
-    "DEFAULT_PERMISSION_CLASSES": (
-        "rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly",
-    ),
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly",),
     # "DEFAULT_THROTTLE_CLASSES": [
     #     "rest_framework.throttling.ScopedRateThrottle",
     # ],
