@@ -20,7 +20,7 @@ jobs:
       pull-requests: write  # to write comment
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -79,7 +79,7 @@ jobs:
           echo "EXIT_CODE=${EXIT_CODE}" >> $GITHUB_OUTPUT
 
       - name: Commit baseline if improved | checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE == '1' }}
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
