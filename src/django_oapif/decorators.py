@@ -81,16 +81,10 @@ def register_oapif_viewset(
                     geo_field = geom_field
 
                 def to_internal_value(self, data):
-                    # TODO: this needs improvement!!!
-                    if "geometry" in data and "crs" not in data["geometry"]:
-                        data["geometry"]["crs"] = {
-                            "type": "name",
-                            "properties": {"name": f"urn:ogc:def:crs:EPSG::{Model.crs}"},
-                        }
-                    print(data)
-                    data = super().to_internal_value(data)
-                    print(12344555, data)
-                    return data
+                    geom = super().to_internal_value(data)
+                    if geom.crs is None:
+                        geom.crs = Model.crs
+                    return geom
 
         # Create the viewset
         class Viewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
