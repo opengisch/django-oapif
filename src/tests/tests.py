@@ -35,15 +35,17 @@ class TestBasicAuth(APITestCase):
             "geometry": {
                 "type": "Point",
                 "coordinates": [2508500.0, 1152000.0],
-                "crs": {"type": "name", "properties": {"name": "urn:ogc:def:crs:EPSG::2056"}},
             },
             "properties": {"field_0": "test123456"},
         }
+        data_with_crs = data
+        data_with_crs["geometry"]["crs"] = {"type": "name", "properties": {"name": "urn:ogc:def:crs:EPSG::2056"}}
 
         for layer in ("tests.point_2056_10fields_local_json", "tests.point_2056_10fields"):
-            url = f"{collections_url}/{layer}/items"
-            post_to_items = self.client.post(url, data, format="json")
-            self.assertIn(post_to_items.status_code, (200, 201), (url, post_to_items.data))
+            for _data in (data, data_with_crs):
+                url = f"{collections_url}/{layer}/items"
+                post_to_items = self.client.post(url, _data, format="json")
+                self.assertIn(post_to_items.status_code, (200, 201), (url, data, post_to_items.data))
 
     def test_anonymous_items_options(self):
         # Anonymous user

@@ -80,12 +80,6 @@ def register_oapif_viewset(
                     fields = "__all__"
                     geo_field = geom_field
 
-                def to_internal_value(self, data):
-                    geom = super().to_internal_value(data)
-                    if geom.crs is None:
-                        geom.crs = Model.crs
-                    return geom
-
         # Create the viewset
         class Viewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
             queryset = Model.objects.all()
