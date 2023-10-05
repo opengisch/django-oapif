@@ -20,7 +20,7 @@ from .functions import AsGeoJSON
 
 def register_oapif_viewset(
     key: Optional[str] = None,
-    geom_db_serializer: Optional[bool] = True,
+    serialize_geom_in_db: Optional[bool] = True,
     geom_field: [str] = "geom",
     crs: Optional[int] = None,
     custom_serializer_attrs: Dict[str, Any] = None,
@@ -31,7 +31,7 @@ def register_oapif_viewset(
     a model to the default OAPIF endpoint.
 
     - key: allows to pass a custom name for the collection (defaults to the model's label)
-    - geom_db_serializer: delegate the geometry serialization to the DB
+    - serialize_geom_in_db: delegate the geometry serialization to the DB
     - geom_field: the geometry field name. If None, a null geometry is produced
     - crs: the EPSG code, if empty CRS84 is assumed
     - custom_serializer_attrs: allows to pass custom attributes to set to the serializer's Meta (e.g. custom fields)
@@ -51,7 +51,7 @@ def register_oapif_viewset(
 
         Model.crs = crs
 
-        if geom_db_serializer and geom_field:
+        if serialize_geom_in_db and geom_field:
 
             class AutoSerializer(GeoFeatureModelSerializer):
                 _geom_geosjon = serializers.JSONField(required=False, allow_null=True, read_only=True)
@@ -93,7 +93,7 @@ def register_oapif_viewset(
                     return data
 
         # Create the viewset
-        class ViewSet(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
+        class OgcAPIFeatureViewSet(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
             queryset = Model.objects.all()
             serializer_class = AutoSerializer
 
@@ -127,7 +127,7 @@ def register_oapif_viewset(
             def get_queryset(self):
                 qs = super().get_queryset()
 
-                if geom_db_serializer and geom_field:
+                if serialize_geom_in_db and geom_field:
                     qs = qs.annotate(_geom_geosjon=Cast(AsGeoJSON(geom_field, False, False), models.JSONField()))
 
                 return qs
@@ -138,10 +138,10 @@ def register_oapif_viewset(
 
         # Apply custom viewset attributes
         for k, v in custom_viewset_attrs.items():
-            setattr(ViewSet, k, v)
+            setattr(OgcAPIFeatureViewSet, k, v)
 
         # Register the model
-        oapif_router.register(key or Model._meta.label_lower, ViewSet, key or Model._meta.label_lower)
+        oapif_router.register(key or Model._meta.label_lower, OgcAPIFeatureViewSet, key or Model._meta.label_lower)
 
         return Model
 
