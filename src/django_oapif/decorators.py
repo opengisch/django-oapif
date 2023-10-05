@@ -88,8 +88,7 @@ def register_oapif_viewset(
                             "type": "name",
                             "properties": {"name": f"urn:ogc:def:crs:EPSG::{Model.crs}"},
                         }
-                        data = super().to_internal_value(data)
-
+                    data = super().to_internal_value(data)
                     return data
 
         # Create the viewset
