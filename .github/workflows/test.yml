@@ -47,7 +47,7 @@ jobs:
         cp .env.example .env
 
         # start the stack
-        docker compose up --build -d
+        docker compose --profile testing_integration up --build -d
 
         # deploy static files and migrate database
         docker compose exec django python manage.py collectstatic --no-input

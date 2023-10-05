@@ -7,6 +7,8 @@ services:
     volumes:
       - ./tests/conformance:/build/run
       - ./test_outputs:/build/output
+    profiles:
+      - testing_conformance
 
   integration_tests:
     image: opengisch/qgis:nightly
@@ -15,3 +17,5 @@ services:
     volumes:
       - ./tests/integration:/integration
     working_dir: /integration
+    profiles:
+      - testing_integration
