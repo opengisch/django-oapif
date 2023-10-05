@@ -28,10 +28,8 @@ docker compose exec django python manage.py collectstatic --no-input
 docker compose exec django python manage.py migrate --no-input
 
 # A convenience start-up Django command is there to populate the database with testdata for each app:
-docker compose exec django python manage.py populate_vl
-docker compose exec django python manage.py populate_signs_poles
-docker compose exec django python manage.py populate_edge_cases
 docker compose exec django python manage.py populate_users
+docker compose exec django python manage.py populate_data
 ```
 After waiting little you'll be able to access all collections at http://localhost/oapif/collections.
 
@@ -70,7 +68,7 @@ INSTALLED_APPS = [
 ```
 ## Custom authentication & permissions
 
-By default the viewsets under `signalo/core` use the `DjangoModelPermissionsOrAnonReadOnly` permissions class. You can add model permissions when registering their corresponding viewsets, as `permission_classes` [^1]. Example:
+By default the viewsets under `tests` use the `DjangoModelPermissionsOrAnonReadOnly` permissions class. You can add model permissions when registering their corresponding viewsets, as `permission_classes` [^1]. Example:
 
 ```python
 models.py
