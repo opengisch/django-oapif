@@ -5,8 +5,7 @@
     "core.landingpage.LandingPage"
   ],
   "skipped": [
-    "core.collections.FeatureCollection",
-    "core.collections.FeatureCollections",
+    "crs.CrsRequirementClassPrecondition",
     "crs.discovery.collection.DiscoveryCollectionCrsUri",
     "crs.discovery.collection.DiscoveryCollectionDefaultCrs",
     "crs.discovery.collection.DiscoveryCollectionStorageCrs",
@@ -23,10 +22,12 @@
     "crs.query.crs.features.FeaturesCrsParameter",
     "crs.query.crs.features.FeaturesCrsParameterDefault",
     "crs.query.crs.features.FeaturesCrsParameterInvalid",
-    "crs.query.crs.features.FeaturesCrsParameterTransform"
+    "crs.query.crs.features.FeaturesCrsParameterTransform",
+    "core.collections.FeatureCollection",
+    "core.collections.FeatureCollections"
   ],
   "failed": [
-    "crs.CrsRequirementClassPrecondition",
+    "core.collections.Feature",
     "core.collections.FeaturesBBox",
     "core.collections.FeaturesLimit",
     "core.collections.FeaturesTime",

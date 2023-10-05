@@ -40,9 +40,9 @@ jobs:
           file: docker/django/Dockerfile
           push: ${{ github.repository == 'opengisch/django-ogcapif' }}
           pull: true
-          cache-from: type=registry,ref=opengisch/signalo-django:latest
-          cache-to: type=registry,ref=opengisch/signalo-django:latest,mode=max
-          tags: opengisch/signalo-django:latest
+          cache-from: type=registry,ref=opengisch/django-oapif:latest
+          cache-to: type=registry,ref=opengisch/django-oapif:latest,mode=max
+          tags: opengisch/django-oapif:latest
 
       - name: Do quickstart
         run: |
@@ -50,7 +50,7 @@ jobs:
           cp .env.example .env
 
           # start the stack
-          docker compose up --build -d
+          docker compose --profile testing_conformance up --build -d
 
           # deploy static files and migrate database
           docker compose exec django python manage.py collectstatic --no-input
@@ -68,14 +68,16 @@ jobs:
         with:
           name: emailable-report
           path: |
-            ./_test_outputs/**/emailable-report.html
+            ./test_outputs/**/emailable-report.html
+
+      - name: Install requirements
+        run: pip install lxml
 
       - name: Check baseline
         id: baseline
         run: |
-          pip install lxml
           EXIT_CODE=0
-          python scripts/parse_report.py _test_outputs/emailable-report.html conformance-baseline.json || EXIT_CODE=$?
+          python tests/conformance/parse_report.py test_outputs/emailable-report.html tests/conformance/conformance-baseline.json || EXIT_CODE=$?
           echo "EXIT_CODE=${EXIT_CODE}" >> $GITHUB_OUTPUT
 
       - name: Commit baseline if improved | checkout
@@ -88,13 +90,13 @@ jobs:
 
       - name: Commit baseline if improved | copy baseline file
         if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE == '1' }}
-        run: cp conformance-baseline.json baseline_repo/conformance-baseline.json
+        run: cp tests/conformance/conformance-baseline.json baseline_repo/tests/conformance/conformance-baseline.json
 
       - name: Commit baseline if improved | commit
         if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE == '1' }}
         uses: EndBug/add-and-commit@v9
         with:
-          add: conformance-baseline.json
+          add: tests/conformance/conformance-baseline.json
           cwd: ./baseline_repo
           message: update baseline
 
@@ -116,8 +118,7 @@ jobs:
 
       - name: Recheck baseline
         run: |
-          pip install lxml
-          python scripts/parse_report.py _test_outputs/emailable-report.html conformance-baseline.json
+          python tests/conformance/parse_report.py test_outputs/emailable-report.html tests/conformance/conformance-baseline.json
 
       - name: Failure logs
         if: failure()

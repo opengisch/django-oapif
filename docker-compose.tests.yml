@@ -1,21 +1,21 @@
 # overrides for running tests
+version: '3.7'
 
 services:
-
   conformance_test:
-    build: ./docker/conformance-tests
+    build: ./docker/conformance
     volumes:
-      - ./_test_outputs:/build/run/output
-      - ./docker/conformance-tests/test-run-props.xml:/build/run/test-run-props.xml
+      - ./tests/conformance:/build/run
+      - ./test_outputs:/build/output
     profiles:
-      - testing
+      - testing_conformance
 
   integration_tests:
     image: opengisch/qgis:nightly
     command: sh -c 'xvfb-run python3 -m unittest discover'
     tty: true
     volumes:
-      - ./docker/integration-tests:/integration-tests
-    working_dir: /integration-tests
+      - ./tests/integration:/integration
+    working_dir: /integration
     profiles:
-      - testing
+      - testing_integration
