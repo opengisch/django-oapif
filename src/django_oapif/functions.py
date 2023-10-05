@@ -5,7 +5,7 @@ from django.db import models
 # and https://github.com/django/django/pull/17320
 
 
-class AsGeoJSON(functions.GeoFunc):
+class AsGeoJSON(functions.AsGeoJSON):
     output_field = models.TextField()
 
     def __init__(self, expression, bbox=False, crs=False, precision=8, **extra):
