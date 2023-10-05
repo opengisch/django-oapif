@@ -54,12 +54,12 @@ def register_oapif_viewset(
         if geom_db_serializer and geom_field:
 
             class AutoSerializer(GeoFeatureModelSerializer):
-                _geom_json_db = serializers.JSONField(required=False, allow_null=True, read_only=True)
+                _geom_geosjon = serializers.JSONField(required=False, allow_null=True, read_only=True)
 
                 class Meta:
                     model = Model
                     exclude = [geom_field]
-                    geo_field = "_geom_json_db"
+                    geo_field = "_geom_geosjon"
 
                 def to_internal_value(self, data):
                     # TODO: this needs improvement!!!
@@ -128,7 +128,7 @@ def register_oapif_viewset(
                 qs = super().get_queryset()
 
                 if geom_db_serializer and geom_field:
-                    qs = qs.annotate(_geom_json_db=Cast(AsGeoJSON(geom_field, False, False), models.JSONField()))
+                    qs = qs.annotate(_geom_geosjon=Cast(AsGeoJSON(geom_field, False, False), models.JSONField()))
 
                 return qs
 
