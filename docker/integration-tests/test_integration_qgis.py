@@ -97,4 +97,4 @@ class TestStack(unittest.TestCase):
                 layer.addFeature(f)
             f = next(layer.getFeatures("field_0='Super Green'"))
             self.assertIsInstance(f, QgsFeature)
-            self.assertEquals(geom, f.geometry())
+            self.assertEqual(geom.asWkt(), f.geometry().asWkt())

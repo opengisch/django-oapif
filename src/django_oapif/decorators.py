@@ -4,7 +4,7 @@ from typing import Any, Callable, Dict, Optional
 from django.contrib.gis.geos import GEOSGeometry
 from django.db import models
 from django.db.models.functions import Cast
-from rest_framework import serializers, viewsets
+from rest_framework import reverse, serializers, viewsets
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from django_oapif.metadata import OAPIFMetadata
@@ -49,6 +49,8 @@ def register_oapif_viewset(
         Create the serializers
         """
 
+        Model.crs = crs
+
         if geom_db_serializer and geom_field:
 
             class AutoSerializer(GeoFeatureModelSerializer):
@@ -67,7 +69,6 @@ def register_oapif_viewset(
                         if crs not in geo:
                             geo["crs"] = {"type": "name", "properties": {"name": f"urn:ogc:def:crs:EPSG::{Model.crs}"}}
                     data = super().to_internal_value(data)
-                    print(543534534, data)
                     if geo:
                         data[geom_field] = GEOSGeometry(json.dumps(geo))
                     return data
@@ -87,14 +88,12 @@ def register_oapif_viewset(
                             "type": "name",
                             "properties": {"name": f"urn:ogc:def:crs:EPSG::{Model.crs}"},
                         }
-                        print(data)
                         data = super().to_internal_value(data)
-                        print(12344555, data)
 
                     return data
 
         # Create the viewset
-        class Viewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
+        class ViewSet(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
             queryset = Model.objects.all()
             serializer_class = AutoSerializer
 
@@ -112,6 +111,11 @@ def register_oapif_viewset(
             # Metadata
             metadata_class = OAPIFMetadata
 
+            def get_success_headers(self, data):
+                location = reverse.reverse(f"{self.basename}-detail", {"lookup": data[Model._meta.pk.column]})
+                headers = {"Location": location}
+                return headers
+
             def finalize_response(self, request, response, *args, **kwargs):
                 response = super().finalize_response(request, response, *args, **kwargs)
                 if request.method == "OPTIONS":
@@ -128,18 +132,16 @@ def register_oapif_viewset(
 
                 return qs
 
-        setattr(Model, "crs", crs)
-
         # Apply custom serializer attributes
         for k, v in custom_serializer_attrs.items():
             setattr(AutoSerializer.Meta, k, v)
 
         # Apply custom viewset attributes
         for k, v in custom_viewset_attrs.items():
-            setattr(Viewset, k, v)
+            setattr(ViewSet, k, v)
 
         # Register the model
-        oapif_router.register(key or Model._meta.label_lower, Viewset, key or Model._meta.label_lower)
+        oapif_router.register(key or Model._meta.label_lower, ViewSet, key or Model._meta.label_lower)
 
         return Model
 
