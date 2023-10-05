@@ -6,7 +6,12 @@ from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from tests.models import Line_2056_10fields, NoGeom_10fields, Point_2056_10fields
+from tests.models import (
+    Line_2056_10fields,
+    NoGeom_10fields,
+    Point_2056_10fields,
+    Point_2056_10fields_local_json,
+)
 
 
 class Command(BaseCommand):
@@ -26,6 +31,7 @@ class Command(BaseCommand):
         magnitude = math.ceil(math.sqrt(size))
 
         points = []
+        points_local_json = []
         lines = []
         no_geoms = []
 
@@ -48,6 +54,8 @@ class Command(BaseCommand):
                 fields["geom"] = geom_pt_wkt
                 point = Point_2056_10fields(**fields)
                 points.append(point)
+                point_local_json = Point_2056_10fields_local_json(**fields)
+                points_local_json.append(point_local_json)
 
                 fields["geom"] = geom_line_wkt
                 line = Line_2056_10fields(**fields)
@@ -55,6 +63,7 @@ class Command(BaseCommand):
 
         # Create objects in batches
         Point_2056_10fields.objects.bulk_create(points)
+        Point_2056_10fields_local_json.objects.bulk_create(points_local_json)
         NoGeom_10fields.objects.bulk_create(no_geoms)
         Line_2056_10fields.objects.bulk_create(lines)
 

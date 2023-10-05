@@ -13,7 +13,7 @@ class Command(BaseCommand):
         modifying = []
         viewing = []
 
-        for model in ("point_2056_10fields", "nogeom_10fields", "line_2056_10fields"):
+        for model in ("point_2056_10fields", "point_2056_10fields_local_json", "nogeom_10fields", "line_2056_10fields"):
             adding.append(Permission.objects.get(codename=f"add_{model}"))
             modifying.append(Permission.objects.get(codename=f"change_{model}"))
             viewing.append(Permission.objects.get(codename=f"view_{model}"))
