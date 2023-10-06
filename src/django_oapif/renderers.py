@@ -8,7 +8,7 @@ from django.conf import settings
 from django.http import StreamingHttpResponse
 from fiona.crs import CRS
 from json_stream_generator import json_generator
-from rest_framework import renderers, response
+from rest_framework import renderers
 
 
 class FGBRenderer(renderers.BaseRenderer):
