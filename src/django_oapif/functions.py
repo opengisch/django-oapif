@@ -3,7 +3,7 @@ from django.db import models
 
 # see https://code.djangoproject.com/ticket/34882#ticket
 # and https://github.com/django/django/pull/17320
-
+# this will be fixed in Django 5.0
 
 class AsGeoJSON(functions.AsGeoJSON):
     output_field = models.TextField()
