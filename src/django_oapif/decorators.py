@@ -92,7 +92,7 @@ def register_oapif_viewset(
         class Viewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
             queryset = Model.objects.all()
             serializer_class = AutoSerializer
-            renderer_classes = [renderers.JSONRenderer, JSONStreamingRenderer, JSONorjson, JSONujson, FGBRenderer]
+            renderer_classes = [renderers.JSONRenderer, FGBRenderer]
 
             # TODO: these should probably be moved to the mixin
             oapif_title = Model._meta.verbose_name
@@ -119,9 +119,9 @@ def register_oapif_viewset(
 
             def list(self, request, *args, **kwargs):
                 """
-                Stream collection items as JSON chunks if 'streaming=true' is passed.
+                Stream collection items as JSON chunks if 'format=json' and streaming=true' are passed.
                 Stream them as FGB chunks if 'format=fgb' is passed.
-                Otherwise render them as a single JSON chunk.
+                Otherwise render them as a single JSON chunk, using a variety of renderers depending on the request.
                 """
                 if request.query_params.get("format") == "json":
                     if request.query_params.get("streaming", "").casefold() == "true":
@@ -133,6 +133,7 @@ def register_oapif_viewset(
                     else:
                         renderer = renderers.JSONRenderer()
                     request.accepted_renderer = renderer
+                    request.accepted_media_type = renderer.media_type
                 return super().list(request, *args, **kwargs)
 
             def get_queryset(self):
