@@ -257,6 +257,22 @@ class TestJSON(APITestCase):
         self.assertTrue(response_content)
         self.timings[inspect.currentframe().f_code.co_name] = round(t1 - t0, 2)
 
+    def test_roads_orjson(self):
+        t0 = default_timer()
+        response_content = self.client.get(self.items_url, {"format": "json", "json_encoder": "orjson"}).content
+        t1 = default_timer()
+
+        self.assertTrue(response_content)
+        self.timings[inspect.currentframe().f_code.co_name] = round(t1 - t0, 2)
+
+    def test_roads_ujson(self):
+        t0 = default_timer()
+        response_content = self.client.get(self.items_url, {"format": "json", "json_encoder": "ujson"}).content
+        t1 = default_timer()
+
+        self.assertTrue(response_content)
+        self.timings[inspect.currentframe().f_code.co_name] = round(t1 - t0, 2)
+
 
 class TestFGB(APITestCase):
     @classmethod
@@ -270,7 +286,7 @@ class TestFGB(APITestCase):
         p = os.path.abspath("/unit_tests_outputs/rendering_performance.txt")
         with open(p, "a+") as fh:
             for k, v in cls.timings.items():
-                fh.write(f"{k}: {v}")
+                fh.write(f"{k}: {v}\n")
 
     @classmethod
     def setUpTestData(cls):

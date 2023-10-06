@@ -2,11 +2,13 @@ import io
 from typing import OrderedDict
 
 import fiona
+import orjson
+import ujson
 from django.conf import settings
 from django.http import StreamingHttpResponse
 from fiona.crs import CRS
 from json_stream_generator import json_generator
-from rest_framework import renderers
+from rest_framework import renderers, response
 
 
 class FGBRenderer(renderers.BaseRenderer):
@@ -44,3 +46,23 @@ class JSONStreamingRenderer(renderers.BaseRenderer):
         features_data = data["features"] if "features" in data else data["results"]["features"]
         generate = json_generator(feature for feature in features_data)
         return StreamingHttpResponse(generate)
+
+
+class JSONorjson(renderers.BaseRenderer):
+    format = "json"
+    media_type = "application/json"
+
+    def render(self, data: OrderedDict, accepted_media_type=None, renderer_context=None) -> response.Response:
+        features_data = data["features"] if "features" in data else data["results"]["features"]
+        data = orjson.dumps(features_data)
+        return response.Response(data)
+
+
+class JSONujson(renderers.BaseRenderer):
+    format = "json"
+    media_type = "application/json"
+
+    def render(self, data: OrderedDict, accepted_media_type=None, renderer_context=None) -> response.Response:
+        features_data = data["features"] if "features" in data else data["results"]["features"]
+        data = ujson.dumps(features_data)
+        return response.Response(data)

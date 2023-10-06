@@ -8,7 +8,12 @@ from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from django_oapif.metadata import OAPIFMetadata
 from django_oapif.mixins import OAPIFDescribeModelViewSetMixin
-from django_oapif.renderers import FGBRenderer, JSONStreamingRenderer
+from django_oapif.renderers import (
+    FGBRenderer,
+    JSONorjson,
+    JSONStreamingRenderer,
+    JSONujson,
+)
 from django_oapif.urls import oapif_router
 
 from .filters import BboxFilterBackend
@@ -87,7 +92,7 @@ def register_oapif_viewset(
         class Viewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
             queryset = Model.objects.all()
             serializer_class = AutoSerializer
-            renderer_classes = [renderers.JSONRenderer, JSONStreamingRenderer, FGBRenderer]
+            renderer_classes = [renderers.JSONRenderer, JSONStreamingRenderer, JSONorjson, JSONujson, FGBRenderer]
 
             # TODO: these should probably be moved to the mixin
             oapif_title = Model._meta.verbose_name
@@ -118,11 +123,16 @@ def register_oapif_viewset(
                 Stream them as FGB chunks if 'format=fgb' is passed.
                 Otherwise render them as a single JSON chunk.
                 """
-                if (
-                    request.query_params.get("format") == "json"
-                    and request.query_params.get("streaming", "").casefold() == "true"
-                ):
-                    self.renderer_classes = [JSONStreamingRenderer]
+                if request.query_params.get("format") == "json":
+                    if request.query_params.get("streaming", "").casefold() == "true":
+                        renderer = JSONStreamingRenderer()
+                    elif request.query_params.get("json_encoder", "").casefold() == "orjson":
+                        renderer = JSONorjson()
+                    elif request.query_params.get("json_encoder", "").casefold() == "ujson":
+                        renderer = JSONujson()
+                    else:
+                        renderer = renderers.JSONRenderer()
+                    request.accepted_renderer = renderer
                 return super().list(request, *args, **kwargs)
 
             def get_queryset(self):

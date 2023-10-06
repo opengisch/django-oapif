@@ -10,3 +10,5 @@ pyproj
 pyyaml
 transifex-client
 uritemplate
+orjson
+ujson
