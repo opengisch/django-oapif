@@ -231,7 +231,7 @@ class TestJSON(APITestCase):
         p = os.path.abspath("/unit_tests_outputs/rendering_performance.txt")
         with open(p, "a+") as fh:
             for k, v in cls.timings.items():
-                fh.write(f"{k}: {v}")
+                fh.write(f"{k}: {v}\n")
 
     @classmethod
     def setUpTestData(cls):
@@ -278,7 +278,7 @@ class TestFGB(APITestCase):
         cls.collection_url = collections_url + "/signalo_roads.road"
         cls.items_url = cls.collection_url + "/items"
 
-    def test_roads_fgb(self):
+    def test_roads_fgb_streaming(self):
         t0 = default_timer()
         FGBRenderer.schema = {"geometry": "MultiLineString", "properties": {}}
         response_content = self.client.get(self.items_url, {"format": "fgb"}, streaming=True).content

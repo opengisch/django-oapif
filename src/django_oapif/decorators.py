@@ -15,7 +15,6 @@ from .filters import BboxFilterBackend
 from .functions import AsGeoJSON
 
 USE_PG_GEOJSON = False
-USE_PG_GEOJSON = True
 
 
 def register_oapif_viewset(
