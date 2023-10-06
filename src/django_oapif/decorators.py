@@ -119,16 +119,16 @@ def register_oapif_viewset(
 
             def list(self, request, *args, **kwargs):
                 """
-                Stream collection items as JSON chunks if 'format=json' and streaming=true' are passed.
-                Stream them as FGB chunks if 'format=fgb' is passed.
+                Stream collection items as FGB chunks if 'format=fgb' is passed.
+                Stream them as JSON chunks if 'format=json' and streaming=true' are passed.
                 Otherwise render them as a single JSON chunk, using a variety of renderers depending on the request.
                 """
                 if request.query_params.get("format") == "json":
                     if request.query_params.get("streaming", "").casefold() == "true":
                         renderer = JSONStreamingRenderer()
-                    elif request.query_params.get("json_encoder", "").casefold() == "orjson":
+                    elif request.query_params.get("json_encoder", "") == "orjson":
                         renderer = JSONorjson()
-                    elif request.query_params.get("json_encoder", "").casefold() == "ujson":
+                    elif request.query_params.get("json_encoder", "") == "ujson":
                         renderer = JSONujson()
                     else:
                         renderer = renderers.JSONRenderer()
