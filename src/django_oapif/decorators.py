@@ -2,13 +2,13 @@ from typing import Any, Callable, Dict, Optional
 
 from django.db import models
 from django.db.models.functions import Cast
-from rest_framework import serializers, viewsets
+from rest_framework import renderers, serializers, viewsets
 from rest_framework.serializers import ModelSerializer
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from django_oapif.metadata import OAPIFMetadata
 from django_oapif.mixins import OAPIFDescribeModelViewSetMixin
-from django_oapif.renderers import JSONStreamingRenderer
+from django_oapif.renderers import FGBRenderer, JSONStreamingRenderer
 from django_oapif.urls import oapif_router
 
 from .filters import BboxFilterBackend
@@ -88,6 +88,7 @@ def register_oapif_viewset(
         class Viewset(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
             queryset = Model.objects.all()
             serializer_class = AutoSerializer
+            renderer_classes = [renderers.JSONRenderer, JSONStreamingRenderer, FGBRenderer]
 
             # TODO: these should probably be moved to the mixin
             oapif_title = Model._meta.verbose_name
