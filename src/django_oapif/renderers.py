@@ -52,17 +52,13 @@ class JSONorjson(renderers.BaseRenderer):
     format = "json"
     media_type = "application/json"
 
-    def render(self, data: OrderedDict, accepted_media_type=None, renderer_context=None) -> response.Response:
-        features_data = data["features"] if "features" in data else data["results"]["features"]
-        data = orjson.dumps(features_data)
-        return response.Response(data)
+    def render(self, data: OrderedDict, accepted_media_type=None, renderer_context=None) -> bytes:
+        return orjson.dumps(data)
 
 
 class JSONujson(renderers.BaseRenderer):
     format = "json"
     media_type = "application/json"
 
-    def render(self, data: OrderedDict, accepted_media_type=None, renderer_context=None) -> response.Response:
-        features_data = data["features"] if "features" in data else data["results"]["features"]
-        data = ujson.dumps(features_data)
-        return response.Response(data)
+    def render(self, data: OrderedDict, accepted_media_type=None, renderer_context=None) -> bytes:
+        return ujson.dumps(data)
