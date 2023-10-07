@@ -2,7 +2,8 @@ from typing import Any, Callable, Dict, Optional
 
 from django.db import models
 from django.db.models.functions import Cast
-from rest_framework import renderers, serializers, viewsets
+from django.http.response import StreamingHttpResponse
+from rest_framework import renderers, response, serializers, viewsets
 from rest_framework.serializers import ModelSerializer
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
@@ -117,27 +118,41 @@ def register_oapif_viewset(
                     response.headers["Allow"] = allowed_actions
                 return response
 
-            def list(self, request, *args, **kwargs):
+            def list(self, request, *args, **kwargs) -> response.Response | StreamingHttpResponse:
                 """
                 Stream collection items as FGB chunks if 'format=fgb' is passed.
                 Stream them as JSON chunks if 'format=json' and streaming=true' are passed.
                 Otherwise render them as a single JSON chunk, using a variety of renderers depending on the request.
                 """
                 streaming = request.query_params.get("streaming", "").casefold() == "true"
+                format = request.query_params.get("format")
+                encoder = request.query_params.get("json_encoder")
 
-                if request.query_params.get("format") == "json":
+                if format == "fgb":
+                    renderer = FGBRenderer()
+                elif format == "json":
                     if streaming:
                         renderer = JSONStreamingRenderer()
-                    elif request.query_params.get("json_encoder") == "orjson":
+                    elif encoder == "orjson":
                         renderer = JSONorjson()
-                    elif request.query_params.get("json_encoder") == "ujson":
+                    elif encoder == "ujson":
                         renderer = JSONujson()
                     else:
                         renderer = renderers.JSONRenderer()
+                else:
+                    renderer = renderers.JSONRenderer()
+
+                if streaming:
+                    qs = self.get_queryset()
+                    renderer_context = self.get_renderer_context()
+                    serializer = self.get_serializer_class()
+                    serialized = serializer(qs, many=True).data
+                    rendered = renderer.render(serialized, renderer.media_type, renderer_context)
+                    return StreamingHttpResponse(rendered)
+                else:
                     request.accepted_renderer = renderer
                     request.accepted_media_type = renderer.media_type
-
-                return super().list(request, *args, **kwargs)
+                    return super().list(request, *args, **kwargs)
 
             def get_renderer_context(self):
                 context = super().get_renderer_context()
