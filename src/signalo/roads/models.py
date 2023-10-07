@@ -22,3 +22,7 @@ class Road(models.Model):
         if geometry == "wkb":
             return self.geom.wkb
         return self.geom.wkt
+
+    @staticmethod
+    def get_schema() -> dict:
+        return {"geometry": "MultiLineString", "properties": {}}

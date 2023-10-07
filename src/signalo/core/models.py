@@ -28,6 +28,10 @@ class Pole(ComputedFieldsModel):
     def _serialized(self):
         return f'{{"id": "{str(self.id)}", "type": "Feature", "geometry": {self.geom.geojson}, "properties": {{"name": "{self.name}"}}}}'
 
+    @staticmethod
+    def get_schema() -> dict:
+        return {"geometry": "Point", "properties": {"name": "str", "_serialized": "str"}}
+
 
 @register_oapif_viewset()
 class Azimuth(ComputedFieldsModel):

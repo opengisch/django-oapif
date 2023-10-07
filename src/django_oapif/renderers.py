@@ -13,20 +13,18 @@ from rest_framework import renderers
 class FGBRenderer(renderers.BaseRenderer):
     format = "fgb"
     media_type = "application/event-stream"
-    # FIXME: This should be sent by the model.
-    schema = {"geometry": "Point", "properties": {"name": "str", "_serialized": "str"}}
 
     def render(self, data: OrderedDict, accepted_media_type=None, renderer_context=None) -> io.BytesIO:
-        """Renders pre-serialized Python objects as a flatgeobuf binary stream"""
+        """Renders data as a flatgeobuf binary stream"""
+        assert renderer_context
         features_data = data["features"] if "features" in data else data["results"]["features"]
         features = (fiona.Feature.from_dict(obj) for obj in features_data)
         buffer_wrapper = io.BytesIO()
-
         with fiona.open(
             buffer_wrapper,
             mode="w",
             driver="FlatGeobuf",
-            schema=self.schema,
+            schema=renderer_context["schema"],
             crs=CRS.from_epsg(settings.GEOMETRY_SRID),
         ) as fh:
             for feature in features:

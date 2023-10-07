@@ -123,18 +123,29 @@ def register_oapif_viewset(
                 Stream them as JSON chunks if 'format=json' and streaming=true' are passed.
                 Otherwise render them as a single JSON chunk, using a variety of renderers depending on the request.
                 """
+                streaming = request.query_params.get("streaming", "").casefold() == "true"
+
                 if request.query_params.get("format") == "json":
-                    if request.query_params.get("streaming", "").casefold() == "true":
+                    if streaming:
                         renderer = JSONStreamingRenderer()
-                    elif request.query_params.get("json_encoder", "") == "orjson":
+                    elif request.query_params.get("json_encoder") == "orjson":
                         renderer = JSONorjson()
-                    elif request.query_params.get("json_encoder", "") == "ujson":
+                    elif request.query_params.get("json_encoder") == "ujson":
                         renderer = JSONujson()
                     else:
                         renderer = renderers.JSONRenderer()
                     request.accepted_renderer = renderer
                     request.accepted_media_type = renderer.media_type
+
                 return super().list(request, *args, **kwargs)
+
+            def get_renderer_context(self):
+                context = super().get_renderer_context()
+
+                if hasattr(Model, "get_schema"):
+                    context.update({"schema": Model.get_schema()})
+
+                return context
 
             def get_queryset(self):
                 qs = super().get_queryset()

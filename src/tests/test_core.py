@@ -14,7 +14,6 @@ from django.contrib.auth.models import User
 from django.core.management import call_command
 from rest_framework.test import APITestCase
 
-from django_oapif.renderers import FGBRenderer
 from signalo.core.models import Azimuth, Pole, Sign
 from signalo.core.views import PoleSerializer
 
@@ -200,7 +199,7 @@ class TestFGBFeatures(APITestCase):
         json_coordinates = [tuple(json_feature["geometry"]["coordinates"]) for json_feature in json_features]
         output_stream = io.BytesIO(self.client.get(self.items_url, {"format": "fgb"}, streaming=True).content)
 
-        with fiona.open(output_stream, mode="r", driver="FlatGeobuf", schema=FGBRenderer.schema) as fgb_features:
+        with fiona.open(output_stream, mode="r", driver="FlatGeobuf", schema=Pole.get_schema()) as fgb_features:
             fgb_coordinates = [fgb_feature.geometry["coordinates"] for fgb_feature in fgb_features]
 
         self.assertEqual(
@@ -286,7 +285,6 @@ class TestFGB(APITestCase):
 
     def test_roads_fgb_streaming(self):
         t0 = default_timer()
-        FGBRenderer.schema = {"geometry": "MultiLineString", "properties": {}}
         self.client.get(self.items_url, {"format": "fgb"}, streaming=True)
         t1 = default_timer()
         self.timings[inspect.currentframe().f_code.co_name] = round(t1 - t0, 2)
