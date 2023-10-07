@@ -143,10 +143,13 @@ def register_oapif_viewset(
                     renderer = renderers.JSONRenderer()
 
                 if streaming:
-                    qs = self.get_queryset()
                     renderer_context = self.get_renderer_context()
                     serializer = self.get_serializer_class()
-                    serialized = serializer(qs, many=True).data
+                    qs = self.filter_queryset(self.get_queryset())
+                    if paginated_qs := self.paginate_queryset(qs):
+                        serialized = serializer(paginated_qs, many=True).data
+                    else:
+                        serialized = serializer(qs, many=True).data
                     rendered = renderer.render(serialized, renderer.media_type, renderer_context)
                     return StreamingHttpResponse(rendered)
                 else:
