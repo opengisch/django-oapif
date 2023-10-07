@@ -7,3 +7,7 @@ git+https://github.com/3nids/django-rest-framework-gis@93d9718d123c2158f4d1c5f6c
 pyyaml
 uritemplate
 pyproj
+fiona
+json-stream-generator
+orjson
+ujson

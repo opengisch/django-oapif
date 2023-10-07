@@ -26,6 +26,10 @@ class Point_2056_10fields(ComputedFieldsModel):
     field_8 = models.CharField(max_length=255, verbose_name=_("Field 8"), null=True, blank=True)
     field_9 = models.CharField(max_length=255, verbose_name=_("Field 9"), null=True, blank=True)
 
+    @staticmethod
+    def get_schema() -> dict:
+        return {"geometry": "Point", "properties": {}}
+
 
 @register_oapif_viewset(crs=2056, serialize_geom_in_db=False)
 class Point_2056_10fields_local_json(ComputedFieldsModel):
@@ -41,6 +45,10 @@ class Point_2056_10fields_local_json(ComputedFieldsModel):
     field_7 = models.CharField(max_length=255, verbose_name=_("Field 7"), null=True, blank=True)
     field_8 = models.CharField(max_length=255, verbose_name=_("Field 8"), null=True, blank=True)
     field_9 = models.CharField(max_length=255, verbose_name=_("Field 9"), null=True, blank=True)
+
+    @staticmethod
+    def get_schema() -> dict:
+        return {"geometry": "Point", "properties": {}}
 
 
 @register_oapif_viewset(geom_field=None)
@@ -75,3 +83,7 @@ class Line_2056_10fields(ComputedFieldsModel):
     field_7 = models.CharField(max_length=255, verbose_name=_("Field 7"), null=True, blank=True)
     field_8 = models.CharField(max_length=255, verbose_name=_("Field 8"), null=True, blank=True)
     field_9 = models.CharField(max_length=255, verbose_name=_("Field 9"), null=True, blank=True)
+
+    @staticmethod
+    def get_schema() -> dict:
+        return {"geometry": "LineString", "properties": {}}

@@ -4,11 +4,17 @@ from typing import Any, Callable, Dict, Optional
 from django.contrib.gis.geos import GEOSGeometry
 from django.db import models
 from django.db.models.functions import Cast
-from rest_framework import reverse, serializers, viewsets
+from rest_framework import renderers, reverse, serializers, viewsets
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from django_oapif.metadata import OAPIFMetadata
 from django_oapif.mixins import OAPIFDescribeModelViewSetMixin
+from django_oapif.renderers import (
+    FGBRenderer,
+    JSONorjson,
+    JSONStreamingRenderer,
+    JSONujson,
+)
 from django_oapif.urls import oapif_router
 
 from .filters import BboxFilterBackend
@@ -95,6 +101,7 @@ def register_oapif_viewset(
         class OgcAPIFeatureViewSet(OAPIFDescribeModelViewSetMixin, viewsets.ModelViewSet):
             queryset = Model.objects.all()
             serializer_class = AutoSerializer
+            renderer_classes = [renderers.JSONRenderer, FGBRenderer]
 
             # TODO: these should probably be moved to the mixin
             oapif_title = Model._meta.verbose_name
@@ -122,6 +129,36 @@ def register_oapif_viewset(
                     allowed_actions = ", ".join(allowed_actions.keys())
                     response.headers["Allow"] = allowed_actions
                 return response
+
+            def list(self, request, *args, **kwargs):
+                """
+                Stream collection items as FGB chunks if 'format=fgb' is passed.
+                Stream them as JSON chunks if 'format=json' and streaming=true' are passed.
+                Otherwise render them as a single JSON chunk, using a variety of renderers depending on the request.
+                """
+                streaming = request.query_params.get("streaming", "").casefold() == "true"
+
+                if request.query_params.get("format") == "json":
+                    if streaming:
+                        renderer = JSONStreamingRenderer()
+                    elif request.query_params.get("json_encoder") == "orjson":
+                        renderer = JSONorjson()
+                    elif request.query_params.get("json_encoder") == "ujson":
+                        renderer = JSONujson()
+                    else:
+                        renderer = renderers.JSONRenderer()
+                    request.accepted_renderer = renderer
+                    request.accepted_media_type = renderer.media_type
+
+                return super().list(request, *args, **kwargs)
+
+            def get_renderer_context(self):
+                context = super().get_renderer_context()
+
+                if hasattr(Model, "get_schema"):
+                    context.update({"schema": Model.get_schema()})
+
+                return context
 
             def get_queryset(self):
                 qs = super().get_queryset()
