@@ -18,7 +18,6 @@ jobs:
     env:
       DOCKER_BUILDKIT: 1
       COMPOSE_DOCKER_CLI_BUILD: 1
-      OGCAPIF_HOST: localhost
 
     steps:
     - name: Install deps
@@ -47,6 +46,8 @@ jobs:
         # copy default conf
         cp .env.example .env
         source .env
+        export OGCAPIF_HOST
+        export DJANGO_DEV_PORT
         ./tests/benchmark/time.sh
 
     - name: Failure logs
