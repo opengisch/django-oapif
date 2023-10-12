@@ -2,7 +2,6 @@ import logging
 import uuid
 
 from django.contrib.gis.db import models
-from django.db import models
 from django.utils.translation import gettext as _
 from rest_framework import permissions
 
