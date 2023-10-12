@@ -46,14 +46,7 @@ jobs:
       run: |
         # copy default conf
         cp .env.example .env
-        SIZES=(  100 1000 1000 10000 10000 10000 )
-        LIMITS=( 100  100 1000   100  1000 10000 )
-        for idx in "${!SIZES[@]}"; do
-          SIZE=${SIZES[$idx]}
-          LIMIT=${LIMITS[$idx]}
-          ./scripts/restart.sh ${SIZE}
-          ./tests/benchmark/time.sh ${LIMIT}
-        done
+        ./tests/benchmark/time.sh
         
 
     - name: Failure logs
