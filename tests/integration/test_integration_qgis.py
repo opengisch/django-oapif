@@ -62,7 +62,7 @@ class TestStack(unittest.TestCase):
         self.assertFalse(bool(layer.dataProvider().capabilities() & QgsVectorDataProvider.Capability.AddFeatures))
 
     def test_load_and_edit_with_basic_auth(self):
-        for layer in ("tests.point_2056_10fields_local_json", "tests.point_2056_10fields"):
+        for layer in ("tests.point_2056_10fields_local_geom", "tests.point_2056_10fields"):
             uri = QgsDataSourceUri()
             uri.setParam("service", "wfs")
             uri.setParam("typename", layer)
