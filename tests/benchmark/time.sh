@@ -18,7 +18,7 @@ for SIZE in "${SIZES[@]}"; do
     for LAYER in "${LAYERS[@]}"; do
       hyperfine -r 10 "curl http://${OGCAPIF_HOST}:${DJANGO_DEV_PORT}/oapif/collections/tests.${LAYER}/items?limit=${LIMIT}" --export-json .time.json
       cat .time.json
-      echo "$SIZE $LIMIT $LAYER $(cat .time.json | jq '.results.[0].mean')" >> benchmark.dat
+      echo "$SIZE $LIMIT $LAYER $(cat .time.json | jq '.results[0].mean')" >> benchmark.dat
     done
   done
 done
