@@ -42,7 +42,7 @@ jobs:
         cache-from: type=registry,ref=opengisch/django-oapif:latest
         tags: opengisch/django-oapif:latest
 
-    - name: Benchmark
+    - name: Run Benchmark
       run: |
         # copy default conf
         cp .env.example .env
@@ -50,6 +50,9 @@ jobs:
         export OGCAPIF_HOST
         export DJANGO_DEV_PORT
         ./tests/benchmark/time.sh
+
+    - name: Results
+      run: cat benchmark.dat
 
     - name: Failure logs
       if: failure()
