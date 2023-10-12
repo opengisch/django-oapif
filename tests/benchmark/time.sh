@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 
+rm -p benchmark.dat
+
 SIZES=( 100 1000 10000 )
+LAYERS=( point_2056_10fields point_2056_10fields_local_geom nogeom_10fields nogeom_100fields line_2056_10fields line_2056_10fields_local_geom polygon_2056_10fields polygon_2056_10fields_local_geom secretlayer )
+
 for SIZE in "${SIZES[@]}"; do
   echo "::group::setup ${SIZE}"
   ./scripts/restart.sh ${SIZE}
@@ -10,8 +14,11 @@ for SIZE in "${SIZES[@]}"; do
   while [[ $LIMIT -lt $SIZE ]]; do
     LIMIT=$((LIMIT*10))
 
-  hyperfine -r 10 "curl http://${OGCAPIF_HOST}:${DJANGO_DEV_PORT}/oapif/collections/tests.point_2056_10fields/items?limit=${LIMIT}"
-  hyperfine -r 10 "curl http://${OGCAPIF_HOST}:${DJANGO_DEV_PORT}/oapif/collections/tests.point_2056_10fields_local_json/items?limit=${LIMIT}"
-
+    for LAYER in "${LAYERS[@]}"; do
+      hyperfine -r 10 "curl http://${OGCAPIF_HOST}:${DJANGO_DEV_PORT}/oapif/collections/tests.${LAYER}/items?limit=${LIMIT}" --export-json .time.json
+      echo "$SIZE $LIMIT $LAYER $(cat .time.json | jq '.results.[0].mean')" >> benchmark.dat
+    done
   done
 done
+
+cat benchmark.dat

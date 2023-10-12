@@ -1,6 +1,7 @@
 import math
 import random
 import string
+from copy import deepcopy
 
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
@@ -8,9 +9,12 @@ from django.db import transaction
 
 from tests.models import (
     Line_2056_10fields,
+    Line_2056_10fields_local_geom,
     NoGeom_10fields,
+    NoGeom_100fields,
     Point_2056_10fields,
-    Point_2056_10fields_local_json,
+    Point_2056_10fields_local_geom,
+    SecretLayer,
 )
 
 
@@ -18,7 +22,7 @@ class Command(BaseCommand):
     help = "Populate db with testdata"
 
     def add_arguments(self, parser):
-        parser.add_argument("-s", "--size", type=int, default=10000)
+        parser.add_argument("-s", "--size", type=int, default=1000)
 
     @transaction.atomic
     def handle(self, *args, **options):
@@ -31,9 +35,12 @@ class Command(BaseCommand):
         magnitude = math.ceil(math.sqrt(size))
 
         points = []
-        points_local_json = []
+        points_local_geom = []
+        secret_points = []
         lines = []
+        lines_local_geom = []
         no_geoms = []
+        no_geoms_100fields = []
 
         letters = string.ascii_lowercase
 
@@ -51,11 +58,19 @@ class Command(BaseCommand):
                 no_geom = NoGeom_10fields(**fields)
                 no_geoms.append(no_geom)
 
+                no_geom_100fields = deepcopy(fields)
+                for f in range(90):
+                    no_geom_100fields[f"field_{10+f}"] = "".join(random.choice(letters) for i in range(10))
+                no_geom_100fields = NoGeom_100fields(**no_geom_100fields)
+                no_geoms_100fields.append(no_geom_100fields)
+
                 fields["geom"] = geom_pt_wkt
                 point = Point_2056_10fields(**fields)
                 points.append(point)
-                point_local_json = Point_2056_10fields_local_json(**fields)
-                points_local_json.append(point_local_json)
+                point_local_geom = Point_2056_10fields_local_geom(**fields)
+                points_local_geom.append(point_local_geom)
+                secret_point = SecretLayer(**fields)
+                secret_points.append(secret_point)
 
                 fields["geom"] = geom_line_wkt
                 line = Line_2056_10fields(**fields)
@@ -63,9 +78,12 @@ class Command(BaseCommand):
 
         # Create objects in batches
         Point_2056_10fields.objects.bulk_create(points)
-        Point_2056_10fields_local_json.objects.bulk_create(points_local_json)
+        Point_2056_10fields_local_geom.objects.bulk_create(points_local_geom)
+        SecretLayer.objects.bulk_create(secret_points)
         NoGeom_10fields.objects.bulk_create(no_geoms)
+        NoGeom_100fields.objects.bulk_create(no_geoms_100fields)
         Line_2056_10fields.objects.bulk_create(lines)
+        Line_2056_10fields_local_geom.objects.bulk_create(lines_local_geom)
 
         # Call 'update_data' to update computed properties
         call_command("updatedata")

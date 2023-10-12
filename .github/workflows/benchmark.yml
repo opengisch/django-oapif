@@ -22,6 +22,7 @@ jobs:
     steps:
     - name: Install deps
       run: |
+        sudo apt-get install -y jq
         HF_VERSION=1.18.0
         wget https://github.com/sharkdp/hyperfine/releases/download/v${HF_VERSION}/hyperfine_${HF_VERSION}_amd64.deb
         sudo dpkg -i hyperfine_${HF_VERSION}_amd64.deb

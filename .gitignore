@@ -11,7 +11,12 @@ dist
 *.egg-info
 src/django_oapif/__version__.py
 
+.time.json
+benchmark.dat
+
+data
 static
 media
 test_outputs
 .vscode/
+.python-version
