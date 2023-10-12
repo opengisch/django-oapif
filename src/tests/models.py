@@ -1,8 +1,8 @@
 import logging
 import uuid
 
-from computedfields.models import ComputedFieldsModel
 from django.contrib.gis.db import models
+from django.db import models
 from django.utils.translation import gettext as _
 from rest_framework import permissions
 
@@ -11,7 +11,7 @@ from django_oapif.decorators import register_oapif_viewset
 logger = logging.getLogger(__name__)
 
 
-class BaseModel10Fields(ComputedFieldsModel):
+class BaseModel10Fields(models.Model):
     class Meta:
         abstract = True
 
@@ -148,13 +148,17 @@ class Line_2056_10fields_local_geom(BaseModel10Fields):
 
 
 @register_oapif_viewset(crs=2056)
-class Polygon_2056_10fields(BaseModel10Fields):
-    geom = models.PolygonField(srid=2056, verbose_name=_("Geometry"))
+class Polygon_2056_10fields(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255, verbose_name=_("Name"), null=True, blank=True)
+    geom = models.MultiPolygonField(srid=2056, verbose_name=_("Geometry"))
 
 
 @register_oapif_viewset(crs=2056, serialize_geom_in_db=False)
-class Polygon_2056_10fields_local_geom(BaseModel10Fields):
-    geom = models.PolygonField(srid=2056, verbose_name=_("Geometry"))
+class Polygon_2056_10fields_local_geom(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255, verbose_name=_("Name"), null=True, blank=True)
+    geom = models.MultiPolygonField(srid=2056, verbose_name=_("Geometry"))
 
 
 @register_oapif_viewset(crs=2056, custom_viewset_attrs={"permission_classes": (permissions.DjangoModelPermissions,)})

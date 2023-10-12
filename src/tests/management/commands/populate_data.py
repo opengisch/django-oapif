@@ -14,6 +14,8 @@ from tests.models import (
     NoGeom_100fields,
     Point_2056_10fields,
     Point_2056_10fields_local_geom,
+    Polygon_2056_10fields,
+    Polygon_2056_10fields_local_geom,
     SecretLayer,
 )
 
@@ -23,10 +25,30 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("-s", "--size", type=int, default=1000)
+        parser.add_argument("--polygons", action="store_true")
 
     @transaction.atomic
     def handle(self, *args, **options):
         """Populate db with testdata"""
+
+        if options["polygons"]:
+            polygons = []
+            polygons_local_geom = []
+            with open("/data/swiss-municipalities.geojson") as f:
+                data = json.load(f)
+                for f in data["features"]:
+                    polygon_data = {
+                        "name": f["properties"]["gemeinde.NAME"],
+                        "geometry": f["properties"]["geometry"],
+                    }
+                    polygon = Polygon_2056_10fields(**polygon_data)
+                    polygons.append(polygon)
+                    polygon_local_geom = Polygon_2056_10fields_local_geom(**polygon_data)
+                    polygons_local_geom.append(polygon_local_geom)
+
+            Polygon_2056_10fields.objects.bulk_create(polygons)
+            Polygon_2056_10fields_local_geom.objects.bulk_create(polygons_local_geom)
+
         size = options["size"]
         x_start = 2508500
         y_start = 1152000
@@ -49,7 +71,12 @@ class Command(BaseCommand):
                 x = x_start + dx * step
                 y = y_start + dy * step
                 geom_pt_wkt = f"Point({x:4f} {y:4f})"
-                geom_line_wkt = f"LineString({x:4f} {y:4f}, {x+random.randint(10,50):4f} {y+random.randint(10,50):4f})"
+                geom_line_wkt = (
+                    f"LineString("
+                    f"{x:4f} {y:4f}, "
+                    f"{x+random.randint(10,50):4f} {y+random.randint(10,50):4f})"
+                    f"{x+random.randint(10,50):4f} {y+random.randint(10,50):4f})"
+                )
 
                 fields = {}
                 for f in range(10):
