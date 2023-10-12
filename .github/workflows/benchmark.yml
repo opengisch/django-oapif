@@ -51,8 +51,9 @@ jobs:
         export DJANGO_DEV_PORT
         ./tests/benchmark/time.sh
 
-    - name: Results
-      run: cat benchmark.dat
+    - uses: actions/upload-artifact@v3
+      with:
+        path: benchmark.dat
 
     - name: Failure logs
       if: failure()
