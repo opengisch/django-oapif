@@ -10,9 +10,8 @@ for SIZE in "${SIZES[@]}"; do
   while [[ $LIMIT -lt $SIZE ]]; do
     LIMIT=$((LIMIT*10))
 
-  hyperfine -r 10 "curl http://0.0.0.0:7180/oapif/collections/tests.point_2056_10fields/items?limit=${LIMIT}"
-  hyperfine -r 10 "curl http://0.0.0.0:7180/oapif/collections/tests.point_2056_10fields_local_json/items?limit=${LIMIT}"
+  hyperfine -r 10 "curl http://localhost/oapif/collections/tests.point_2056_10fields/items?limit=${LIMIT}"
+  hyperfine -r 10 "curl http://localhost/oapif/collections/tests.point_2056_10fields_local_json/items?limit=${LIMIT}"
 
   done
 done
-
