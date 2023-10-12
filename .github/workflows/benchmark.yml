@@ -20,14 +20,20 @@ jobs:
       COMPOSE_DOCKER_CLI_BUILD: 1
 
     steps:
+    - uses: actions/checkout@v4
+
+    - name: Create env
+      run: cp .env.example .env
+
+    - name: Load .env file
+      uses: xom9ikk/dotenv@v2
+
     - name: Install deps
       run: |
         sudo apt-get install -y jq
         HF_VERSION=1.18.0
         wget https://github.com/sharkdp/hyperfine/releases/download/v${HF_VERSION}/hyperfine_${HF_VERSION}_amd64.deb
         sudo dpkg -i hyperfine_${HF_VERSION}_amd64.deb
-
-    - uses: actions/checkout@v4
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -43,13 +49,7 @@ jobs:
         tags: opengisch/django-oapif:latest
 
     - name: Run Benchmark
-      run: |
-        # copy default conf
-        cp .env.example .env
-        source .env
-        export OGCAPIF_HOST
-        export DJANGO_DEV_PORT
-        ./tests/benchmark/time.sh
+      run: ./tests/benchmark/time.sh
 
     - uses: actions/upload-artifact@v3
       with:

@@ -14,13 +14,18 @@ jobs:
     env:
       DOCKER_BUILDKIT: 1
       COMPOSE_DOCKER_CLI_BUILD: 1
-      OGCAPIF_HOST: localhost
     permissions:
       contents: write
       pull-requests: write  # to write comment
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Create env
+        run: cp .env.example .env
+
+      - name: Load .env file
+        uses: xom9ikk/dotenv@v2
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
