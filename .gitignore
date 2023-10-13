@@ -11,8 +11,7 @@ dist
 *.egg-info
 src/django_oapif/__version__.py
 
-.time.json
-benchmark.dat
+tests/benchmark/results
 
 data
 static

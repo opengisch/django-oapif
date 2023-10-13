@@ -82,13 +82,13 @@ class Command(BaseCommand):
                 lines.append(line)
 
         # Create objects in batches
-        Point_2056_10fields.objects.bulk_create(points)
-        Point_2056_10fields_local_geom.objects.bulk_create(points_local_geom)
-        SecretLayer.objects.bulk_create(secret_points)
-        NoGeom_10fields.objects.bulk_create(no_geoms)
-        NoGeom_100fields.objects.bulk_create(no_geoms_100fields)
-        Line_2056_10fields.objects.bulk_create(lines)
-        Line_2056_10fields_local_geom.objects.bulk_create(lines_local_geom)
+        Point_2056_10fields.objects.bulk_create(points, batch_size=10000)
+        Point_2056_10fields_local_geom.objects.bulk_create(points_local_geom, batch_size=10000)
+        SecretLayer.objects.bulk_create(secret_points, batch_size=10000)
+        NoGeom_10fields.objects.bulk_create(no_geoms, batch_size=10000)
+        NoGeom_100fields.objects.bulk_create(no_geoms_100fields, batch_size=10000)
+        Line_2056_10fields.objects.bulk_create(lines, batch_size=10000)
+        Line_2056_10fields_local_geom.objects.bulk_create(lines_local_geom, batch_size=10000)
 
         # Call 'update_data' to update computed properties
         call_command("updatedata")

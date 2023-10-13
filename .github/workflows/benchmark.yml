@@ -28,9 +28,15 @@ jobs:
     - name: Load .env file
       uses: xom9ikk/dotenv@v2
 
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
     - name: Install deps
       run: |
         sudo apt-get install -y jq
+        pip install plotly, kalideo
+        # hyperfine for timing
         HF_VERSION=1.18.0
         wget https://github.com/sharkdp/hyperfine/releases/download/v${HF_VERSION}/hyperfine_${HF_VERSION}_amd64.deb
         sudo dpkg -i hyperfine_${HF_VERSION}_amd64.deb
@@ -51,9 +57,14 @@ jobs:
     - name: Run Benchmark
       run: ./tests/benchmark/time.sh
 
+    - name: Create plots
+      run: ./tests/benchmark/plot.py
+
     - uses: actions/upload-artifact@v3
       with:
-        path: benchmark.dat
+        path: |
+          - ./tests/benchmark/results/benchmark.dat
+          - ./tests/benchmark/results/**.png
 
     - name: Failure logs
       if: failure()

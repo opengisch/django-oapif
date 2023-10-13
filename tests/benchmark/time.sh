@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-rm -p benchmark.dat
+OUTPUT_PATH="tests/benchmark/results"
+
+rm -p ${OUTPUT_PATH}/benchmark.dat
 
 SIZES=( 100 1000 10000 100000 )
 LAYERS=( point_2056_10fields point_2056_10fields_local_geom nogeom_10fields nogeom_100fields line_2056_10fields line_2056_10fields_local_geom polygon_2056_10fields polygon_2056_10fields_local_geom secretlayer )
@@ -16,9 +18,10 @@ for SIZE in "${SIZES[@]}"; do
     LIMIT=$((LIMIT*10))
 
     for LAYER in "${LAYERS[@]}"; do
-      hyperfine -r 10 "curl http://${OGCAPIF_HOST}:${DJANGO_DEV_PORT}/oapif/collections/tests.${LAYER}/items?limit=${LIMIT}" --export-json .time.json
-      cat .time.json
-      echo "$SIZE,$LIMIT,$LAYER,$(cat .time.json | jq -r '.results[0]| [.mean, .stddev] | @csv')" >> benchmark.dat
+      hyperfine -r 10 "curl http://${OGCAPIF_HOST}:${DJANGO_DEV_PORT}/oapif/collections/tests.${LAYER}/items?limit=${LIMIT}" --export-json ${OUTPUT_PATH}/.time.json
+      echo "$SIZE,$LIMIT,$LAYER,$(cat ${OUTPUT_PATH}/.time.json | jq -r '.results[0]| [.mean, .stddev] | @csv')" >> ${OUTPUT_PATH}/benchmark.dat
     done
   done
 done
+
+rm ${OUTPUT_PATH}/.time.json
