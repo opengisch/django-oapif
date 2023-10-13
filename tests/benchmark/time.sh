@@ -21,7 +21,7 @@ for SIZE in "${SIZES[@]}"; do
     LIMIT=$((LIMIT*10))
 
     for LAYER in "${LAYERS[@]}"; do
-      hyperfine -r 10 "curl http://${OGCAPIF_HOST}:${DJANGO_DEV_PORT}/oapif/collections/tests.${LAYER}/items?limit=${LIMIT}" --export-json ${OUTPUT_PATH}/.time.json
+      hyperfine --warmup 1 -r 10 "curl http://${OGCAPIF_HOST}:${DJANGO_DEV_PORT}/oapif/collections/tests.${LAYER}/items?limit=${LIMIT}" --export-json ${OUTPUT_PATH}/.time.json
       echo "$SIZE,$LIMIT,$LAYER,$(cat ${OUTPUT_PATH}/.time.json | jq -r '.results[0]| [.mean, .stddev] | @csv')" >> ${OUTPUT_PATH}/benchmark.dat
     done
   done

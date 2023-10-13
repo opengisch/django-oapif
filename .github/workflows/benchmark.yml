@@ -64,6 +64,8 @@ jobs:
     - name: Create plots
       run: ./tests/benchmark/plot.py
 
+    - run: echo $(ls -la tests/benchmark/results)
+
     - uses: actions/upload-artifact@v3
       with:
         path: |
