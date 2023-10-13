@@ -64,13 +64,11 @@ jobs:
     - name: Create plots
       run: ./tests/benchmark/plot.py
 
-    - run: echo $(ls -la tests/benchmark/results)
-
     - uses: actions/upload-artifact@v3
       with:
         path: |
-          - tests/benchmark/results/benchmark.dat
-          - tests/benchmark/results/*.png
+          tests/benchmark/results/benchmark.dat
+          tests/benchmark/results/*.png
         if-no-files-found: error
 
     - name: Failure logs
