@@ -55,6 +55,9 @@ jobs:
         cache-from: type=registry,ref=opengisch/django-oapif:latest
         tags: opengisch/django-oapif:latest
 
+    - name: Download fixtures
+      run: ./scripts/download-fixtures.sh
+
     - name: Run Benchmark
       run: ./tests/benchmark/time.sh
 

@@ -27,8 +27,3 @@ RUN if [ "$DEV" = "true" ] ; then pip install -r requirements-dev.txt ; fi
 
 # copy project
 COPY /src /usr/src/app
-
-# download fixtures
-RUN mkdir -p /usr/src/app/tests/fixtures
-RUN curl -L -o /usr/src/app/tests/fixtures/polygon_2056_10fields.json.gz 'https://drive.google.com/uc?export=download&id=1DhCDaDAA3YvZIP9XFHiap5wjeCCWIfRU'
-RUN cp /usr/src/app/tests/fixtures/polygon_2056_10fields.json.gz /usr/src/app/tests/fixtures/polygon_2056_10fields_local_geom.json.gz

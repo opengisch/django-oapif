@@ -1,4 +1,4 @@
-# overrides for local developpement (mounts the source, enables debug, live-reload, etc.)
+# overrides for local development (mounts the source, enables debug, live-reload, etc.)
 # DO NOT USE ON PRODUCTION !!!
 
 version: '3.7'
