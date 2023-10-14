@@ -35,10 +35,12 @@ with open(f"{output_path}/benchmark.dat") as csvfile:
         data[(layer, size)][limit] = (time, std)
 
 
-def create_fig() -> go.Figure:
+def create_fig(title: str = None) -> go.Figure:
     _fig = go.Figure()
-    _fig.update_layout(plot_bgcolor="white")
+    if title:
+        _fig.update_layout(title_text=title)
     _fig.update_layout(
+        plot_bgcolor="white",
         showlegend=True,
         autosize=False,
         width=600,
@@ -78,14 +80,15 @@ for (layer, size), d_ in data.items():
     plots[layer][2].append(d_[limit][0] / limit)
 
 fig = create_fig()
-fig.update_xaxes(type="log")
-fig.update_yaxes(type="log")
+fig.update_xaxes(title_text="Number of features", type="log")
+fig.update_yaxes(title_text="Fetching time (ms)", type="log")
 for layer, plot in plots.items():
     fig.add_trace(go.Scatter(x=plot[0], y=plot[1], mode="lines", name=tr(layer)))
 fig.write_image(f"{output_path}/total_time_vs_size.png", scale=6)
 
 fig = create_fig()
-fig.update_xaxes(type="log")
+fig.update_xaxes(title_text="Number of features", type="log")
+fig.update_yaxes(title_text="Fetching time per feature (ms)")
 for layer, plot in plots.items():
     fig.add_trace(go.Scatter(x=plot[0], y=plot[2], mode="lines", name=tr(layer)))
 fig.write_image(f"{output_path}/time_per_feature_vs_size.png", scale=6)
@@ -103,7 +106,8 @@ for (layer, size), d_ in data.items():
     plots[layer][0].append(size)
     plots[layer][1].append(d_[limit][0])
 fig = create_fig()
-fig.update_xaxes(type="log")
+fig.update_xaxes(title_text="Number of features", type="log")
+fig.update_yaxes(title_text="Fetching time for 100 feature (ms)")
 for layer, plot in plots.items():
     fig.add_trace(go.Scatter(x=plot[0], y=plot[1], mode="lines", name=tr(layer)))
 
@@ -126,8 +130,9 @@ for (layer, size), d_ in data.items():
     plots[geom][layer][1].append(d_[limit][0])
 
 for geom, data in plots.items():
-    fig = create_fig()
-    fig.update_xaxes(type="log")
+    fig = create_fig(title="Local Django vs DB serialization of geometry")
+    fig.update_xaxes(title_text="Number of features", type="log")
+    fig.update_yaxes(title_text="Fetching time (ms)")
     for layer, plot in data.items():
         fig.add_trace(go.Scatter(x=plot[0], y=plot[1], mode="lines", name=tr(layer)))
         fig.write_image(f"{output_path}/local_vs_db_geom_serialization_{geom}.png", scale=6)
