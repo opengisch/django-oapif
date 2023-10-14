@@ -80,6 +80,8 @@ class Command(BaseCommand):
                 fields["geom"] = geom_line_wkt
                 line = Line_2056_10fields(**fields)
                 lines.append(line)
+                line_local_geom = Line_2056_10fields_local_geom(**fields)
+                lines_local_geom.append(line_local_geom)
 
         # Create objects in batches
         Point_2056_10fields.objects.bulk_create(points, batch_size=10000)
