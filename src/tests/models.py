@@ -147,14 +147,14 @@ class Line_2056_10fields_local_geom(BaseModel10Fields):
 
 
 @register_oapif_viewset(crs=2056)
-class Polygon_2056_10fields(models.Model):
+class Polygon_2056(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255, verbose_name=_("Name"), null=True, blank=True)
     geom = models.MultiPolygonField(srid=2056, verbose_name=_("Geometry"))
 
 
 @register_oapif_viewset(crs=2056, serialize_geom_in_db=False)
-class Polygon_2056_10fields_local_geom(models.Model):
+class Polygon_2056_local_geom(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255, verbose_name=_("Name"), null=True, blank=True)
     geom = models.MultiPolygonField(srid=2056, verbose_name=_("Geometry"))

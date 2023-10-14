@@ -222,7 +222,7 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.CreateModel(
-            name='Polygon_2056_10fields',
+            name='Polygon_2056',
             fields=[
                 ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
                 ('name', models.CharField(blank=True, max_length=255, null=True, verbose_name='Name')),
@@ -230,7 +230,7 @@ class Migration(migrations.Migration):
             ],
         ),
         migrations.CreateModel(
-            name='Polygon_2056_10fields_local_geom',
+            name='Polygon_2056_local_geom',
             fields=[
                 ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
                 ('name', models.CharField(blank=True, max_length=255, null=True, verbose_name='Name')),

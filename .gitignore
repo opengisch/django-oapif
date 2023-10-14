@@ -13,8 +13,8 @@ src/django_oapif/__version__.py
 
 tests/benchmark/results
 
-src/tests/fixtures/polygon_2056_10fields.json.gz
-src/tests/fixtures/polygon_2056_10fields_local_geom.json.gz
+src/tests/fixtures/polygon_2056.json.gz
+src/tests/fixtures/polygon_2056_local_geom.json.gz
 
 data
 static

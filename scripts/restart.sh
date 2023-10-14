@@ -19,4 +19,4 @@ docker compose exec django python manage.py collectstatic --no-input
 docker compose exec django python manage.py populate_users
 docker compose exec django python manage.py populate_data -s ${SIZE}
 
-docker compose exec django python manage.py loaddata polygon_2056_10fields polygon_2056_10fields_local_geom
+docker compose exec django python manage.py loaddata polygon_2056 polygon_2056_local_geom

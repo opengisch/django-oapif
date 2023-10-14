@@ -20,8 +20,8 @@ class Command(BaseCommand):
             "nogeom_100fields",
             "line_2056_10fields",
             "line_2056_10fields_local_geom",
-            "polygon_2056_10fields",
-            "polygon_2056_10fields_local_geom",
+            "polygon_2056",
+            "polygon_2056_local_geom",
             "secretlayer",
         ):
             adding.append(Permission.objects.get(codename=f"add_{model}"))
