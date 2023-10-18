@@ -16,7 +16,7 @@ class BaseModelWithTenFields(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     field_bool = models.BooleanField(default=True)
-    field_int = models.IntegerField()
+    field_int = models.IntegerField(null=True, blank=True)
     field_str_0 = models.CharField(max_length=255, verbose_name=_("Field 0"), null=True, blank=True)
     field_str_1 = models.CharField(max_length=255, verbose_name=_("Field 1"), null=True, blank=True)
     field_str_2 = models.CharField(max_length=255, verbose_name=_("Field 2"), null=True, blank=True)
