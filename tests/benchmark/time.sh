@@ -12,8 +12,7 @@ LAYERS=( point_2056_10fields point_2056_10fields_local_geom nogeom_10fields noge
 
 for SIZE in "${SIZES[@]}"; do
   echo "::group::setup ${SIZE}"
-  ./scripts/restart.sh ${SIZE}
-  sleep 2
+  ./scripts/populate.sh ${SIZE}
   echo "::endgroup::"
 
   for LAYER in "${LAYERS[@]}"; do
@@ -28,7 +27,7 @@ for SIZE in "${SIZES[@]}"; do
       LIMIT=$((LIMIT*10))
       LIMIT=$(( LIMIT < ACTUAL_SIZE ? LIMIT : ACTUAL_SIZE ))
 
-      hyperfine --warmup 1 -r 10 "curl http://${OGCAPIF_HOST}:${DJANGO_DEV_PORT}/oapif/collections/tests.${LAYER}/items?limit=${LIMIT}" --export-json ${OUTPUT_PATH}/.time.json
+      hyperfine --warmup 2 -r 10 "curl http://${OGCAPIF_HOST}:${DJANGO_DEV_PORT}/oapif/collections/tests.${LAYER}/items?limit=${LIMIT}" --export-json ${OUTPUT_PATH}/.time.json
       echo "$ACTUAL_SIZE,$LIMIT,$LAYER,$(cat ${OUTPUT_PATH}/.time.json | jq -r '.results[0]| [.mean, .stddev] | @csv')" >> ${OUTPUT_PATH}/benchmark.dat
     done
   done

@@ -56,16 +56,16 @@ class Command(BaseCommand):
                     f"{x+random.randint(10,50):4f} {y+random.randint(10,50):4f})"
                 )
 
-                fields = {}
+                fields = {"field_int": random.randint(1, 999)}
                 for f in range(10):
-                    fields[f"field_{f}"] = "".join(random.choice(letters) for i in range(10))
+                    fields[f"field_str_{f}"] = "".join(random.choice(letters) for i in range(10))
 
                 no_geom = NoGeom_10fields(**fields)
                 no_geoms.append(no_geom)
 
                 no_geom_100fields = deepcopy(fields)
                 for f in range(90):
-                    no_geom_100fields[f"field_{10+f}"] = "".join(random.choice(letters) for i in range(10))
+                    no_geom_100fields[f"field_str_{10+f}"] = "".join(random.choice(letters) for i in range(10))
                 no_geom_100fields = NoGeom_100fields(**no_geom_100fields)
                 no_geoms_100fields.append(no_geom_100fields)
 

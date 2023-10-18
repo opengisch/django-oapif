@@ -58,6 +58,9 @@ jobs:
     - name: Download fixtures
       run: ./scripts/download-fixtures.sh
 
+    - name: Start Django
+      run: ./scripts/restart.sh
+
     - name: Run Benchmark
       run: ./tests/benchmark/time.sh
 
