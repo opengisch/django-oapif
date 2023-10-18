@@ -36,7 +36,7 @@ class TestBasicAuth(APITestCase):
                 "type": "Point",
                 "coordinates": [2508500.0, 1152000.0],
             },
-            "properties": {"field_0": "test123456"},
+            "properties": {"field_str_0": "test123456"},
         }
         data_with_crs = data
         data_with_crs["geometry"]["crs"] = {"type": "name", "properties": {"name": "urn:ogc:def:crs:EPSG::2056"}}
