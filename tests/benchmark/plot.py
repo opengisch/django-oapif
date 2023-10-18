@@ -26,13 +26,12 @@ with open(f"{output_path}/benchmark.dat") as csvfile:
     reader = csv.reader(csvfile, delimiter=",")
     for row in reader:
         size = int(row[0])
-        limit = int(row[1])
-        layer = row[2]
-        time = float(row[3]) * 1000
-        std = float(row[4])
-        if (layer, size) not in data:
-            data[(layer, size)] = {}
-        data[(layer, size)][limit] = (time, std)
+        layer = row[1]
+        time = float(row[2]) * 1000
+        std = float(row[3])
+        if layer not in data:
+            data[layer] = {}
+        data[layer][size] = (time, std)
 
 
 def create_fig(title: str = None) -> go.Figure:
@@ -69,15 +68,14 @@ def create_fig(title: str = None) -> go.Figure:
 
 # Time vs Size
 plots = {}
-for (layer, size), d_ in data.items():
+for layer, d_ in data.items():
     if "local_geom" not in layer and "nogeom" not in layer:
         continue
-    if layer not in plots:
-        plots[layer] = ([], [], [])
-    limit = max(d_.keys())
-    plots[layer][0].append(size)
-    plots[layer][1].append(d_[limit][0])
-    plots[layer][2].append(d_[limit][0] / limit)
+    plots[layer] = ([], [], [])
+    for size, d__ in d_.items():
+        plots[layer][0].append(size)
+        plots[layer][1].append(d__[0])
+        plots[layer][2].append(d__[0] / size)
 
 fig = create_fig()
 fig.update_xaxes(title_text="Number of features", type="log")
@@ -94,28 +92,9 @@ for layer, plot in plots.items():
 fig.write_image(f"{output_path}/time_per_feature_vs_size.png", scale=6)
 
 
-# Time vs pagination
-plots = {}
-for (layer, size), d_ in data.items():
-    if layer == "secretlayer" or "local_geom" in layer:
-        continue
-    if layer not in plots:
-        plots[layer] = ([], [], [])
-    limit = min(d_.keys())
-    print(layer, limit)
-    plots[layer][0].append(size)
-    plots[layer][1].append(d_[limit][0])
-fig = create_fig()
-fig.update_xaxes(title_text="Number of features", type="log")
-fig.update_yaxes(title_text="Fetching time for 100 feature (ms)")
-for layer, plot in plots.items():
-    fig.add_trace(go.Scatter(x=plot[0], y=plot[1], mode="lines", name=tr(layer)))
-
-fig.write_image(f"{output_path}/time_vs_pagination.png", scale=6)
-
 # local vs non local geom serialization
 plots = {}
-for (layer, size), d_ in data.items():
+for layer, d_ in data.items():
     if layer == "secretlayer" or "nogeom" in layer:
         continue
 
@@ -123,11 +102,11 @@ for (layer, size), d_ in data.items():
     if geom not in plots:
         plots[geom] = {}
     if layer not in plots[geom]:
-        plots[geom][layer] = ([], [], [])
-    limit = max(d_.keys())
-    print(layer, limit)
-    plots[geom][layer][0].append(size)
-    plots[geom][layer][1].append(d_[limit][0])
+        plots[geom][layer] = ([], [])
+
+    for size, d__ in d_.items():
+        plots[geom][layer][0].append(size)
+        plots[geom][layer][1].append(d__[0])
 
 for geom, data in plots.items():
     fig = create_fig(title="Local Django vs DB serialization of geometry")
