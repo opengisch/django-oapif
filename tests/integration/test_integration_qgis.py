@@ -90,6 +90,7 @@ class TestStack(unittest.TestCase):
             # create with geometry
             f = QgsFeature()
             f.setFields(layer.fields())
+            f["field_bool"] = True
             f["field_str_0"] = "Super Green"
             geom = QgsGeometry.fromPoint(QgsPoint(2345678.0, 1234567.0))
             f.setGeometry(geom)
