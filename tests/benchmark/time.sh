@@ -22,7 +22,7 @@ for LAYER in "${LAYERS[@]}"; do
   fi
 
   LIMIT=1
-  while [[ $LIMIT -lte $SIZE ]]; do
+  while [[ $LIMIT -le $SIZE ]]; do
     LIMIT=$(( LIMIT < ACTUAL_SIZE ? LIMIT : ACTUAL_SIZE ))
     hyperfine --warmup 2 -r 10 "curl http://${OGCAPIF_HOST}:${DJANGO_DEV_PORT}/oapif/collections/tests.${LAYER}/items?limit=${LIMIT}" --export-json ${OUTPUT_PATH}/.time.json
     echo "$LIMIT,$LAYER,$(cat ${OUTPUT_PATH}/.time.json | jq -r '.results[0]| [.mean, .stddev] | @csv')" >> ${OUTPUT_PATH}/benchmark.dat

@@ -56,7 +56,8 @@ jobs:
 
         # migrate database
         docker compose exec django python manage.py migrate --no-input
-        ./scripts/populate.sh 100
+        docker compose exec django python manage.py populate_users
+        docker compose exec django python manage.py populate_data
 
     - name: Run unit tests
       run: docker compose exec django python manage.py test tests
