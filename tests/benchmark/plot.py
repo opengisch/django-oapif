@@ -3,6 +3,7 @@
 import csv
 
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 output_path = "tests/benchmark/results"
 
@@ -10,12 +11,12 @@ output_path = "tests/benchmark/results"
 def tr(layer: str) -> str:
     dictionary = {
         "point_2056_10fields": "Point, 10 string fields, geometry serialized in DB",
-        "point_2056_10fields_local_geom": "Point, 10 string fields",
+        "point_2056_10fields_local_geom": "Point",
         "line_2056_10fields": "Line, 10 string fields, geometry serialized in DB",
-        "line_2056_10fields_local_geom": "Line, 10 string fields",
+        "line_2056_10fields_local_geom": "Line",
         "polygon_2056": "Polygon, geometry serialized in DB",
         "polygon_2056_local_geom": "Polygon",
-        "nogeom_10fields": "No geometry, 10 fields",
+        "nogeom_10fields": "No geometry",
         "nogeom_100fields": "No geometry, 100 fields",
     }
     return dictionary[layer]
@@ -27,20 +28,26 @@ with open(f"{output_path}/benchmark.dat") as csvfile:
     for row in reader:
         size = int(row[0])
         layer = row[1]
-        time = float(row[2]) * 1000
+        time = float(row[2])
         std = float(row[3])
         if layer not in data:
             data[layer] = {}
         data[layer][size] = (time, std)
 
 
-def create_fig(title: str = None) -> go.Figure:
+def create_fig(title: str = None, showlegend: bool = True) -> go.Figure:
     _fig = go.Figure()
+    configure(_fig, title, showlegend)
+    return _fig
+
+
+def configure(_fig: go.Figure, title: str = None, showlegend: bool = True):
     if title:
-        _fig.update_layout(title_text=title)
+        fig.update_layout(title_text=title)
+    _fig.update_layout(margin=dict(l=5, r=5, t=25, b=5))
     _fig.update_layout(
         plot_bgcolor="white",
-        showlegend=True,
+        showlegend=showlegend,
         autosize=False,
         width=600,
         height=600,
@@ -63,7 +70,6 @@ def create_fig(title: str = None) -> go.Figure:
         gridcolor="lightgrey",
         tickfont=dict(size=8, color="black"),
     )
-    return _fig
 
 
 # Time vs Size
@@ -78,17 +84,17 @@ for layer, d_ in data.items():
         plots[layer][2].append(d__[0] / size)
 
 fig = create_fig()
-fig.update_xaxes(title_text="Number of features", type="log")
-fig.update_yaxes(title_text="Fetching time (ms)", type="log")
+fig.update_xaxes(title_text="Number of features", type="log", tickvals=[1, 10, 100, 1000, 10000, 100000])
+fig.update_yaxes(title_text="Fetching time (s)", type="log", tickvals=[0.1, 1, 10, 100, 1000])
 for layer, plot in plots.items():
-    fig.add_trace(go.Scatter(x=plot[0], y=plot[1], mode="lines", name=tr(layer)))
+    fig.add_trace(go.Scatter(x=plot[0], y=plot[1], mode="lines+markers", name=tr(layer)))
 fig.write_image(f"{output_path}/total_time_vs_size.png", scale=6)
 
 fig = create_fig()
 fig.update_xaxes(title_text="Number of features", type="log")
-fig.update_yaxes(title_text="Fetching time per feature (ms)")
+fig.update_yaxes(title_text="Fetching time per feature (s)")
 for layer, plot in plots.items():
-    fig.add_trace(go.Scatter(x=plot[0], y=plot[2], mode="lines", name=tr(layer)))
+    fig.add_trace(go.Scatter(x=plot[0], y=plot[2], mode="lines+markers", name=tr(layer)))
 fig.write_image(f"{output_path}/time_per_feature_vs_size.png", scale=6)
 
 
@@ -102,16 +108,40 @@ for layer, d_ in data.items():
     if geom not in plots:
         plots[geom] = {}
     if layer not in plots[geom]:
-        plots[geom][layer] = ([], [])
+        plots[geom][layer] = ([], [], [])
 
     for size, d__ in d_.items():
         plots[geom][layer][0].append(size)
         plots[geom][layer][1].append(d__[0])
+        plots[geom][layer][2].append(d__[1])
 
+fig.update_xaxes(title_text="Number of features", type="log")
+fig.update_yaxes(title_text="Fetching time (s)")
+fig = make_subplots(rows=1, cols=3)
+configure(fig, title="Geometry serialization", showlegend=True)
+fig.update_yaxes(title_text="Fetching time per feature (s)", row=1, col=1)
+c = 0
 for geom, data in plots.items():
-    fig = create_fig(title="Local Django vs DB serialization of geometry")
-    fig.update_xaxes(title_text="Number of features", type="log")
-    fig.update_yaxes(title_text="Fetching time (ms)")
+    c += 1
+    fig.update_xaxes(
+        title_text=geom, type="log", tickmode="array", tickvals=[1, 10, 100, 1000, 10000, 100000], row=1, col=c
+    )
+    fig.update_yaxes(type="log", tickvals=[0.1, 1, 10, 100], row=1, col=c)
+    colors = ["royalblue", "firebrick"]
+    names = ["Postgis", "Django"]
     for layer, plot in data.items():
-        fig.add_trace(go.Scatter(x=plot[0], y=plot[1], mode="lines", name=tr(layer)))
-        fig.write_image(f"{output_path}/local_vs_db_geom_serialization_{geom}.png", scale=6)
+        fig.add_trace(
+            go.Scatter(
+                x=plot[0],
+                y=plot[1],
+                error_y=dict(type="data", array=plot[2], visible=False),
+                mode="lines+markers",
+                name=names.pop(0),
+                line=dict(color=colors.pop(0)),
+                showlegend=(c == 1),
+            ),
+            row=1,
+            col=c,
+        )
+fig.update_layout(legend=dict(traceorder="reversed"))
+fig.write_image(f"{output_path}/local_vs_db_geom_serialization.png", scale=6)
