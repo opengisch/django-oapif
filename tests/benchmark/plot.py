@@ -118,7 +118,7 @@ for layer, d_ in data.items():
 
 fig.update_xaxes(title_text="Number of features", type="log")
 fig.update_yaxes(title_text="Fetching time (s)")
-fig = make_subplots(rows=2, cols=3, row_heights=[0.7, 0.3])
+fig = make_subplots(rows=2, cols=3, row_heights=[0.7, 0.3], shared_xaxes=False, vertical_spacing=0.07)
 configure(fig, title="Geometry serialization", showlegend=True)
 fig.update_layout(legend=dict(yanchor="top", y=0.94, xanchor="left", x=0.02))
 fig.update_layout(margin=dict(l=5, r=5, t=30, b=5))
