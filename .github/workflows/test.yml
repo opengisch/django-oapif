@@ -18,10 +18,15 @@ jobs:
     env:
       DOCKER_BUILDKIT: 1
       COMPOSE_DOCKER_CLI_BUILD: 1
-      OGCAPIF_HOST: localhost
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Create env
+      run: cp .env.example .env
+
+    - name: Load .env file
+      uses: xom9ikk/dotenv@v2
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -53,8 +58,7 @@ jobs:
         # start the stack
         docker compose --profile testing_integration up --build -d
 
-        # deploy static files and migrate database
-        docker compose exec django python manage.py collectstatic --no-input
+        # migrate database
         docker compose exec django python manage.py migrate --no-input
         docker compose exec django python manage.py populate_users
         docker compose exec django python manage.py populate_data

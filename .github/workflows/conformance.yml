@@ -14,13 +14,18 @@ jobs:
     env:
       DOCKER_BUILDKIT: 1
       COMPOSE_DOCKER_CLI_BUILD: 1
-      OGCAPIF_HOST: localhost
     permissions:
       contents: write
       pull-requests: write  # to write comment
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Create env
+        run: cp .env.example .env
+
+      - name: Load .env file
+        uses: xom9ikk/dotenv@v2
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -58,7 +63,7 @@ jobs:
           docker compose exec django python manage.py populate_data
 
       - name: Healthcheck
-        run: wget --no-check-certificate https://localhost/oapif/collections/tests.point_2056_10fields/items
+        run: wget http://${OGCAPIF_HOST}:${DJANGO_DEV_PORT}/oapif/collections/tests.point_2056_10fields/items
 
       - name: Run conformance test suite
         run: docker compose run conformance_test

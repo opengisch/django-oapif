@@ -36,12 +36,12 @@ class TestBasicAuth(APITestCase):
                 "type": "Point",
                 "coordinates": [2508500.0, 1152000.0],
             },
-            "properties": {"field_0": "test123456"},
+            "properties": {"field_str_0": "test123456"},
         }
         data_with_crs = data
         data_with_crs["geometry"]["crs"] = {"type": "name", "properties": {"name": "urn:ogc:def:crs:EPSG::2056"}}
 
-        for layer in ("tests.point_2056_10fields_local_json", "tests.point_2056_10fields"):
+        for layer in ("tests.point_2056_10fields_local_geom", "tests.point_2056_10fields"):
             for _data in (data, data_with_crs):
                 url = f"{collections_url}/{layer}/items"
                 post_to_items = self.client.post(url, _data, format="json")
@@ -50,7 +50,7 @@ class TestBasicAuth(APITestCase):
     def test_anonymous_items_options(self):
         # Anonymous user
         expected = {"GET", "OPTIONS", "HEAD"}
-        for layer in ("tests.point_2056_10fields_local_json", "tests.point_2056_10fields"):
+        for layer in ("tests.point_2056_10fields_local_geom", "tests.point_2056_10fields"):
             url = f"{collections_url}/{layer}/items"
             response = self.client.options(url)
 
@@ -64,7 +64,7 @@ class TestBasicAuth(APITestCase):
         # Authenticated user with editing permissions
         expected = {"POST", "GET", "OPTIONS", "HEAD"}
         self.client.force_authenticate(user=self.demo_editor)
-        for layer in ("tests.point_2056_10fields_local_json", "tests.point_2056_10fields"):
+        for layer in ("tests.point_2056_10fields_local_geom", "tests.point_2056_10fields"):
             url = f"{collections_url}/{layer}/items"
             response = self.client.options(url)
 

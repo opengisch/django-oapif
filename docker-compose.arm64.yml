@@ -1,0 +1,7 @@
+
+# see https://github.com/postgis/docker-postgis/issues/216#issuecomment-1763399631
+# https://github.com/postgis/docker-postgis/pull/356
+
+services:
+  postgres:
+    image: imresamu/postgis-arm64:15-3.4-alpine

@@ -55,14 +55,14 @@ class TestStack(unittest.TestCase):
         self.assertIsNotNone(layer)
 
         f = None
-        for f in layer.getFeatures("field_0 is not null"):
+        for f in layer.getFeatures("field_str_0 is not null"):
             pass
         self.assertIsInstance(f, QgsFeature)
 
         self.assertFalse(bool(layer.dataProvider().capabilities() & QgsVectorDataProvider.Capability.AddFeatures))
 
     def test_load_and_edit_with_basic_auth(self):
-        for layer in ("tests.point_2056_10fields_local_json", "tests.point_2056_10fields"):
+        for layer in ("tests.point_2056_10fields_local_geom", "tests.point_2056_10fields"):
             uri = QgsDataSourceUri()
             uri.setParam("service", "wfs")
             uri.setParam("typename", layer)
@@ -80,21 +80,22 @@ class TestStack(unittest.TestCase):
             f = next(layer.getFeatures())
             self.assertIsInstance(f, QgsFeature)
 
-            # f["field_0"] = "xyz"
+            # f["field_str_0"] = "xyz"
             # with edit(layer):
             #    layer.updateFeature(f)
 
-            # f = next(layer.getFeatures("field_0='xyz'"))
+            # f = next(layer.getFeatures("field_str_0='xyz'"))
             # self.assertIsInstance(f, QgsFeature)
 
             # create with geometry
             f = QgsFeature()
             f.setFields(layer.fields())
-            f["field_0"] = "Super Green"
+            f["field_bool"] = True
+            f["field_str_0"] = "Super Green"
             geom = QgsGeometry.fromPoint(QgsPoint(2345678.0, 1234567.0))
             f.setGeometry(geom)
             with edit(layer):
                 layer.addFeature(f)
-            f = next(layer.getFeatures("field_0='Super Green'"))
+            f = next(layer.getFeatures("field_str_0='Super Green'"))
             self.assertIsInstance(f, QgsFeature)
             self.assertEqual(geom.asWkt(), f.geometry().asWkt())
