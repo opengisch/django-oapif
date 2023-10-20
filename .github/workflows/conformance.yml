@@ -85,7 +85,7 @@ jobs:
           python tests/conformance/parse_report.py test_outputs/emailable-report.html tests/conformance/conformance-baseline.json || EXIT_CODE=$?
           echo "EXIT_CODE=${EXIT_CODE}" >> $GITHUB_OUTPUT
 
-      - name: Commit baseline if improved | checkout
+      - name: Commit baseline if improved >> checkout
         uses: actions/checkout@v4
         if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE == '1' }}
         with:
@@ -93,24 +93,24 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
           path: ./baseline_repo
 
-      - name: Commit baseline if improved | copy baseline file
+      - name: Commit baseline if improved >> copy baseline file
         if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE == '1' }}
         run: cp tests/conformance/conformance-baseline.json baseline_repo/tests/conformance/conformance-baseline.json
 
-      - name: Commit baseline if improved | commit
+      - name: Commit baseline if improved >> commit
         if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE == '1' }}
         uses: EndBug/add-and-commit@v9
         with:
           add: tests/conformance/conformance-baseline.json
           cwd: ./baseline_repo
-          message: update baseline
+          message: update conformance baseline
 
       - name: 💬 Prepare comment
         id: prepare_comment
         if: ${{ github.event_name == 'pull_request' && steps.baseline.outputs.EXIT_CODE != '0' }}
         run : |
           if [[ ${{ steps.baseline.outputs.EXIT_CODE }} == 1 ]]; then
-            echo "comment=Conformance tests got better! (update baseline if the job fails)" >> $GITHUB_OUTPUT
+            echo "comment=Conformance tests got better! (update conformance baseline if the job fails)" >> $GITHUB_OUTPUT
           else
             echo "comment=Oh no! Conformance tests got worse!" >> $GITHUB_OUTPUT
           fi

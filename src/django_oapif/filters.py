@@ -39,7 +39,9 @@ class BboxFilterBackend(BaseFilterBackend):
                     "type": "array",
                     "items": {"type": "number"},
                     "minItems": 4,
-                    "maxItems": 4,
+                    # maxItems should be 4, no idea why conformance wants 6 here
+                    # https://github.com/opengeospatial/ets-ogcapi-features10/blob/c557c227729715836cb32925b6a7bd67d1ae213f/src/main/java/org/opengis/cite/ogcapifeatures10/conformance/core/collections/FeaturesBBox.java#L123C20-L125C44
+                    "maxItems": 6,
                     "example": [0, 0, 10, 10],
                 },
                 "style": "form",
