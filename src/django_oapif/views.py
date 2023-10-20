@@ -63,7 +63,7 @@ class ConformanceView(views.APIView):
                     "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/core",
                     "http://www.opengis.net/spec/ogcapi-features-4/1.0/conf/create-replace-delete",
                     "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/geojson",
-                    "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/oas30",
+                    "http://www.opengis.net/spec/ogcapi-features-1/1.0/req/oas30",
                     "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/html",
                     "http://www.opengis.net/spec/ogcapi-features-2/1.0/conf/crs",
                 ]
