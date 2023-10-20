@@ -6,6 +6,13 @@ concurrency:
 
 on:
   workflow_dispatch:
+    inputs:
+      size:
+        description: 'number of features to load'
+        required: true
+        default: 100
+        type: number
+
   push:
     branches:
       - main
@@ -63,7 +70,7 @@ jobs:
       run: ./scripts/restart.sh
 
     - name: Run Benchmark
-      run: ./tests/benchmark/time.sh
+      run: ./tests/benchmark/time.sh ${{ inputs.size }}
 
     - name: Create plots
       run: ./tests/benchmark/plot.py
