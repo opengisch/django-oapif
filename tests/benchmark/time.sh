@@ -7,7 +7,8 @@ OUTPUT_PATH="tests/benchmark/results"
 mkdir -p ${OUTPUT_PATH}
 rm -f ${OUTPUT_PATH}/benchmark.dat
 
-SIZE=100000
+SIZE=${1:-100000}
+
 LAYERS=( point_2056_10fields point_2056_10fields_local_geom nogeom_10fields nogeom_100fields line_2056_10fields line_2056_10fields_local_geom polygon_2056 polygon_2056_local_geom secretlayer )
 
 
