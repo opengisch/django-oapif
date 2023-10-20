@@ -40,6 +40,16 @@ class OapifPagination(pagination.LimitOffsetPagination):
             }
         )
 
+    def get_schema_operation_parameters(self, view):
+        params = super().get_schema_operation_parameters(view)
+        for param in params:
+            if param["name"] in ("limit", "offset") and "style" not in param:
+                # The OGC conformance test requires `style: form` to be specified in the OpenAPI schema,
+                # even though it is the default style.
+                # see https://swagger.io/docs/specification/serialization/
+                param["style"] = "form"
+        return params
+
 
 class HighPerfPagination(pagination.LimitOffsetPagination):
     """OAPIF-compatible django rest paginator, tailored for the high performance version where data is pre-concatenated json"""
