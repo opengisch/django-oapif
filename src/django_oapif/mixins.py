@@ -60,7 +60,7 @@ class OAPIFDescribeModelViewSetMixin:
                 {
                     "href": request.build_absolute_uri(f"{base_url}{key}"),
                     "rel": "self",
-                    "type": "application/geo+json",
+                    "type": "application/json",
                     "title": "This document as JSON",
                 },
                 {
@@ -70,6 +70,7 @@ class OAPIFDescribeModelViewSetMixin:
                     "title": key,
                 },
             ],
+            "itemType": "feature",
             **response,
         }
 
