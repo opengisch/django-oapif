@@ -16,8 +16,6 @@ RUN mvn dependency:resolve dependency:resolve-plugins dependency:copy-dependenci
 # Install offline to avoid triggering new dependency update
 RUN mvn install -DskipTests -Dmaven.javadoc.skip
 
-# TODO: Should get the version from build context
-# ARG VERSION=1.5-SNAPSHOT  # done above
 ENV VERSION=${VERSION}
 
 CMD ["sh", "-c", "/build/run/run.sh"]
