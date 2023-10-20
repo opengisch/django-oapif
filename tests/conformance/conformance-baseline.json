@@ -1,11 +1,12 @@
 {
   "passed": [
-    "crs.CrsRequirementClassPrecondition",
     "core.apidefinition.ApiDefinition",
     "core.collections.FeaturesBBox",
+    "core.collections.FeaturesLimit",
     "core.conformance.Conformance",
     "core.general.GeneralHttp",
-    "core.landingpage.LandingPage"
+    "core.landingpage.LandingPage",
+    "crs.CrsRequirementClassPrecondition"
   ],
   "skipped": [
     "crs.discovery.collections.DiscoveryCollectionsCrsUri",
@@ -14,7 +15,6 @@
   ],
   "failed": [
     "core.collections.Feature",
-    "core.collections.FeaturesLimit",
     "core.collections.FeaturesTime"
   ]
 }
