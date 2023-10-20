@@ -1,36 +1,20 @@
 {
   "passed": [
     "core.apidefinition.ApiDefinition",
+    "core.conformance.Conformance",
     "core.general.GeneralHttp",
-    "core.landingpage.LandingPage"
+    "core.landingpage.LandingPage",
+    "crs.CrsRequirementClassPrecondition"
   ],
   "skipped": [
-    "crs.CrsRequirementClassPrecondition",
-    "crs.discovery.collection.DiscoveryCollectionCrsUri",
-    "crs.discovery.collection.DiscoveryCollectionDefaultCrs",
-    "crs.discovery.collection.DiscoveryCollectionStorageCrs",
     "crs.discovery.collections.DiscoveryCollectionsCrsUri",
     "crs.discovery.collections.DiscoveryCollectionsDefaultCrs",
-    "crs.discovery.collections.DiscoveryCollectionsStorageCrs",
-    "crs.query.bboxcrs.BBoxCrsParameter",
-    "crs.query.bboxcrs.BBoxCrsParameterDefault",
-    "crs.query.bboxcrs.BBoxCrsParameterInvalid",
-    "crs.query.crs.feature.FeatureCrsParameter",
-    "crs.query.crs.feature.FeatureCrsParameterDefault",
-    "crs.query.crs.feature.FeatureCrsParameterInvalid",
-    "crs.query.crs.feature.FeatureCrsParameterTransform",
-    "crs.query.crs.features.FeaturesCrsParameter",
-    "crs.query.crs.features.FeaturesCrsParameterDefault",
-    "crs.query.crs.features.FeaturesCrsParameterInvalid",
-    "crs.query.crs.features.FeaturesCrsParameterTransform",
-    "core.collections.FeatureCollection",
-    "core.collections.FeatureCollections"
+    "crs.discovery.collections.DiscoveryCollectionsStorageCrs"
   ],
   "failed": [
     "core.collections.Feature",
     "core.collections.FeaturesBBox",
     "core.collections.FeaturesLimit",
-    "core.collections.FeaturesTime",
-    "core.conformance.Conformance"
+    "core.collections.FeaturesTime"
   ]
 }
