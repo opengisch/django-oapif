@@ -34,22 +34,23 @@ class OAPIFDescribeModelViewSetMixin:
             srid = meta_model.get_field(geom_lookup).srid
             extents = self.get_queryset().aggregate(e=Extent(geom_lookup))["e"]
 
+            response["crs"] = [
+                "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                f"http://www.opengis.net/def/crs/EPSG/0/{srid}",
+            ]
+            response["storageCrs"] = f"http://www.opengis.net/def/crs/EPSG/0/{srid}"
+
+            response["extent"] = {"temporal": {"interval": [None]}}
+
             if extents:
                 transformer = Transformer.from_crs(CRS.from_epsg(srid), "OGC:CRS84")
                 LL = transformer.transform(extents[0], extents[1])
                 UR = transformer.transform(extents[2], extents[3])
 
-                response["crs"] = [
-                    "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
-                    f"http://www.opengis.net/def/crs/EPSG/0/{srid}",
-                ]
-                response["extent"] = {
-                    "spatial": {
-                        "bbox": [[LL[0], LL[1], UR[0], UR[1]]],
-                        "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
-                    },
+                response["extent"]["spatial"] = {
+                    "bbox": [[LL[0], LL[1], UR[0], UR[1]]],
+                    "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
                 }
-                response["storageCrs"] = f"http://www.opengis.net/def/crs/EPSG/0/{srid}"
 
         # return the oapif layer description as an object
         return {
