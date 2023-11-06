@@ -40,7 +40,7 @@ class OAPIFDescribeModelViewSetMixin:
             ]
             response["storageCrs"] = f"http://www.opengis.net/def/crs/EPSG/0/{srid}"
 
-            response["extent"] = {"temporal": {"interval": [None]}}
+            response["extent"] = {}
 
             if extents:
                 transformer = Transformer.from_crs(CRS.from_epsg(srid), "OGC:CRS84")
