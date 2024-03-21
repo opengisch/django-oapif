@@ -11,8 +11,7 @@ services:
 
   django:
     build:
-      args:
-        DEV: "true"
+      target: dev
     environment:
       # live-reload, show exceptions in browser, etc.
       DJANGO_DEBUG: "true"
@@ -31,3 +30,21 @@ services:
   postgres:
     ports:
       - ${HOST_POSTGRES_PORT:?}:5432
+
+  conformance_test:
+    build: ./docker/conformance
+    volumes:
+      - ./tests/conformance:/build/run
+      - ./test_outputs:/build/output
+    profiles:
+      - testing_conformance
+
+  integration_tests:
+    image: opengisch/qgis:nightly
+    command: sh -c 'xvfb-run python3 -m unittest discover'
+    tty: true
+    volumes:
+      - ./tests/integration:/integration
+    working_dir: /integration
+    profiles:
+      - testing_integration
