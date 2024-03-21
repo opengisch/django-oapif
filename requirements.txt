@@ -1,7 +1,5 @@
 django>=4
-django-computedfields
 psycopg2-binary
-transifex-client
 djangorestframework
 git+https://github.com/3nids/django-rest-framework-gis@93d9718d123c2158f4d1c5f6cf461ba8f6cf89e7
 pyyaml
