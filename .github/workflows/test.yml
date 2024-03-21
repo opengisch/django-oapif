@@ -44,6 +44,7 @@ jobs:
         context: .
         provenance: false
         file: docker/django/Dockerfile
+        target: dev
         push: ${{ github.repository == 'opengisch/django-ogcapif' }}
         pull: true
         cache-from: type=registry,ref=opengisch/django-oapif:latest
