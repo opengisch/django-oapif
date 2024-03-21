@@ -1,4 +1,4 @@
-FROM python:3.10-buster AS prod
+FROM python:3.12-bookworm AS prod
 
 WORKDIR /usr/src/app
 
@@ -23,4 +23,4 @@ FROM prod as dev
 
 ENV PYTHONDONTWRITEBYTECODE 1
 COPY ./requirements-dev.txt .
-pip install -r requirements-dev.txt
+RUN pip install -r requirements-dev.txt

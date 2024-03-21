@@ -38,19 +38,6 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Build Django image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        provenance: false
-        file: docker/django/Dockerfile
-        target: dev
-        push: ${{ github.repository == 'opengisch/django-ogcapif' }}
-        pull: true
-        cache-from: type=registry,ref=opengisch/django-oapif:latest
-        cache-to: type=registry,ref=opengisch/django-oapif:latest,mode=max
-        tags: opengisch/django-oapif:latest
-
     - name: Setup Compose
       run: |
         # copy default conf

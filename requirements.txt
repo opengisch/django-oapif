@@ -1,4 +1,4 @@
-django>=4
+django>=4,<5
 psycopg2-binary
 djangorestframework
 git+https://github.com/3nids/django-rest-framework-gis
