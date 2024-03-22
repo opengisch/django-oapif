@@ -39,9 +39,6 @@ jobs:
 
       - name: Do quickstart
         run: |
-          # copy default conf
-          cp .env.example .env
-
           # start the stack
           docker compose --profile testing_conformance up --build -d
 

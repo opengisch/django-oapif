@@ -15,7 +15,7 @@ services:
       DJANGO_DEBUG: "true"
     volumes:
       # mounting the source code for live reloading
-      - .:/usr/src
+      - ..:/usr/src
       # mounting directory to hold unit tests outputs
       - ./unit_tests_outputs/:/unit_tests_outputs
     ports:

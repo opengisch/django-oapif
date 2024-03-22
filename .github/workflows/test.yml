@@ -40,9 +40,6 @@ jobs:
 
     - name: Setup Compose
       run: |
-        # copy default conf
-        cp .env.example .env
-
         # start the stack
         docker compose --profile testing_integration up --build -d
 
