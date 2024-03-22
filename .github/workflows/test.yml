@@ -49,7 +49,7 @@ jobs:
         docker compose exec django python manage.py populate_data
 
     - name: Run unit tests
-      run: docker compose exec django_oapif_tests python manage.py test tests
+      run: docker compose exec django_oapif_tests python manage.py test
 
     - name: Run integration tests
       run: docker compose run integration_tests

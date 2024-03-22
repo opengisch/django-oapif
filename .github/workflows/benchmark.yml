@@ -53,27 +53,19 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
-    - name: Build Django image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        provenance: false
-        file: docker/django_oapif_tests/Dockerfile
-        pull: true
-        cache-from: type=registry,ref=opengisch/django_oapif_tests-oapif:latest
-        tags: opengisch/django_oapif_tests-oapif:latest
-
     - name: Download fixtures
-      run: ./scripts/download-fixtures.sh
+      run: ../scripts/download-fixtures.sh
 
     - name: Start Django
-      run: ./scripts/restart.sh
+      run: |
+        docker compose up --build -d
+        docker compose exec django python manage.py migrate
 
     - name: Run Benchmark
-      run: ./tests/benchmark/time.sh ${{ inputs.size }}
+      run: ./benchmark/time.sh ${{ inputs.size }}
 
     - name: Create plots
-      run: ./tests/benchmark/plot.py
+      run: ./benchmark/plot.py
 
     - uses: actions/upload-artifact@v4
       with:
