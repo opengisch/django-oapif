@@ -7,7 +7,7 @@ services:
 
   caddy:
     volumes:
-      - docker/caddy:/etc/caddy
+      - ./docker/caddy:/etc/caddy
 
   django:
     environment:
