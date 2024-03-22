@@ -23,6 +23,9 @@ on:
 jobs:
   benchmark:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tests
     env:
       DOCKER_BUILDKIT: 1
       COMPOSE_DOCKER_CLI_BUILD: 1
@@ -32,9 +35,6 @@ jobs:
 
     - name: Create env
       run: cp .env.example .env
-
-    - name: Load .env file
-      uses: xom9ikk/dotenv@v2
 
     - uses: actions/setup-python@v5
       with:
