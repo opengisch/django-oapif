@@ -4,11 +4,12 @@ from typing import Any, Callable, Dict, Optional
 from django.contrib.gis.geos import GEOSGeometry
 from django.db import models
 from django.db.models.functions import Cast
+from rest_framework import reverse, serializers, viewsets
+from rest_framework_gis.serializers import GeoFeatureModelSerializer
+
 from django_oapif.metadata import OAPIFMetadata
 from django_oapif.mixins import OAPIFDescribeModelViewSetMixin
 from django_oapif.urls import oapif_router
-from rest_framework import reverse, serializers, viewsets
-from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from .filters import BboxFilterBackend
 

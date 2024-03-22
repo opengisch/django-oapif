@@ -6,8 +6,7 @@ from copy import deepcopy
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.db import transaction
-
-from tests.models import (
+from django_oapif_tests.tests.models import (
     Line_2056_10fields,
     Line_2056_10fields_local_geom,
     NoGeom_10fields,

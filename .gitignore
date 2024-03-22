@@ -9,7 +9,7 @@ tests/.env
 build
 dist
 *.egg-info
-src/core/__version__.py
+django_oapif/core/__version__.py
 
 tests/benchmark/results
 

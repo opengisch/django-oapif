@@ -30,12 +30,13 @@ DEBUG_TOOLBAR_CONFIG = {
 }
 
 
-ALLOWED_HOSTS = ["localhost", "django_oapif_tests", os.getenv("OGCAPIF_HOST", "")]
+ALLOWED_HOSTS = ["localhost", "django", os.getenv("OGCAPIF_HOST", "")]
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    "django_oapif",
     "django_oapif_tests.tests",
     "django.contrib.admin",
     "django.contrib.auth",

@@ -24,6 +24,9 @@ homepage = "https://github.com/opengisch/django-ogcapif"
 repository = "https://github.com/opengisch/django-ogcapif"
 tracker = "https://github.com/opengisch/django-ogcapif/issues"
 
+[tool.setuptools]
+packages = ["django_oapif"]
+
 [tool.setuptools-git-versioning]
 enabled = true
 version_callback = "0.0.0.dev"
