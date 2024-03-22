@@ -58,10 +58,10 @@ jobs:
       with:
         context: .
         provenance: false
-        file: docker/django/Dockerfile
+        file: docker/django_oapif_tests/Dockerfile
         pull: true
-        cache-from: type=registry,ref=opengisch/django-oapif:latest
-        tags: opengisch/django-oapif:latest
+        cache-from: type=registry,ref=opengisch/django_oapif_tests-oapif:latest
+        tags: opengisch/django_oapif_tests-oapif:latest
 
     - name: Download fixtures
       run: ./scripts/download-fixtures.sh

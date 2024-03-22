@@ -1,4 +1,4 @@
-exclude: ^src/tests/migrations/
+exclude: ^core/tests/migrations/
 
 repos:
   # Fix end of files

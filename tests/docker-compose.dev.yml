@@ -7,21 +7,19 @@ services:
 
   caddy:
     volumes:
-      - ./src/:/usr/src/app
+      - .:/etc/caddy
 
   django:
-    build:
-      target: dev
     environment:
       # live-reload, show exceptions in browser, etc.
       DJANGO_DEBUG: "true"
     volumes:
       # mounting the source code for live reloading
-      - ./src/:/usr/src/app
+      - .:/usr/src
       # mounting directory to hold unit tests outputs
       - ./unit_tests_outputs/:/unit_tests_outputs
     ports:
-      # making django directly accessible for debugging
+      # making django_oapif_tests directly accessible for debugging
       - ${DJANGO_DEV_PORT:?}:8000
       # debugpy
       - ${DEBUGPY_PORT:?}:5678
@@ -32,7 +30,7 @@ services:
       - ${HOST_POSTGRES_PORT:?}:5432
 
   conformance_test:
-    build: ./docker/conformance
+    build: docker/conformance
     volumes:
       - ./tests/conformance:/build/run
       - ./test_outputs:/build/output

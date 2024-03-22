@@ -4,17 +4,17 @@ db.sqlite3
 .DS_Store
 *.pyc
 __pycache__
-.env
+tests/.env
 *.orig
 build
 dist
 *.egg-info
-src/django_oapif/__version__.py
+src/core/__version__.py
 
 tests/benchmark/results
 
-src/tests/fixtures/polygon_2056.json.gz
-src/tests/fixtures/polygon_2056_local_geom.json.gz
+tests/django_oapif_tests/tests/fixtures/polygon_2056.json.gz
+tests/django_oapif_tests/tests/fixtures/polygon_2056_local_geom.json.gz
 
 data
 static

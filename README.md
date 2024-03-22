@@ -24,13 +24,13 @@ cp .env.example .env
 docker compose up --build -d
 
 # deploy static files and migrate database
-docker compose exec django python manage.py collectstatic --no-input
-docker compose exec django python manage.py migrate --no-input
+docker compose exec django_oapif_tests python manage.py collectstatic --no-input
+docker compose exec django_oapif_tests python manage.py migrate --no-input
 
 # A convenience start-up Django command is there
 # to populate the database with testdata
-docker compose exec django python manage.py populate_users
-docker compose exec django python manage.py populate_data
+docker compose exec django_oapif_tests python manage.py populate_users
+docker compose exec django_oapif_tests python manage.py populate_data
 ```
 After waiting little you'll be able to access all collections at http://0.0.0.0:7180/oapif/collections.
 
@@ -58,7 +58,7 @@ This project is [hosted on PyPI](https://pypi.org/project/django-ogcapif/). You 
 
 ```bash
 # Install with your favorite package manager
-pip3 install --user django-ogcapif
+pip3 install --user django_oapif_tests-ogcapif
 # Edit your Django project's settings.py accordingly:
 settings.py
 -----------
@@ -76,7 +76,8 @@ models.py
 ---------
 from rest_framework import permissions
 from django.contrib.gis.db import models
-from django_oapif.decorators import register_oapif_viewset
+from django_oapif import register_oapif_viewset
+
 
 @register_oapif_viewset(
     custom_viewset_attrs={

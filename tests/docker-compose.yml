@@ -6,8 +6,7 @@ services:
 
   caddy:
     build:
-      context: .
-      dockerfile: docker/caddy/Dockerfile
+      context: docker/caddy
     volumes:
       - caddy_data:/data
       - static_volume:/static_volume
@@ -22,8 +21,8 @@ services:
   django:
     image: opengisch/django-oapif:latest
     build:
-      context: .
-      dockerfile: docker/django/Dockerfile
+      context: ..
+      dockerfile: tests/docker/django/Dockerfile
       cache_from:
         - opengisch/django-oapif:latest
     restart: unless-stopped
