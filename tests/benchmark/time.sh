@@ -13,7 +13,10 @@ LAYERS=( point_2056_10fields point_2056_10fields_local_geom nogeom_10fields noge
 
 
 echo "::group::setup ${SIZE}"
-./scripts/populate.sh ${SIZE}
+docker compose exec django python manage.py flush --no-input
+docker compose exec django python manage.py populate_users
+docker compose exec django python manage.py populate_data -s ${SIZE}
+docker compose exec django python manage.py loaddata polygon_2056 polygon_2056_local_geom
 echo "::endgroup::"
 
 for LAYER in "${LAYERS[@]}"; do
