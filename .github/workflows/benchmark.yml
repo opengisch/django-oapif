@@ -33,9 +33,6 @@ jobs:
     - name: Create env
       run: cp .env.example .env
 
-    - name: Load .env file
-      uses: xom9ikk/dotenv@v2
-
     - uses: actions/setup-python@v5
       with:
         python-version: '3.10'
@@ -53,21 +50,16 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
-    - name: Build Django image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        provenance: false
-        file: docker/django/Dockerfile
-        pull: true
-        cache-from: type=registry,ref=opengisch/django-oapif:latest
-        tags: opengisch/django-oapif:latest
-
     - name: Download fixtures
-      run: ./scripts/download-fixtures.sh
+      run: scripts/download-fixtures.sh
 
     - name: Start Django
-      run: ./scripts/restart.sh
+      run: |
+        docker compose up --build -d
+        docker compose exec django python manage.py migrate
+
+    - name: Load .env file
+      uses: xom9ikk/dotenv@v2
 
     - name: Run Benchmark
       run: ./tests/benchmark/time.sh ${{ inputs.size }}
@@ -78,8 +70,8 @@ jobs:
     - uses: actions/upload-artifact@v4
       with:
         path: |
-          tests/benchmark/results/benchmark.dat
-          tests/benchmark/results/*.png
+          tests/benchmark/output/benchmark.dat
+          tests/benchmark/output/*.png
         if-no-files-found: error
 
     - name: Failure logs

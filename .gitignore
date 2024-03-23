@@ -9,16 +9,16 @@ __pycache__
 build
 dist
 *.egg-info
-src/django_oapif/__version__.py
+django_oapif/core/__version__.py
 
-tests/benchmark/results
+tests/benchmark/output
+tests/output
 
-src/tests/fixtures/polygon_2056.json.gz
-src/tests/fixtures/polygon_2056_local_geom.json.gz
+tests/django_oapif_tests/tests/fixtures/polygon_2056.json.gz
+tests/django_oapif_tests/tests/fixtures/polygon_2056_local_geom.json.gz
 
 data
 static
 media
-test_outputs
 .vscode/
 .python-version

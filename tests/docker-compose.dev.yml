@@ -7,22 +7,19 @@ services:
 
   caddy:
     volumes:
-      - ./src/:/usr/src/app
+      - ./tests/docker/caddy:/etc/caddy
 
   django:
-    build:
-      args:
-        DEV: "true"
     environment:
       # live-reload, show exceptions in browser, etc.
       DJANGO_DEBUG: "true"
     volumes:
       # mounting the source code for live reloading
-      - ./src/:/usr/src/app
+      - ..:/usr/src
       # mounting directory to hold unit tests outputs
       - ./unit_tests_outputs/:/unit_tests_outputs
     ports:
-      # making django directly accessible for debugging
+      # making django_oapif_tests directly accessible for debugging
       - ${DJANGO_DEV_PORT:?}:8000
       # debugpy
       - ${DEBUGPY_PORT:?}:5678
@@ -31,3 +28,21 @@ services:
   postgres:
     ports:
       - ${HOST_POSTGRES_PORT:?}:5432
+
+  conformance_test:
+    build: docker/conformance
+    volumes:
+      - ./conformance:/build/run
+      - ./output:/build/output
+    profiles:
+      - testing_conformance
+
+  integration_tests:
+    image: opengisch/qgis:3.34-lunar
+    command: sh -c 'xvfb-run python3 -m unittest discover'
+    tty: true
+    volumes:
+      - ./integration:/integration
+    working_dir: /integration
+    profiles:
+      - testing_integration

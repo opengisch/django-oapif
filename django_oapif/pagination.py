@@ -5,7 +5,7 @@ from rest_framework.utils.serializer_helpers import ReturnList
 
 
 class OapifPagination(pagination.LimitOffsetPagination):
-    """OAPIF-compatible django rest paginator"""
+    """OAPIF-compatible django_oapif_tests rest paginator"""
 
     default_limit = 1000
 
@@ -52,7 +52,7 @@ class OapifPagination(pagination.LimitOffsetPagination):
 
 
 class HighPerfPagination(pagination.LimitOffsetPagination):
-    """OAPIF-compatible django rest paginator, tailored for the high performance version where data is pre-concatenated json"""
+    """OAPIF-compatible django_oapif_tests rest paginator, tailored for the high performance version where data is pre-concatenated json"""
 
     def get_paginated_response(self, data):
         # FIXME: this probably is a bug, since `data` is a string, it is not the number of features

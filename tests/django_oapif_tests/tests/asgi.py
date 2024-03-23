@@ -1,5 +1,5 @@
 """
-ASGI config for django oapif project.
+ASGI config for django_oapif_tests oapif project.
 
 It exposes the ASGI callable as a module-level variable named ``application``.
 
@@ -11,6 +11,6 @@ import os
 
 from django.core.asgi import get_asgi_application
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "tests.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "django_oapif_tests.tests.settings")
 
 application = get_asgi_application()

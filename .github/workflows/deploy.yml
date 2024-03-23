@@ -34,4 +34,4 @@ jobs:
 
       - name: Failure logs
         if: failure()
-        run: docker-compose logs django
+        run: docker-compose logs django_oapif_tests

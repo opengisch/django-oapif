@@ -36,7 +36,8 @@ urlpatterns += [
 # models.py
 
 from django.contrib.gis.db import models
-from django_oapif.decorators import register
+from django_oapif import register
+
 
 @register()
 class TestingDecorator(models.Model):

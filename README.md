@@ -58,7 +58,7 @@ This project is [hosted on PyPI](https://pypi.org/project/django-ogcapif/). You 
 
 ```bash
 # Install with your favorite package manager
-pip3 install --user django-ogcapif
+pip3 install --user https://github.com/opengisch/django-ogcapif
 # Edit your Django project's settings.py accordingly:
 settings.py
 -----------
@@ -76,7 +76,8 @@ models.py
 ---------
 from rest_framework import permissions
 from django.contrib.gis.db import models
-from django_oapif.decorators import register_oapif_viewset
+from django_oapif import register_oapif_viewset
+
 
 @register_oapif_viewset(
     custom_viewset_attrs={
@@ -104,4 +105,4 @@ You can run the OGC API conformance test suite like this:
 docker compose run conformance_test
 ```
 
-Results will be stored to `test_outputs\emailable-report.html
+Results will be stored to `tests/output/emailable-report.html
