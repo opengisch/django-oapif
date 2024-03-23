@@ -32,8 +32,8 @@ services:
   conformance_test:
     build: docker/conformance
     volumes:
-      - ./tests/conformance:/build/run
-      - ./test_outputs:/build/output
+      - ./conformance:/build/run
+      - ./output:/build/output
     profiles:
       - testing_conformance
 
@@ -42,7 +42,7 @@ services:
     command: sh -c 'xvfb-run python3 -m unittest discover'
     tty: true
     volumes:
-      - ./tests/integration:/integration
+      - ./integration:/integration
     working_dir: /integration
     profiles:
       - testing_integration

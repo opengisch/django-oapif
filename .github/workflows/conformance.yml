@@ -51,7 +51,7 @@ jobs:
         with:
           name: emailable-report
           path: |
-            ./test_outputs/**/emailable-report.html
+            ./tests/output/**/emailable-report.html
 
       - name: Install requirements
         run: pip install lxml
@@ -60,7 +60,7 @@ jobs:
         id: baseline
         run: |
           EXIT_CODE=0
-          python tests/conformance/parse_report.py test_outputs/emailable-report.html tests/conformance/conformance-baseline.json || EXIT_CODE=$?
+          python tests/conformance/parse_report.py tests/output/emailable-report.html tests/conformance/conformance-baseline.json || EXIT_CODE=$?
           echo "EXIT_CODE=${EXIT_CODE}" >> $GITHUB_OUTPUT
 
       - name: Commit baseline if improved >> checkout
@@ -101,7 +101,7 @@ jobs:
 
       - name: Recheck baseline
         run: |
-          python tests/conformance/parse_report.py test_outputs/emailable-report.html tests/conformance/conformance-baseline.json
+          python tests/conformance/parse_report.py tests/output/emailable-report.html tests/conformance/conformance-baseline.json
 
       - name: Failure logs
         if: failure()

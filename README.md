@@ -105,4 +105,4 @@ You can run the OGC API conformance test suite like this:
 docker compose run conformance_test
 ```
 
-Results will be stored to `test_outputs\emailable-report.html
+Results will be stored to `tests/output/emailable-report.html
