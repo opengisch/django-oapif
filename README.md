@@ -1,8 +1,8 @@
-# django-ogcapif
+# django-oapif
 
 **WARNING** This is in under development. API will break. Do not use in production.
 
-*django-ogcapif* allows to easily expose your Django models through an OGCAPI-Features endpoint. It is based on Django REST Framework.
+*django-oapif* allows to easily expose your Django models through an OAPI-Features endpoint. It is based on Django REST Framework.
 
 ## Table of contents
 - [Quickstart](#quickstart)
@@ -54,17 +54,17 @@ When up and running you can access the REST API from QGIS like this:
 
 ## Install it as a Django app
 
-This project is [hosted on PyPI](https://pypi.org/project/django-ogcapif/). You can install it as a Django app:
+This project is [hosted on PyPI](https://pypi.org/project/django-oapif/). You can install it as a Django app:
 
 ```bash
 # Install with your favorite package manager
-pip3 install --user https://github.com/opengisch/django-ogcapif
+pip3 install --user https://github.com/opengisch/django-oapif
 # Edit your Django project's settings.py accordingly:
 settings.py
 -----------
 INSTALLED_APPS = [
     ...
-    django_ogcapif
+    django_oapif
 ]
 ```
 ## Custom authentication & permissions

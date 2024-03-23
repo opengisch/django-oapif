@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 requires-python = ">=3.9"
-name = "django-ogcapif"
+name = "django-oapif"
 authors = [
     {name = "OPENGIS.ch", email = "info@opengis.ch"},
 ]
 description = "Easily expose your Django models through an OGCAPI-Features endpoint"
-keywords =  ["django", "ogc", "api", "wfs3", "features", "rest", "gis", "ogcapif"]
+keywords =  ["django", "ogc", "api", "wfs3", "features", "rest", "gis", "ogcapif", "oapif"]
 classifiers = [
     "Framework :: Django",
     "Intended Audience :: Developers",
@@ -20,9 +20,9 @@ license = { text = "MIT License" }
 dynamic = ["version", "readme", "dependencies", "optional-dependencies"]
 
 [project.urls]
-homepage = "https://github.com/opengisch/django-ogcapif"
-repository = "https://github.com/opengisch/django-ogcapif"
-tracker = "https://github.com/opengisch/django-ogcapif/issues"
+homepage = "https://github.com/opengisch/django-oapif"
+repository = "https://github.com/opengisch/django-oapif"
+tracker = "https://github.com/opengisch/django-oapif/issues"
 
 [tool.setuptools]
 packages = ["django_oapif"]
