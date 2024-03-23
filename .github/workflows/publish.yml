@@ -14,18 +14,18 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.9"
+          python-version: "3.12"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install build twine
 
-      - name: Prepare source files and build
-        run: ./scripts/prepare_then_build.sh
+      - name: Build
+        run: python -m build
 
       - name: Publish
         env:
           TWINE_USERNAME: "__token__"
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
-        run: twine upload ./django_oapif_tests-ogcapif/dist/* --verbose
+        run: twine upload ./django_oapif/dist/* --verbose
