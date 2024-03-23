@@ -1,6 +1,6 @@
-django>=4,<5
+django>=4
 psycopg2-binary
-djangorestframework==3.14.0
+djangorestframework>=3.15.1
 djangorestframework-gis@git+https://github.com/openwisp/django-rest-framework-gis@4f244d5d8a7ad5b453fd04f64150818d15123e01
 pyyaml
 uritemplate
