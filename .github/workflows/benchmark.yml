@@ -58,6 +58,9 @@ jobs:
         docker compose up --build -d
         docker compose exec django python manage.py migrate
 
+    - name: Load .env file
+      uses: xom9ikk/dotenv@v2
+
     - name: Run Benchmark
       run: ./tests/benchmark/time.sh ${{ inputs.size }}
 
