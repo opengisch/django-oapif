@@ -11,7 +11,8 @@ dist
 *.egg-info
 django_oapif/core/__version__.py
 
-tests/benchmark/results
+tests/benchmark/output
+tests/output
 
 tests/django_oapif_tests/tests/fixtures/polygon_2056.json.gz
 tests/django_oapif_tests/tests/fixtures/polygon_2056_local_geom.json.gz
@@ -19,6 +20,5 @@ tests/django_oapif_tests/tests/fixtures/polygon_2056_local_geom.json.gz
 data
 static
 media
-test_outputs
 .vscode/
 .python-version

@@ -2,7 +2,7 @@
 
 set -e
 
-OUTPUT_PATH="tests/benchmark/results"
+OUTPUT_PATH="tests/benchmark/output"
 
 mkdir -p ${OUTPUT_PATH}
 rm -f ${OUTPUT_PATH}/benchmark.dat
