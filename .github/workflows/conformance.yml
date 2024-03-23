@@ -37,6 +37,9 @@ jobs:
           docker compose exec django python manage.py populate_users
           docker compose exec django python manage.py populate_data
 
+      - name: Load .env file
+        uses: xom9ikk/dotenv@v2
+
       - name: Healthcheck
         run: wget http://${OGCAPIF_HOST}:${DJANGO_DEV_PORT}/oapif/collections/tests.point_2056_10fields/items
 

@@ -59,10 +59,10 @@ jobs:
         docker compose exec django python manage.py migrate
 
     - name: Run Benchmark
-      run: .tests/benchmark/time.sh ${{ inputs.size }}
+      run: ./tests/benchmark/time.sh ${{ inputs.size }}
 
     - name: Create plots
-      run: .tests/benchmark/plot.py
+      run: ./tests/benchmark/plot.py
 
     - uses: actions/upload-artifact@v4
       with:
