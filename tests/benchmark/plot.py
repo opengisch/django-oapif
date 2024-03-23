@@ -5,7 +5,7 @@ import csv
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-output_path = "tests/benchmark/results"
+output_path = "tests/benchmark/output"
 
 
 def tr(layer: str) -> str:
