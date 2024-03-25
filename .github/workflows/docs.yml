@@ -1,0 +1,51 @@
+name: 🚧 Website MkDocs
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch: # useful for testing tx pushes
+  workflow_call: # call from release
+
+defaults:
+  run:
+    working-directory: docs
+
+jobs:
+  website:
+    runs-on: ubuntu-latest
+    # Skip if this job was scheduled and the runner belongs to a fork (i.e. forks have no use for this action)
+    if: (github.event_name == 'schedule' && github.repository == 'opengisch/django-oapif') || (github.event_name != 'schedule')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python requirements
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Build documentation
+        run: mkdocs build
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ github.event_name == 'pull_request' }}
+        with:
+          name: docs
+          path: docs/site
+          if-no-files-found: error
+
+      - name: Deploy to GitHub Pages
+        if: contains(fromJSON('["push", "workflow_dispatch"]'), github.event_name)
+        run: mkdocs gh-deploy --force

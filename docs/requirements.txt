@@ -1,0 +1,3 @@
+mkdocs-material==9.5.9
+mkdocs-video==1.5.0
+fancyboxmd==1.1.0
