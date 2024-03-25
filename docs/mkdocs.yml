@@ -1,0 +1,83 @@
+site_name: Django-OAPIF
+site_url:
+site_author: OPENGIS.ch
+
+docs_dir: content
+
+# Repository
+repo_name: opengisch/django-oapif
+repo_url: https://github.com/opengisch/django-oapif
+edit_uri: https://github.com/opengisch/django-oapif/tree/main/docs/content/
+
+# Copyright
+copyright: Copyright &copy; 2023-2024 <a href="https://OPENGIS.ch">OPENGIS.ch</a>
+
+# Configuration
+theme:
+  name: material
+  custom_dir: theme_overrides/
+  language: fr
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.tracking
+    - search.suggest
+    - search.highlight
+  #logo: assets/images/oapif_logo.png
+  #favicon: assets/images/favicon.ico
+  palette:
+    # Palette toggle for automatic mode
+    - media: "(prefers-color-scheme)"
+      primary: grey
+      toggle:
+        icon: material/brightness-auto
+        name: Light mode
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: grey
+      toggle:
+        icon: material/brightness-7
+        name: Dark mode
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: grey
+      toggle:
+        icon: material/brightness-4
+        name: System default
+
+nav:
+  - Quick start: quick-start.md
+  - Demo: demo.md
+  - Permissions: permissions.md
+  - Test and conformance: tests.md
+
+# Css
+extra_css:
+  - stylesheets/extra.css
+  - stylesheets/jquery.fancybox.min.css
+
+# Extra javascript
+extra_javascript:
+  - javascript/jquery.min.js
+  - javascript/jquery.fancybox.min.js
+
+extra:
+  # Remove "Made with Material for MkDocs" from footer
+  generator: false
+
+markdown_extensions:
+  - attr_list
+  - md_in_html
+  - fancyboxmd
+  - sane_lists
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.superfences
+
+plugins:
+  - search
