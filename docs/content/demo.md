@@ -1,3 +1,8 @@
+---
+hide:
+  - navigation
+---
+
 # Try the demo
 
 ## Setup

@@ -1,3 +1,8 @@
+---
+hide:
+  - navigation
+---
+
 ## Run tests
 
     # unit tests

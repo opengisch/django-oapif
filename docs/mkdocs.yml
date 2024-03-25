@@ -48,20 +48,11 @@ theme:
         name: System default
 
 nav:
+  - Home: index.md
   - Quick start: quick-start.md
   - Demo: demo.md
   - Permissions: permissions.md
   - Test and conformance: tests.md
-
-# Css
-extra_css:
-  - stylesheets/extra.css
-  - stylesheets/jquery.fancybox.min.css
-
-# Extra javascript
-extra_javascript:
-  - javascript/jquery.min.js
-  - javascript/jquery.fancybox.min.js
 
 extra:
   # Remove "Made with Material for MkDocs" from footer

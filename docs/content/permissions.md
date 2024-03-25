@@ -1,3 +1,8 @@
+---
+hide:
+  - navigation
+---
+
 # Custom authentication & permissions
 
 By default the viewsets use `DjangoModelPermissionsOrAnonReadOnly` [permissions class from DRF](https://www.django-rest-framework.org/api-guide/permissions/#djangomodelpermissionsoranonreadonly).
