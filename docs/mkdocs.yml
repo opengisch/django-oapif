@@ -15,7 +15,7 @@ copyright: Copyright &copy; 2023-2024 <a href="https://OPENGIS.ch">OPENGIS.ch</a
 # Configuration
 theme:
   name: material
-  language: fr
+  language: en
   features:
     - navigation.tabs
     - navigation.tabs.sticky
