@@ -3,14 +3,12 @@ on:
   pull_request:
     branches:
       - main
-      - docs
     paths:
       - 'docs/**'
       - '.github/workflows/docs.yml'
   push:
     branches:
       - main
-      - docs
     paths:
       - 'docs/**'
       - '.github/workflows/docs.yml'
