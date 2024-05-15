@@ -51,6 +51,7 @@ nav:
   - Home: index.md
   - Quick start: quick-start.md
   - Demo: demo.md
+  - API: api.md
   - Permissions: permissions.md
   - Test and conformance: tests.md
 
@@ -64,6 +65,7 @@ markdown_extensions:
   - fancyboxmd
   - sane_lists
   - admonition
+  - codehilite
   - pymdownx.details
   - pymdownx.tabbed:
       alternate_style: true
@@ -71,3 +73,4 @@ markdown_extensions:
 
 plugins:
   - search
+  - mkdocstring
