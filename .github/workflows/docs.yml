@@ -45,7 +45,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: ${{ github.event_name == 'pull_request' }}
         with:
-          name: docs
+          name: Django-OAPIF-documentation
           path: docs/site
           if-no-files-found: error
 
