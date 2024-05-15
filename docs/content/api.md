@@ -1,3 +1,3 @@
 # API documentation
 
-::: django_oapif.decorators.register_oapif_viewset
+::: django_oapif.decorators
