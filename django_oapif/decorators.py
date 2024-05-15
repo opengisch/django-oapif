@@ -83,7 +83,7 @@ def register_oapif_viewset(
 
                 def to_internal_value(self, data):
                     # TODO: this needs improvement!!!
-                    if "geometry" in data and "crs" not in data["geometry"]:
+                    if "geometry" in data and data["geometry"] is not None and "crs" not in data["geometry"]:
                         data["geometry"]["crs"] = {
                             "type": "name",
                             "properties": {"name": f"urn:ogc:def:crs:EPSG::{Model.crs}"},
