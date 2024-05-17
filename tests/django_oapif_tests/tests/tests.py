@@ -54,7 +54,7 @@ class TestBasicAuth(APITestCase):
             url = f"{collections_url}/{layer}/items"
             response = self.client.options(url)
 
-            allowed_headers = set(s.strip() for s in response.headers["Allow"].split(","))
+            allowed_headers = {s.strip() for s in response.headers["Allow"].split(",")}
             allowed_body = set(response.json()["actions"].keys())
 
             self.assertEqual(allowed_body, expected)
@@ -68,8 +68,20 @@ class TestBasicAuth(APITestCase):
             url = f"{collections_url}/{layer}/items"
             response = self.client.options(url)
 
-            allowed_headers = set(s.strip() for s in response.headers["Allow"].split(","))
+            allowed_headers = {s.strip() for s in response.headers["Allow"].split(",")}
             allowed_body = set(response.json()["actions"].keys())
 
             self.assertEqual(allowed_body, expected)
             self.assertEqual(allowed_headers, allowed_body)
+
+    def test_post_without_geometry(self):
+        self.client.force_authenticate(user=self.demo_editor)
+        data = {
+            "geometry": None,
+            "properties": {"field_str_0": "test123456"},
+        }
+
+        for layer in ("tests.point_2056_10fields_local_geom",):
+            url = f"{collections_url}/{layer}/items"
+            post_to_items = self.client.post(url, data, format="json")
+            self.assertIn(post_to_items.status_code, (200, 201), (url, data, post_to_items.data))
