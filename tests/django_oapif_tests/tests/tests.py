@@ -85,3 +85,15 @@ class TestBasicAuth(APITestCase):
             url = f"{collections_url}/{layer}/items"
             post_to_items = self.client.post(url, data, format="json")
             self.assertIn(post_to_items.status_code, (200, 201), (url, data, post_to_items.data))
+
+    def test_post_geometry_less_layer(self):
+        self.client.force_authenticate(user=self.demo_editor)
+        data = {
+            "geometry": None,
+            "properties": {"field_str_0": "test123456"},
+        }
+
+        for layer in ("tests.nogeom_10fields",):
+            url = f"{collections_url}/{layer}/items"
+            post_to_items = self.client.post(url, data, format="json")
+            self.assertIn(post_to_items.status_code, (200, 201), (url, data, post_to_items.data))
