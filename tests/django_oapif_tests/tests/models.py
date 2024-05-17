@@ -36,7 +36,7 @@ class Point_2056_10fields(BaseModelWithTenFields):
 
 @register_oapif_viewset(crs=2056, serialize_geom_in_db=False)
 class Point_2056_10fields_local_geom(BaseModelWithTenFields):
-    geom = models.PointField(srid=2056, verbose_name=_("Geometry"))
+    geom = models.PointField(srid=2056, verbose_name=_("Geometry"), null=True)
 
 
 @register_oapif_viewset(geom_field=None)

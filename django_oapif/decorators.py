@@ -1,5 +1,5 @@
 import json
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Optional
 
 from django.contrib.gis.geos import GEOSGeometry
 from django.db import models
@@ -23,8 +23,8 @@ def register_oapif_viewset(
     serialize_geom_in_db: Optional[bool] = True,
     geom_field: [str] = "geom",
     crs: Optional[int] = None,
-    custom_serializer_attrs: Dict[str, Any] = None,
-    custom_viewset_attrs: Dict[str, Any] = None,
+    custom_serializer_attrs: dict[str, Any] = None,
+    custom_viewset_attrs: dict[str, Any] = None,
 ) -> Callable[[Any], models.Model]:
     """
     This decorator takes care of all boilerplate code (creating a serializer, a viewset and registering it) to register

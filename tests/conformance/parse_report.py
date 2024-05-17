@@ -15,7 +15,7 @@ from enum import Enum
 from itertools import islice
 from os import path
 from sys import argv, exit
-from typing import List, NamedTuple
+from typing import NamedTuple
 
 from lxml import etree
 
@@ -36,13 +36,13 @@ class Cmp(str, Enum):
 
 
 class Result(NamedTuple):
-    passed: List[str]
-    skipped: List[str]
-    failed: List[str]
+    passed: list[str]
+    skipped: list[str]
+    failed: list[str]
 
     @classmethod
     def load(cls, _path) -> "Result":
-        with open(_path, "r") as fh:
+        with open(_path) as fh:
             results = json.load(fh)
         return cls(**results)
 

@@ -11,7 +11,7 @@ CRS_AUTHORITY = [
     "OGC",
 ]
 CRS_URI_PATTERN = re.compile(
-    (rf"^http://www.opengis\.net/def/crs/" rf"(?P<auth>{'|'.join(CRS_AUTHORITY)})/" rf"[\d|\.]+?/(?P<code>\w+?)$")
+    rf"^http://www.opengis\.net/def/crs/" rf"(?P<auth>{'|'.join(CRS_AUTHORITY)})/" rf"[\d|\.]+?/(?P<code>\w+?)$"
 )
 
 
