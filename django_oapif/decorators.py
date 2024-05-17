@@ -66,7 +66,7 @@ def register_oapif_viewset(
                     geo = None
                     if "geometry" in data:
                         geo = data["geometry"]
-                        if crs not in geo:
+                        if geo and crs not in geo:
                             geo["crs"] = {"type": "name", "properties": {"name": f"urn:ogc:def:crs:EPSG::{Model.crs}"}}
                     data = super().to_internal_value(data)
                     if geo:
