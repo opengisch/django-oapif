@@ -1,4 +1,5 @@
 import logging
+import re
 
 from django.contrib.auth.models import User
 from django.core.management import call_command
@@ -97,3 +98,22 @@ class TestBasicAuth(APITestCase):
             url = f"{collections_url}/{layer}/items"
             post_to_items = self.client.post(url, data, format="json")
             self.assertIn(post_to_items.status_code, (200, 201), (url, data, post_to_items.data))
+
+    def test_returned_id(self):
+        self.client.force_authenticate(user=self.demo_editor)
+        data = {
+            "geometry": {
+                "type": "Point",
+                "coordinates": [2508500.0, 1152000.0],
+                "crs": {"type": "name", "properties": {"name": "urn:ogc:def:crs:EPSG::2056"}},
+            },
+            "properties": {"field_str_0": "test123456"},
+        }
+
+        for layer in ("tests.point_2056_10fields",):
+            url = f"{collections_url}/{layer}/items"
+            post_to_items = self.client.post(url, data, format="json")
+            self.assertIn(post_to_items.status_code, (200, 201), (url, data, post_to_items.data))
+            location = post_to_items.headers["Location"]
+            print(location)
+            self.assertTrue(re.match(r"^.*[0-9a-f\-]{36}$", location))
