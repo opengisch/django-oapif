@@ -104,14 +104,15 @@ def register_oapif_viewset(
 
             filter_backends = [BboxFilterBackend]
 
-            # Allowing '.' and '-' in urls
-            lookup_value_regex = r"[\w.-]+"
+            # restrict o UUIDs lookup see https://www.django-rest-framework.org/api-guide/routers/
+            # lookup_value_regex = '[0-9a-f]{32}'
+            # lookup_value_converter = 'uuid'
 
             # Metadata
             metadata_class = OAPIFMetadata
 
             def get_success_headers(self, data):
-                location = reverse.reverse(f"{self.basename}-detail", {"lookup": data[Model._meta.pk.column]})
+                location = reverse.reverse(f"{self.basename}-detail", args=[data[Model._meta.pk.column]])
                 headers = {"Location": location}
                 return headers
 
