@@ -29,6 +29,11 @@ class BaseModelWithTenFields(models.Model):
     field_str_9 = models.CharField(max_length=255, verbose_name=_("Field 9"), null=True, blank=True)
 
 
+@register_oapif_viewset(geom_field=None)
+class Non_Null_Field_With_Default(BaseModelWithTenFields):
+    field_non_null_with_default = models.IntegerField(null=False, blank=False, default=8)
+
+
 @register_oapif_viewset(crs=2056)
 class Point_2056_10fields(BaseModelWithTenFields):
     geom = models.PointField(srid=2056, verbose_name=_("Geometry"))
