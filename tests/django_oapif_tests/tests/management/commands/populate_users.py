@@ -15,6 +15,7 @@ class Command(BaseCommand):
         deleting = []
 
         for model in (
+            "non_null_field_with_default",
             "point_2056_10fields",
             "point_2056_10fields_local_geom",
             "nogeom_10fields",
