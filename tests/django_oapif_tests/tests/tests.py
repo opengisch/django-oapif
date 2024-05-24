@@ -141,7 +141,7 @@ class TestBasicAuth(APITestCase):
         self.client.force_authenticate(user=self.demo_editor)
         data = {
             "geometry": None,
-            "properties": None,
+            "properties": {},
         }
         url = f"{collections_url}/tests.non_null_field_with_default/items"
         post_to_items = self.client.post(url, data, format="json")
