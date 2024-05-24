@@ -11,6 +11,7 @@ from django_oapif_tests.tests.models import (
     Line_2056_10fields_local_geom,
     NoGeom_10fields,
     NoGeom_100fields,
+    Non_Null_Field_With_Default,
     Point_2056_10fields,
     Point_2056_10fields_local_geom,
     SecretLayer,
@@ -26,6 +27,8 @@ class Command(BaseCommand):
     @transaction.atomic
     def handle(self, *args, **options):
         """Populate db with testdata"""
+        Non_Null_Field_With_Default.objects.create()
+
         size = options["size"]
         x_start = 2508500
         y_start = 1152000
