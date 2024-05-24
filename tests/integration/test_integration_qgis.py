@@ -99,3 +99,27 @@ class TestStack(unittest.TestCase):
             f = next(layer.getFeatures("field_str_0='Super Green'"))
             self.assertIsInstance(f, QgsFeature)
             self.assertEqual(geom.asWkt(), f.geometry().asWkt())
+
+    def test_non_null_default(self):
+        layer = "tests.non_null_field_with_default"
+        uri = QgsDataSourceUri()
+        uri.setParam("service", "wfs")
+        uri.setParam("typename", layer)
+        uri.setParam("url", ROOT_URL)
+        uri.setPassword(self.password)
+        uri.setUsername(self.user)
+
+        layer = QgsVectorLayer(uri.uri(), layer, "OAPIF")
+        self.assertTrue(layer.isValid())
+        layer = self.project.addMapLayer(layer)
+        self.assertIsNotNone(layer)
+
+        self.assertTrue(bool(layer.dataProvider().capabilities() & QgsVectorDataProvider.Capability.AddFeatures))
+
+        f = QgsFeature(layer.fields())
+        self.assertIsNone(f["field_non_null_with_default"])
+        with edit(layer):
+            layer.addFeature(f)
+        f = next(layer.getFeatures())
+        self.assertIsInstance(f, QgsFeature)
+        self.assertEqual(f["field_non_null_with_default"], 8)
