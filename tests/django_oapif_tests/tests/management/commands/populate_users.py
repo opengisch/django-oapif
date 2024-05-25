@@ -24,8 +24,6 @@ class Command(BaseCommand):
             "polygon_2056",
             "polygon_2056_local_geom",
             "secretlayer",
-            "valve",
-            "pipe",
         ):
             adding.append(Permission.objects.get(codename=f"add_{model}"))
             modifying.append(Permission.objects.get(codename=f"change_{model}"))
