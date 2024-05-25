@@ -12,6 +12,7 @@ class Command(BaseCommand):
         adding = []
         modifying = []
         viewing = []
+        deleting = []
 
         for model in (
             "point_2056_10fields",
@@ -26,9 +27,10 @@ class Command(BaseCommand):
         ):
             adding.append(Permission.objects.get(codename=f"add_{model}"))
             modifying.append(Permission.objects.get(codename=f"change_{model}"))
+            deleting.append(Permission.objects.get(codename=f"delete_{model}"))
             viewing.append(Permission.objects.get(codename=f"view_{model}"))
 
-        editing = adding + modifying + viewing
+        editing = adding + modifying + deleting + viewing
 
         editors, _ = Group.objects.get_or_create(name="editors")
         viewers, _ = Group.objects.get_or_create(name="viewers")

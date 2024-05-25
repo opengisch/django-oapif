@@ -117,3 +117,22 @@ class TestBasicAuth(APITestCase):
             location = post_to_items.headers["Location"]
             print(location)
             self.assertTrue(re.match(r"^.*[0-9a-f\-]{36}$", location))
+
+    def test_delete(self):
+        self.client.force_authenticate(user=self.demo_editor)
+        data = {
+            "geometry": {
+                "type": "Point",
+                "coordinates": [2508500.0, 1152000.0],
+                "crs": {"type": "name", "properties": {"name": "urn:ogc:def:crs:EPSG::2056"}},
+            },
+            "properties": {"field_str_0": "test123456"},
+        }
+
+        url = f"{collections_url}/tests.point_2056_10fields/items"
+        post_to_items = self.client.post(url, data, format="json")
+        self.assertIn(post_to_items.status_code, (200, 201), (url, data, post_to_items.data))
+        location = post_to_items.headers["Location"]
+        fid = re.match(r"^.*([0-9a-f\-]{36})$", location).group(1)
+        delete_from_items = self.client.delete(f"{url}/{fid}")
+        self.assertIn(delete_from_items.status_code, (200, 204), f"{url}/{fid}")
