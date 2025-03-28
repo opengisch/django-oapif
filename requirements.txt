@@ -1,7 +1,7 @@
 django>=4
 psycopg2-binary
 djangorestframework!=3.15.0
-djangorestframework-gis@git+https://github.com/openwisp/django-rest-framework-gis@4f244d5d8a7ad5b453fd04f64150818d15123e01
+djangorestframework-gis@git+https://github.com/openwisp/django-rest-framework-gis@82d9f0aa2457bb695bce9514f4fb055ddaa6a688
 inflection
 pyyaml
 uritemplate
