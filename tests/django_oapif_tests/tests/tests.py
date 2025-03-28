@@ -136,3 +136,13 @@ class TestBasicAuth(APITestCase):
         fid = re.match(r"^.*([0-9a-f\-]{36})$", location).group(1)
         delete_from_items = self.client.delete(f"{url}/{fid}")
         self.assertIn(delete_from_items.status_code, (200, 204), f"{url}/{fid}")
+
+    def test_non_null_with_default(self):
+        self.client.force_authenticate(user=self.demo_editor)
+        data = {
+            "geometry": None,
+            "properties": {},
+        }
+        url = f"{collections_url}/tests.non_null_field_with_default/items"
+        post_to_items = self.client.post(url, data, format="json")
+        self.assertIn(post_to_items.status_code, (200, 201), (url, data, post_to_items.data))
