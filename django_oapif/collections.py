@@ -1,10 +1,8 @@
 from typing import Dict, NamedTuple
 
 # ninja_ogc/routers.py
-from uuid import UUID
-
 from django.contrib.gis.db.models import Extent
-from django.contrib.gis.db.models.functions import AsGeoJSON
+from django.contrib.gis.db.models.functions import AsGeoJSON, Transform
 from django.contrib.gis.geos import Polygon
 from django.db import models
 from django.db.models.functions import Cast
@@ -13,6 +11,7 @@ from django.shortcuts import get_object_or_404
 from geojson_pydantic import Feature, FeatureCollection
 from ninja import Query, Router
 
+from django_oapif.crs import get_srid_from_uri
 from django_oapif.schema import (
     OAPIFCollection,
     OAPIFCollections,
@@ -20,6 +19,8 @@ from django_oapif.schema import (
     OAPIFLink,
     OAPIFSpatialExtent,
 )
+
+CRS84_URI = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
 
 
 class OAPIFCollectionEntry(NamedTuple):
@@ -31,20 +32,36 @@ class OAPIFCollectionEntry(NamedTuple):
     properties_fields: list[str] = []
 
 
-def get_collection_crs(collection: OAPIFCollectionEntry):
-    if (geom := collection.geometry_field):
-        srid = collection.model_class._meta.get_field(geom).srid
-        if srid not in (0, None):
-            return [f"http://www.opengis.net/def/crs/EPSG/0/{srid}"]
-
-
-def get_collection_extent(collection: OAPIFCollectionEntry):
+def get_collection_response(request: HttpRequest, collection: OAPIFCollectionEntry):
+    response = OAPIFCollection(
+        id = collection.id,
+        title = collection.title,
+        description = collection.description,
+        links = [
+            OAPIFLink(
+                href = request.build_absolute_uri(f"collections/{collection.id}"),
+                rel = "self",
+                type = "application/json",
+            ),
+            OAPIFLink(
+                href = request.build_absolute_uri(f"collections/{collection.id}/items"),
+                rel = "items",
+                type = "application/geo+json",
+            )
+        ]
+    )
+    
     if (geom := collection.geometry_field):
         extent = collection.model_class.objects.aggregate(extent=Extent(geom))["extent"]
-        return OAPIFExtent(
-            spatial=OAPIFSpatialExtent(bbox=extent)
-        )
-
+        response.extent = OAPIFExtent(spatial=OAPIFSpatialExtent(bbox=extent))
+        srid = collection.model_class._meta.get_field(geom).srid
+        response.storageCrs = f"http://www.opengis.net/def/crs/EPSG/0/{srid}"
+        response.crs = [
+            "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+            f"http://www.opengis.net/def/crs/EPSG/0/{srid}",
+        ]
+    
+    return response
 
 def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
     router = Router()
@@ -61,25 +78,7 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
                 )
             ],
             collections=[
-                OAPIFCollection(
-                    id = collection.id,
-                    title = collection.title,
-                    description = collection.description,
-                    crs = get_collection_crs(collection),
-                    extent = get_collection_extent(collection),
-                    links = [
-                        OAPIFLink(
-                            href = request.build_absolute_uri(f"collections/{collection.id}"),
-                            rel = "self",
-                            type = "application/json",
-                        ),
-                        OAPIFLink(
-                            href = request.build_absolute_uri(f"collections/{collection.id}/items"),
-                            rel = "items",
-                            type = "application/geo+json",
-                        )
-                    ]
-                )
+                get_collection_response(request, collection)
                 for collection in collections.values()
             ]
         )
@@ -89,45 +88,45 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
         collection = collections.get(collection_id)
         if collection is None:
             raise Http404(f'Collection "{collection_id}" not found.')
-        return OAPIFCollection(
-            id=collection.id,
-            title=collection.title,
-            description=collection.description,
-            crs = get_collection_crs(collection),
-            extent = get_collection_extent(collection),
-            links=[
-                OAPIFLink(
-                    href = request.build_absolute_uri(f"{collection_id}"),
-                    rel = "self",
-                    type = "application/json"
-                ),
-                OAPIFLink(
-                    href = request.build_absolute_uri(f"{collection_id}/items"),
-                    rel = "items",
-                    type = "application/geo+json"
-                )
-            ],
-        )
+        return get_collection_response(request, collection)
     
     @router.get("/{collection_id}/items")
-    def get_items(request, collection_id: str, limit: int | None = None, offset: int | None = None, bbox: str = Query(None, description="BBOX in the format: minx,miny,maxx,maxy")):
+    def get_items(
+        request: HttpRequest,
+        collection_id: str,
+        limit: int | None = None,
+        offset: int | None = None,
+        crs: str | None = CRS84_URI,
+        bbox_crs: str = Query(CRS84_URI, alias="bbox-crs"),
+        bbox: str = Query(None, description="BBOX in the format: minx,miny,maxx,maxy"),
+    ):
         collection = collections.get(collection_id)
         if collection is None:
             raise Http404(f'Collection "{collection_id}" not found.')
+        
         qs = collection.model_class.objects.only("id", *collection.properties_fields)
+        output_srid = get_srid_from_uri(crs)
+
         if (geom := collection.geometry_field):
-            qs = qs.annotate(geometry=Cast(AsGeoJSON(geom, False, False), models.JSONField()))
+            qs = qs.annotate(geometry=Cast(AsGeoJSON(Transform(geom, output_srid)), models.JSONField()))
             if bbox:
                 try:
                     minx, miny, maxx, maxy = map(float, bbox.split(","))
-                    bbox_geom = Polygon.from_bbox((minx, miny, maxx, maxy))
-                    qs = qs.filter(**{f"{geom}__intersects": bbox_geom})
+                    bbox_geom: Polygon = Polygon.from_bbox((minx, miny, maxx, maxy))
+                    bbox_geom.srid = get_srid_from_uri(bbox_crs)
+                    collection_srid = collection.model_class._meta.get_field(geom).srid
+                    if bbox_geom.srid == collection_srid:
+                        qs = qs.filter(**{f"{geom}__intersects": bbox_geom})
+                    else:
+                        qs = qs.filter(**{f"{geom}__intersects": Transform(bbox_geom, collection_srid)})
                 except ValueError:
                     return router.create_response(
                         request, {"error": "Invalid bbox parameter. Expected format: minx,miny,maxx,maxy"}, status=400
                     )
+
         if limit is not None:
             qs = qs[offset:limit]
+
         return FeatureCollection(
             type="FeatureCollection",
             features=[
@@ -142,13 +141,19 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
         )
 
     @router.get("/{collection_id}/items/{item_id}")
-    def get_item(request, collection_id: str, item_id: UUID):
+    def get_item(
+        request: HttpRequest,
+        collection_id: str,
+        item_id: str,
+        crs: str = CRS84_URI,
+    ):
         collection = collections.get(collection_id)
         if collection is None:
             raise Http404(f'Collection "{collection_id}" not found.')
         qs = collection.model_class.objects.only(collection.properties_fields)
+        output_srid = get_srid_from_uri(crs)
         if collection.geometry_field:
-            qs = qs.annotate(geometry=Cast(AsGeoJSON(collection.geometry_field, False, False), models.JSONField()))
+            qs = qs.annotate(geometry=Cast(AsGeoJSON(Transform(collection.geometry_field, output_srid)), models.JSONField()))
         obj = get_object_or_404(qs, pk=item_id)
         return Feature(
             type="Feature",
