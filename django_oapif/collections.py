@@ -1,4 +1,5 @@
 from typing import Dict, NamedTuple
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 # ninja_ogc/routers.py
 from django.contrib.gis.db.models import Extent
@@ -22,6 +23,11 @@ from django_oapif.schema import (
 
 CRS84_URI = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
 
+class PagedFeatureCollection(FeatureCollection):
+    links: list[OAPIFLink]
+    numberReturned: int
+    numberMatched: int
+
 
 class OAPIFCollectionEntry(NamedTuple):
     model_class: models.Model
@@ -30,6 +36,51 @@ class OAPIFCollectionEntry(NamedTuple):
     description: str
     geometry_field: str = "geom"
     properties_fields: list[str] = []
+
+
+
+def replace_query_param(request, **kwargs):
+    url = request.build_absolute_uri()
+    parsed = urlparse(url)
+    query = parse_qs(parsed.query)
+    # Update or remove parameters
+    for k, v in kwargs.items():
+        if v is None:
+            query.pop(k)
+        else:
+            query[k] = [str(v)]
+    new_query = urlencode(query, doseq=True)
+    return urlunparse(parsed._replace(query=new_query))
+
+
+def get_page_links(request: HttpRequest, limit: int, offset: int, total_count: int, returned_count: int):
+    links = [
+        OAPIFLink(
+            rel="self",
+            title="items (self)",
+            type="application/geo+json",
+            href=request.build_absolute_uri()
+        )
+    ]
+    if offset + limit < total_count:
+        links.append(
+            OAPIFLink(
+                rel="next",
+                title="items (next)",
+                type="application/geo+json",
+                href=replace_query_param(request, offset=offset + limit)
+            )
+        )
+    if offset > 0:
+        links.append(
+            OAPIFLink(
+                rel="prev",
+                title="items (prev)",
+                type="application/geo+json",
+                href=replace_query_param(request, offset= None if offset - limit <= 0 else offset - limit)
+            )
+        )
+    return links
 
 
 def get_collection_response(request: HttpRequest, collection: OAPIFCollectionEntry):
@@ -71,7 +122,7 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
         return OAPIFCollections(
             links=[
                 OAPIFLink(
-                    href = request.build_absolute_uri(""),
+                    href = request.build_absolute_uri(),
                     rel = "self",
                     type = "application/json",
                     title = "this document",
@@ -94,8 +145,8 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
     def get_items(
         request: HttpRequest,
         collection_id: str,
-        limit: int | None = None,
-        offset: int | None = None,
+        limit: int = 1000,
+        offset: int = 0,
         crs: str | None = CRS84_URI,
         bbox_crs: str = Query(CRS84_URI, alias="bbox-crs"),
         bbox: str = Query(None, description="BBOX in the format: minx,miny,maxx,maxy"),
@@ -106,6 +157,7 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
         
         qs = collection.model_class.objects.only("id", *collection.properties_fields)
         output_srid = get_srid_from_uri(crs)
+        
 
         if (geom := collection.geometry_field):
             qs = qs.annotate(geometry=Cast(AsGeoJSON(Transform(geom, output_srid)), models.JSONField()))
@@ -124,10 +176,13 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
                         request, {"error": "Invalid bbox parameter. Expected format: minx,miny,maxx,maxy"}, status=400
                     )
 
-        if limit is not None:
-            qs = qs[offset:limit]
 
-        return FeatureCollection(
+        paginated_qs = qs[offset: offset + limit]
+
+        total_count = qs.count()
+        result_count = len(paginated_qs)
+
+        return PagedFeatureCollection(
             type="FeatureCollection",
             features=[
                 Feature(
@@ -136,11 +191,14 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
                     geometry=None if not collection.geometry_field else obj.geometry,
                     properties={field: getattr(obj, field) for field in collection.properties_fields}
                 )
-                for obj in qs
+                for obj in paginated_qs
             ],
+            numberMatched=total_count,
+            numberReturned=result_count,
+            links=get_page_links(request, limit, offset, total_count, result_count)
         )
 
-    @router.get("/{collection_id}/items/{item_id}")
+    @router.get("/{collection_id}/items/{item_id}/")
     def get_item(
         request: HttpRequest,
         collection_id: str,
