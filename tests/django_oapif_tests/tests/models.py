@@ -4,8 +4,6 @@ import uuid
 from django.contrib.gis.db import models
 from django.utils.translation import gettext as _
 
-from django_oapif.api import register_oapif_viewset
-
 logger = logging.getLogger(__name__)
 
 
@@ -28,42 +26,14 @@ class BaseModelWithTenFields(models.Model):
     field_str_9 = models.CharField(max_length=255, verbose_name=_("Field 9"), null=True, blank=True)
 
 
-@register_oapif_viewset(
-    title="point_2056",
-    description="yo",
-    properties_fields=[
-        "field_bool",
-        "field_int",
-        *[f"field_str_{i}" for i in range(10)]
-    ],
-)
 class Point_2056_10fields(BaseModelWithTenFields):
     geom = models.PointField(srid=2056, verbose_name=_("Geometry"))
 
-@register_oapif_viewset(
-    title="nogeom_10fields",
-    description="yo",
-    geometry_field=None,
-    properties_fields=[
-        "field_bool",
-        "field_int",
-        *[f"field_str_{i}" for i in range(10)],
-    ],
-)
+
 class NoGeom_10fields(BaseModelWithTenFields):
     pass
 
 
-@register_oapif_viewset(
-    title="nogeom_100fields",
-    description="yo",
-    geometry_field=None,
-    properties_fields=[
-        "field_bool",
-        "field_int",
-        *[f"field_str_{i}" for i in range(100)],
-    ],
-)
 class NoGeom_100fields(BaseModelWithTenFields):
     field_str_10 = models.CharField(max_length=255, verbose_name=_("Field 0"), null=True, blank=True)
     field_str_11 = models.CharField(max_length=255, verbose_name=_("Field 1"), null=True, blank=True)
@@ -156,23 +126,11 @@ class NoGeom_100fields(BaseModelWithTenFields):
     field_str_98 = models.CharField(max_length=255, verbose_name=_("Field 8"), null=True, blank=True)
     field_str_99 = models.CharField(max_length=255, verbose_name=_("Field 9"), null=True, blank=True)
 
-@register_oapif_viewset(
-    title="line_2056",
-    description="yo",
-    properties_fields=[
-        "field_bool",
-        "field_int",
-        *[f"field_str_{i}" for i in range(10)],
-    ],
-)
+
 class Line_2056_10fields(BaseModelWithTenFields):
     geom = models.LineStringField(srid=2056, verbose_name=_("Geometry"))
 
-@register_oapif_viewset(
-    title="polygon_2056",
-    description="yo",
-    properties_fields=["name"],
-)
+
 class Polygon_2056(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255, verbose_name=_("Name"), null=True, blank=True)
