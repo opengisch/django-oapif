@@ -4,7 +4,7 @@ import uuid
 from django.contrib.gis.db import models
 from django.utils.translation import gettext as _
 
-from django_oapif.ogc import register_oapif_viewset
+from django_oapif.api import register_oapif_viewset
 
 logger = logging.getLogger(__name__)
 

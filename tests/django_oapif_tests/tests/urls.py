@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import include, path
 from ninja import NinjaAPI
 
-from django_oapif.ogc import register_all_ogc_routes
+from django_oapif.api import register_all_ogc_routes
 
 ninja_api = NinjaAPI()
 
