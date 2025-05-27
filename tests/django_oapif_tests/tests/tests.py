@@ -42,16 +42,16 @@ class TestBasicAuth(APITestCase):
         data_with_crs = data
         data_with_crs["geometry"]["crs"] = {"type": "name", "properties": {"name": "urn:ogc:def:crs:EPSG::2056"}}
 
-        for layer in ("tests.point_2056_10fields_local_geom", "tests.point_2056_10fields"):
+        for layer in ("tests.point_2056_10fields"):
             for _data in (data, data_with_crs):
                 url = f"{collections_url}/{layer}/items"
                 post_to_items = self.client.post(url, _data, format="json")
-                self.assertIn(post_to_items.status_code, (200, 201), (url, data, post_to_items.data))
+                self.assertIn(post_to_items.status_code, (200, 201), (url, data, post_to_items))
 
     def test_anonymous_items_options(self):
         # Anonymous user
         expected = {"GET", "OPTIONS", "HEAD"}
-        for layer in ("tests.point_2056_10fields_local_geom", "tests.point_2056_10fields"):
+        for layer in ("tests.point_2056_10fields"):
             url = f"{collections_url}/{layer}/items"
             response = self.client.options(url)
 
@@ -65,7 +65,7 @@ class TestBasicAuth(APITestCase):
         # Authenticated user with editing permissions
         expected = {"POST", "GET", "OPTIONS", "HEAD"}
         self.client.force_authenticate(user=self.demo_editor)
-        for layer in ("tests.point_2056_10fields_local_geom", "tests.point_2056_10fields"):
+        for layer in ("tests.point_2056_10fields"):
             url = f"{collections_url}/{layer}/items"
             response = self.client.options(url)
 
@@ -82,10 +82,10 @@ class TestBasicAuth(APITestCase):
             "properties": {"field_str_0": "test123456"},
         }
 
-        for layer in ("tests.point_2056_10fields_local_geom",):
+        for layer in ("tests.point_2056_10fields",):
             url = f"{collections_url}/{layer}/items"
             post_to_items = self.client.post(url, data, format="json")
-            self.assertIn(post_to_items.status_code, (200, 201), (url, data, post_to_items.data))
+            self.assertIn(post_to_items.status_code, (200, 201), (url, data, post_to_items))
 
     def test_post_geometry_less_layer(self):
         self.client.force_authenticate(user=self.demo_editor)
@@ -97,7 +97,7 @@ class TestBasicAuth(APITestCase):
         for layer in ("tests.nogeom_10fields",):
             url = f"{collections_url}/{layer}/items"
             post_to_items = self.client.post(url, data, format="json")
-            self.assertIn(post_to_items.status_code, (200, 201), (url, data, post_to_items.data))
+            self.assertIn(post_to_items.status_code, (200, 201), (url, data, post_to_items))
 
     def test_returned_id(self):
         self.client.force_authenticate(user=self.demo_editor)
@@ -113,7 +113,7 @@ class TestBasicAuth(APITestCase):
         for layer in ("tests.point_2056_10fields",):
             url = f"{collections_url}/{layer}/items"
             post_to_items = self.client.post(url, data, format="json")
-            self.assertIn(post_to_items.status_code, (200, 201), (url, data, post_to_items.data))
+            self.assertIn(post_to_items.status_code, (200, 201), (url, data, post_to_items))
             location = post_to_items.headers["Location"]
             print(location)
             self.assertTrue(re.match(r"^.*[0-9a-f\-]{36}$", location))
@@ -131,7 +131,7 @@ class TestBasicAuth(APITestCase):
 
         url = f"{collections_url}/tests.point_2056_10fields/items"
         post_to_items = self.client.post(url, data, format="json")
-        self.assertIn(post_to_items.status_code, (200, 201), (url, data, post_to_items.data))
+        self.assertIn(post_to_items.status_code, (200, 201), (url, data, post_to_items))
         location = post_to_items.headers["Location"]
         fid = re.match(r"^.*([0-9a-f\-]{36})$", location).group(1)
         delete_from_items = self.client.delete(f"{url}/{fid}")

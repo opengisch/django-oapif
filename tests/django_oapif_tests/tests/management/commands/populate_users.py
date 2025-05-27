@@ -16,13 +16,10 @@ class Command(BaseCommand):
 
         for model in (
             "point_2056_10fields",
-            "point_2056_10fields_local_geom",
             "nogeom_10fields",
             "nogeom_100fields",
             "line_2056_10fields",
-            "line_2056_10fields_local_geom",
             "polygon_2056",
-            "polygon_2056_local_geom",
             "secretlayer",
         ):
             adding.append(Permission.objects.get(codename=f"add_{model}"))
@@ -56,5 +53,5 @@ class Command(BaseCommand):
         viewer_wo_secret.groups.add(viewers_wo_secret)
 
         print(
-            f"👥 added users 'demo_editor' & 'demo_viewer' to group 'editors' and 'viewers' respectively. Permissions set accordingly."
+            "👥 added users 'demo_editor' & 'demo_viewer' to group 'editors' and 'viewers' respectively. Permissions set accordingly."
         )

@@ -37,28 +37,6 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.CreateModel(
-            name='Line_2056_10fields_local_geom',
-            fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('field_bool', models.BooleanField(default=True)),
-                ('field_int', models.IntegerField(blank=True, null=True)),
-                ('field_str_0', models.CharField(blank=True, max_length=255, null=True, verbose_name='Field 0')),
-                ('field_str_1', models.CharField(blank=True, max_length=255, null=True, verbose_name='Field 1')),
-                ('field_str_2', models.CharField(blank=True, max_length=255, null=True, verbose_name='Field 2')),
-                ('field_str_3', models.CharField(blank=True, max_length=255, null=True, verbose_name='Field 3')),
-                ('field_str_4', models.CharField(blank=True, max_length=255, null=True, verbose_name='Field 4')),
-                ('field_str_5', models.CharField(blank=True, max_length=255, null=True, verbose_name='Field 5')),
-                ('field_str_6', models.CharField(blank=True, max_length=255, null=True, verbose_name='Field 6')),
-                ('field_str_7', models.CharField(blank=True, max_length=255, null=True, verbose_name='Field 7')),
-                ('field_str_8', models.CharField(blank=True, max_length=255, null=True, verbose_name='Field 8')),
-                ('field_str_9', models.CharField(blank=True, max_length=255, null=True, verbose_name='Field 9')),
-                ('geom', django.contrib.gis.db.models.fields.LineStringField(srid=2056, verbose_name='Geometry')),
-            ],
-            options={
-                'abstract': False,
-            },
-        ),
-        migrations.CreateModel(
             name='NoGeom_100fields',
             fields=[
                 ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
@@ -213,37 +191,7 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.CreateModel(
-            name='Point_2056_10fields_local_geom',
-            fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('field_bool', models.BooleanField(default=True)),
-                ('field_int', models.IntegerField(blank=True, null=True)),
-                ('field_str_0', models.CharField(blank=True, max_length=255, null=True, verbose_name='Field 0')),
-                ('field_str_1', models.CharField(blank=True, max_length=255, null=True, verbose_name='Field 1')),
-                ('field_str_2', models.CharField(blank=True, max_length=255, null=True, verbose_name='Field 2')),
-                ('field_str_3', models.CharField(blank=True, max_length=255, null=True, verbose_name='Field 3')),
-                ('field_str_4', models.CharField(blank=True, max_length=255, null=True, verbose_name='Field 4')),
-                ('field_str_5', models.CharField(blank=True, max_length=255, null=True, verbose_name='Field 5')),
-                ('field_str_6', models.CharField(blank=True, max_length=255, null=True, verbose_name='Field 6')),
-                ('field_str_7', models.CharField(blank=True, max_length=255, null=True, verbose_name='Field 7')),
-                ('field_str_8', models.CharField(blank=True, max_length=255, null=True, verbose_name='Field 8')),
-                ('field_str_9', models.CharField(blank=True, max_length=255, null=True, verbose_name='Field 9')),
-                ('geom', django.contrib.gis.db.models.fields.PointField(srid=2056, verbose_name='Geometry')),
-            ],
-            options={
-                'abstract': False,
-            },
-        ),
-        migrations.CreateModel(
             name='Polygon_2056',
-            fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('name', models.CharField(blank=True, max_length=255, null=True, verbose_name='Name')),
-                ('geom', django.contrib.gis.db.models.fields.MultiPolygonField(srid=2056, verbose_name='Geometry')),
-            ],
-        ),
-        migrations.CreateModel(
-            name='Polygon_2056_local_geom',
             fields=[
                 ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
                 ('name', models.CharField(blank=True, max_length=255, null=True, verbose_name='Name')),
