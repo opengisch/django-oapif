@@ -4,4 +4,4 @@
 
 services:
   postgres:
-    image: imresamu/postgis-arm64:15-3.4-alpine
+    platform: linux/amd64
