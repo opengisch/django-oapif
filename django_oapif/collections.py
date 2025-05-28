@@ -9,24 +9,18 @@ from django.db import models
 from django.db.models.functions import Cast
 from django.http import Http404, HttpRequest
 from django.shortcuts import get_object_or_404
-from geojson_pydantic import Feature, FeatureCollection
+from geojson_pydantic import Feature
 from ninja import Query, Router
 
-from django_oapif.crs import get_srid_from_uri
+from django_oapif.crs import CRS84_URI, get_srid_from_uri
 from django_oapif.schema import (
     OAPIFCollection,
     OAPIFCollections,
     OAPIFExtent,
     OAPIFLink,
+    OAPIFPagedFeatureCollection,
     OAPIFSpatialExtent,
 )
-
-CRS84_URI = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
-
-class PagedFeatureCollection(FeatureCollection):
-    links: list[OAPIFLink]
-    numberReturned: int
-    numberMatched: int
 
 
 class OAPIFCollectionEntry(NamedTuple):
@@ -36,7 +30,6 @@ class OAPIFCollectionEntry(NamedTuple):
     description: str
     geometry_field: str = "geom"
     properties_fields: list[str] = []
-
 
 
 def replace_query_param(request, **kwargs):
@@ -84,18 +77,19 @@ def get_page_links(request: HttpRequest, limit: int, offset: int, total_count: i
 
 
 def get_collection_response(request: HttpRequest, collection: OAPIFCollectionEntry):
+    uri_prefix = "collections/" if request.get_full_path().endswith("collections") else ""
     response = OAPIFCollection(
         id = collection.id,
         title = collection.title,
         description = collection.description,
         links = [
             OAPIFLink(
-                href = request.build_absolute_uri(f"collections/{collection.id}"),
+                href = request.build_absolute_uri(f"{uri_prefix}{collection.id}"),
                 rel = "self",
                 type = "application/json",
             ),
             OAPIFLink(
-                href = request.build_absolute_uri(f"collections/{collection.id}/items"),
+                href = request.build_absolute_uri(f"{uri_prefix}{collection.id}/items"),
                 rel = "items",
                 type = "application/geo+json",
             )
@@ -103,14 +97,12 @@ def get_collection_response(request: HttpRequest, collection: OAPIFCollectionEnt
     )
     
     if (geom := collection.geometry_field):
-        extent = collection.model_class.objects.aggregate(extent=Extent(geom))["extent"]
-        response.extent = OAPIFExtent(spatial=OAPIFSpatialExtent(bbox=extent))
         srid = collection.model_class._meta.get_field(geom).srid
-        response.storageCrs = f"http://www.opengis.net/def/crs/EPSG/0/{srid}"
-        response.crs = [
-            "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
-            f"http://www.opengis.net/def/crs/EPSG/0/{srid}",
-        ]
+        crs_uri = f"http://www.opengis.net/def/crs/EPSG/0/{srid}"
+        extent = collection.model_class.objects.aggregate(extent=Extent(geom))["extent"]
+        response.extent = OAPIFExtent(spatial=OAPIFSpatialExtent(bbox=extent, crs=crs_uri))
+        response.storageCrs = crs_uri
+        response.crs = [CRS84_URI, crs_uri]
     
     return response
 
@@ -186,7 +178,7 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
         total_count = qs.count()
         result_count = len(paginated_qs)
 
-        return PagedFeatureCollection(
+        return OAPIFPagedFeatureCollection(
             type="FeatureCollection",
             features=[
                 Feature(
