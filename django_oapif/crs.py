@@ -2,6 +2,9 @@ import re
 
 # taken from https://github.com/geopython/pygeoapi/blob/953b6fa74d2ce292d8f566c4f4d3bcb4161d6e95/pygeoapi/util.py#L90
 
+CRS84_SRID = 4979
+CRS84_URI = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+
 CRS_AUTHORITY = ["EPSG", "OGC"]
 CRS_URI_PATTERN = re.compile(
     rf"^http://www.opengis\.net/def/crs/" rf"(?P<auth>{'|'.join(CRS_AUTHORITY)})/" rf"[\d|\.]+?/(?P<code>\w+?)$"
@@ -12,7 +15,7 @@ def get_srid_from_uri(uri: str) -> int:
     if (result := CRS_URI_PATTERN.match(uri)):
         auth, code = result.groups()
         if auth == "OGC" and code in ("CRS84", "CRS84h"):
-            return 4979
+            return CRS84_SRID
         elif auth == "EPSG" and code.isnumeric():
             return int(code)
         else:

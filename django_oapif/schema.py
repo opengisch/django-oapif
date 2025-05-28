@@ -1,6 +1,7 @@
 
 from typing import Optional
 
+from geojson_pydantic import FeatureCollection
 from ninja import Schema
 
 
@@ -27,6 +28,7 @@ class OAPIFRoot(OAPIFBaseSchema):
 
 class OAPIFSpatialExtent(OAPIFBaseSchema):
     bbox: tuple[float, float, float, float]
+    crs: str
 
 
 class OAPIFExtent(OAPIFBaseSchema):
@@ -47,3 +49,9 @@ class OAPIFCollections(OAPIFBaseSchema):
 
 class OAPIFConformance(OAPIFBaseSchema):
     conformsTo: list[str]
+
+class OAPIFPagedFeatureCollection(FeatureCollection):
+    links: list[OAPIFLink]
+    numberReturned: int
+    numberMatched: int
+
