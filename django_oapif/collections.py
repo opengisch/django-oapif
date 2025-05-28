@@ -152,6 +152,7 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
         bbox: str = Query(None, description="BBOX in the format: minx,miny,maxx,maxy"),
     ):
         collection = collections.get(collection_id)
+
         if collection is None:
             raise Http404(f'Collection "{collection_id}" not found.')
         
@@ -160,13 +161,16 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
         
 
         if (geom := collection.geometry_field):
-            qs = qs.annotate(geometry=Cast(AsGeoJSON(Transform(geom, output_srid)), models.JSONField()))
+            collection_srid = collection.model_class._meta.get_field(geom).srid
+            if output_srid != collection_srid:
+                qs = qs.annotate(geometry=Cast(AsGeoJSON(Transform(geom, output_srid)), models.JSONField()))
+            else:
+                qs = qs.annotate(geometry=Cast(AsGeoJSON(geom), models.JSONField()))
             if bbox:
                 try:
                     minx, miny, maxx, maxy = map(float, bbox.split(","))
                     bbox_geom: Polygon = Polygon.from_bbox((minx, miny, maxx, maxy))
                     bbox_geom.srid = get_srid_from_uri(bbox_crs)
-                    collection_srid = collection.model_class._meta.get_field(geom).srid
                     if bbox_geom.srid == collection_srid:
                         qs = qs.filter(**{f"{geom}__intersects": bbox_geom})
                     else:
@@ -187,7 +191,7 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
             features=[
                 Feature(
                     type="Feature",
-                    id=str(obj.id),
+                    id=str(obj.pk),
                     geometry=None if not collection.geometry_field else obj.geometry,
                     properties={field: getattr(obj, field) for field in collection.properties_fields}
                 )
@@ -210,12 +214,16 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
             raise Http404(f'Collection "{collection_id}" not found.')
         qs = collection.model_class.objects.only(collection.properties_fields)
         output_srid = get_srid_from_uri(crs)
-        if collection.geometry_field:
-            qs = qs.annotate(geometry=Cast(AsGeoJSON(Transform(collection.geometry_field, output_srid)), models.JSONField()))
+        if (geom := collection.geometry_field):
+            collection_srid = collection.model_class._meta.get_field(geom).srid
+            if output_srid != collection_srid:
+                qs = qs.annotate(geometry=Cast(AsGeoJSON(Transform(geom, output_srid)), models.JSONField()))
+            else:
+                qs = qs.annotate(geometry=Cast(AsGeoJSON(geom), models.JSONField()))
         obj = get_object_or_404(qs, pk=item_id)
         return Feature(
             type="Feature",
-            id=str(obj.id),
+            id=str(obj.pk),
             geometry=None if not collection.geometry_field else obj.geometry,
             properties={field: getattr(obj, field) for field in collection.properties_fields}
         )
