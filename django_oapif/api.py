@@ -19,7 +19,6 @@ class OAPIF:
 
     def register(
             self,
-            model_class: models.Model,
             /,
             id: str | None = None,
             title: str | None = None,
@@ -27,15 +26,20 @@ class OAPIF:
             geometry_field: str = "geom",
             properties_fields: list[str] = [],
     ):
-        collection_id = id or model_class._meta.label_lower
-        self.collections[collection_id] = OAPIFCollectionEntry(
-            model_class=model_class,
-            id=collection_id,
-            title=title,
-            description=description,
-            geometry_field=geometry_field,
-            properties_fields=properties_fields,
-        )
+        def decorator(model_class: models.Model):
+            collection_id = id or model_class._meta.label_lower
+            self.collections[collection_id] = OAPIFCollectionEntry(
+                model_class=model_class,
+                id=collection_id,
+                title=title,
+                description=description,
+                geometry_field=geometry_field,
+                properties_fields=properties_fields,
+            )
+            
+            return model_class
+        
+        return decorator
 
     @property
     def urls(self):
