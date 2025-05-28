@@ -62,15 +62,6 @@ def get_page_links(request: HttpRequest, limit: int, offset: int, total_count: i
             href=request.build_absolute_uri()
         )
     ]
-    if offset + limit < total_count:
-        links.append(
-            OAPIFLink(
-                rel="next",
-                title="items (next)",
-                type="application/geo+json",
-                href=replace_query_param(request, offset=offset + limit)
-            )
-        )
     if offset > 0:
         links.append(
             OAPIFLink(
@@ -78,6 +69,15 @@ def get_page_links(request: HttpRequest, limit: int, offset: int, total_count: i
                 title="items (prev)",
                 type="application/geo+json",
                 href=replace_query_param(request, offset= None if offset - limit <= 0 else offset - limit)
+            )
+        )
+    if offset + limit < total_count:
+        links.append(
+            OAPIFLink(
+                rel="next",
+                title="items (next)",
+                type="application/geo+json",
+                href=replace_query_param(request, offset=offset + limit)
             )
         )
     return links
