@@ -180,6 +180,13 @@ class Polygon_2056(models.Model):
     name = models.CharField(max_length=255, verbose_name=_("Name"), null=True, blank=True)
     geom = models.MultiPolygonField(srid=2056, verbose_name=_("Geometry"))
 
-# @register_oapif_viewset(crs=2056, custom_viewset_attrs={"permission_classes": (permissions.DjangoModelPermissions,)})
-# class SecretLayer(BaseModelWithTenFields):
-#     geom = models.PointField(srid=2056, verbose_name=_("Geometry"))
+@ogc_api.register(
+    title="secret",
+    properties_fields=[
+        "field_bool",
+        "field_int",
+        *[f"field_str_{i}" for i in range(10)],
+    ],
+)
+class SecretLayer(BaseModelWithTenFields):
+    geom = models.PointField(srid=2056, verbose_name=_("Geometry"))

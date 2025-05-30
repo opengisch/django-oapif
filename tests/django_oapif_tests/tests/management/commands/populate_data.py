@@ -11,6 +11,7 @@ from django_oapif_tests.tests.models import (
     NoGeom_10fields,
     NoGeom_100fields,
     Point_2056_10fields,
+    SecretLayer,
 )
 
 
@@ -31,7 +32,7 @@ class Command(BaseCommand):
         magnitude = math.ceil(math.sqrt(size))
 
         points = []
-        # secret_points = []
+        secret_points = []
         lines = []
         no_geoms = []
         no_geoms_100fields = []
@@ -66,6 +67,8 @@ class Command(BaseCommand):
                 fields["geom"] = geom_pt_wkt
                 point = Point_2056_10fields(**fields)
                 points.append(point)
+                secret_point = SecretLayer(**fields)
+                secret_points.append(secret_point)
 
                 fields["geom"] = geom_line_wkt
                 line = Line_2056_10fields(**fields)
@@ -73,6 +76,7 @@ class Command(BaseCommand):
 
         # Create objects in batches
         Point_2056_10fields.objects.bulk_create(points, batch_size=10000)
+        SecretLayer.objects.bulk_create(secret_points, batch_size=10000)
         NoGeom_10fields.objects.bulk_create(no_geoms, batch_size=10000)
         NoGeom_100fields.objects.bulk_create(no_geoms_100fields, batch_size=10000)
         Line_2056_10fields.objects.bulk_create(lines, batch_size=10000)

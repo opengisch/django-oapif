@@ -1,4 +1,4 @@
-from typing import Dict, NamedTuple
+from typing import Dict, Literal, NamedTuple
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 # ninja_ogc/routers.py
@@ -11,6 +11,7 @@ from django.http import Http404, HttpRequest
 from django.shortcuts import get_object_or_404
 from geojson_pydantic import Feature
 from ninja import Query, Router
+from ninja.errors import AuthorizationError
 
 from django_oapif.crs import CRS84_URI, get_srid_from_uri
 from django_oapif.schema import (
@@ -28,8 +29,8 @@ class OAPIFCollectionEntry(NamedTuple):
     id: str
     title: str
     description: str
-    geometry_field: str = "geom"
-    properties_fields: list[str] = []
+    geometry_field: str
+    properties_fields: list[str]
 
 
 def replace_query_param(request, **kwargs):
@@ -106,8 +107,22 @@ def get_collection_response(request: HttpRequest, collection: OAPIFCollectionEnt
     
     return response
 
+
+def perm(permission: Literal["view", "add", "delete", "edit"], collection: OAPIFCollectionEntry):
+    return f"{collection.model_class._meta.app_label}.{permission}_{collection.model_class._meta.model_name}"
+
+
 def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
     router = Router()
+
+    def get_collection_authenticated(request: HttpRequest, collection_id: str):
+        collection = collections.get(collection_id)
+        if collection is None:
+            raise Http404(f'Collection "{collection_id}" not found.')
+        if not request.user.has_perm(perm("view", collection)):
+            raise AuthorizationError()
+        return collection
+
 
     @router.get("")
     def list_collections(request: HttpRequest):
@@ -123,14 +138,13 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
             collections=[
                 get_collection_response(request, collection)
                 for collection in collections.values()
+                if request.user.has_perm(perm("view", collection))
             ]
         )
 
     @router.get("/{collection_id}")
     def get_collection(request, collection_id: str):
-        collection = collections.get(collection_id)
-        if collection is None:
-            raise Http404(f'Collection "{collection_id}" not found.')
+        collection = get_collection_authenticated(request, collection_id)
         return get_collection_response(request, collection)
     
     @router.get("/{collection_id}/items")
@@ -139,14 +153,11 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
         collection_id: str,
         limit: int = 1000,
         offset: int = 0,
-        crs: str | None = CRS84_URI,
+        crs: str = CRS84_URI,
         bbox_crs: str = Query(CRS84_URI, alias="bbox-crs"),
         bbox: str = Query(None, description="BBOX in the format: minx,miny,maxx,maxy"),
     ):
-        collection = collections.get(collection_id)
-
-        if collection is None:
-            raise Http404(f'Collection "{collection_id}" not found.')
+        collection = get_collection_authenticated(request, collection_id)
         
         qs = collection.model_class.objects.only("id", *collection.properties_fields)
         output_srid = get_srid_from_uri(crs)
@@ -172,7 +183,6 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
                         request, {"error": "Invalid bbox parameter. Expected format: minx,miny,maxx,maxy"}, status=400
                     )
 
-
         paginated_qs = qs[offset: offset + limit]
 
         total_count = qs.count()
@@ -194,16 +204,15 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
             links=get_page_links(request, limit, offset, total_count, result_count)
         )
 
-    @router.get("/{collection_id}/items/{item_id}/")
+    @router.get("/{collection_id}/items/{item_id}")
     def get_item(
         request: HttpRequest,
         collection_id: str,
         item_id: str,
         crs: str = CRS84_URI,
     ):
-        collection = collections.get(collection_id)
-        if collection is None:
-            raise Http404(f'Collection "{collection_id}" not found.')
+        collection = get_collection_authenticated(request, collection_id)
+    
         qs = collection.model_class.objects.only(collection.properties_fields)
         output_srid = get_srid_from_uri(crs)
         if (geom := collection.geometry_field):
