@@ -13,9 +13,9 @@ class OAPIF:
     def __init__(self):
         self.api = NinjaAPI()
         self.collections: Dict[str, OAPIFCollectionEntry] = {}
-        self.api.add_router("", create_root_router())
-        self.api.add_router("conformance", create_conformance_router())
-        self.api.add_router("collections", create_collections_router(self.collections))
+        self.api.add_router("/", create_root_router())
+        self.api.add_router("/conformance", create_conformance_router())
+        self.api.add_router("/collections", create_collections_router(self.collections))
 
     def register(
             self,
