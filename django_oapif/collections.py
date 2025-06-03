@@ -1,4 +1,4 @@
-import json
+from functools import cached_property
 from typing import Dict, Literal, NamedTuple
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
@@ -11,7 +11,7 @@ from django.db.models.functions import Cast
 from django.http import Http404, HttpRequest
 from django.shortcuts import get_object_or_404
 from geojson_pydantic import Feature
-from ninja import Query, Router
+from ninja import Header, Query, Router
 from ninja.errors import HttpError
 
 from django_oapif.crs import CRS84_URI, get_srid_from_uri
@@ -32,6 +32,12 @@ class OAPIFCollectionEntry(NamedTuple):
     description: str
     geometry_field: str | None
     properties_fields: list[str]
+
+    @cached_property
+    def srid(self):
+        if not self.geometry_field:
+            return None
+        return self.model_class._meta.get_field(self.geometry_field).srid
 
 
 def replace_query_param(request, **kwargs):
@@ -99,8 +105,7 @@ def get_collection_response(request: HttpRequest, collection: OAPIFCollectionEnt
     )
     
     if (geom := collection.geometry_field):
-        srid = collection.model_class._meta.get_field(geom).srid
-        crs_uri = f"http://www.opengis.net/def/crs/EPSG/0/{srid}"
+        crs_uri = f"http://www.opengis.net/def/crs/EPSG/0/{collection.srid}"
         extent = collection.model_class.objects.aggregate(extent=Extent(geom))["extent"]
         response.extent = OAPIFExtent(spatial=OAPIFSpatialExtent(bbox=extent, crs=crs_uri))
         response.storageCrs = crs_uri
@@ -109,13 +114,10 @@ def get_collection_response(request: HttpRequest, collection: OAPIFCollectionEnt
     return response
 
 def to_feature(collection: OAPIFCollectionEntry, obj):
-    geometry = None if not (geom := collection.geometry_field) else getattr(obj, geom)
-    if isinstance(geometry, GEOSGeometry):
-        geometry = json.loads(geometry.json)
     return Feature(
         type="Feature",
         id=str(obj.pk),
-        geometry=geometry,
+        geometry=getattr(obj, "_oapif_geometry", None),
         properties={field: getattr(obj, field) for field in collection.properties_fields}
     )
 
@@ -126,8 +128,33 @@ def operation_for_method(http_method: str):
         case "PUT" | "PATCH": return "change"
         case "POST": return "add"
 
+
 def perm(permission: Literal["view", "add", "delete", "edit"], collection: OAPIFCollectionEntry):
     return f"{collection.model_class._meta.app_label}.{permission}_{collection.model_class._meta.model_name}"
+
+
+def query_collection(collection: OAPIFCollectionEntry, crs: str, bbox: str | None = None, bbox_crs: str | None = None):
+    output_srid = get_srid_from_uri(crs)
+    qs = collection.model_class.objects.only("id", *collection.properties_fields)
+    if (geom_field := collection.geometry_field):
+        if output_srid != collection.srid:
+            qs = qs.annotate(_oapif_geometry=Cast(AsGeoJSON(Transform(geom_field, output_srid)), models.JSONField()))
+        else:
+            qs = qs.annotate(_oapif_geometry=Cast(AsGeoJSON(geom_field), models.JSONField()))
+        if bbox:
+            try:
+                minx, miny, maxx, maxy = map(float, bbox.split(","))
+                bbox_geom: Polygon = Polygon.from_bbox((minx, miny, maxx, maxy))
+                bbox_geom.srid = get_srid_from_uri(bbox_crs)
+                if bbox_geom.srid == collection.srid:
+                    qs = qs.filter(**{f"{geom_field}__intersects": bbox_geom})
+                else:
+                    qs = qs.filter(**{f"{geom_field}__intersects": Transform(bbox_geom, collection.srid)})
+            except ValueError:
+                return HttpError(
+                    400, "Invalid bbox parameter. Expected format: minx,miny,maxx,maxy"
+                )
+    return qs
 
 
 def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
@@ -142,30 +169,6 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
             raise AuthorizationError()
         return collection
 
-
-    def query_collection(collection: OAPIFCollectionEntry, crs: str, bbox: str | None = None, bbox_crs: str | None = None):
-        output_srid = get_srid_from_uri(crs)
-        qs = collection.model_class.objects.only("id", *collection.properties_fields)
-        if (geom := collection.geometry_field):
-            collection_srid = collection.model_class._meta.get_field(geom).srid
-            if output_srid != collection_srid:
-                qs = qs.annotate(geometry=Cast(AsGeoJSON(Transform(geom, output_srid)), models.JSONField()))
-            else:
-                qs = qs.annotate(geometry=Cast(AsGeoJSON(geom), models.JSONField()))
-            if bbox:
-                try:
-                    minx, miny, maxx, maxy = map(float, bbox.split(","))
-                    bbox_geom: Polygon = Polygon.from_bbox((minx, miny, maxx, maxy))
-                    bbox_geom.srid = get_srid_from_uri(bbox_crs)
-                    if bbox_geom.srid == collection_srid:
-                        qs = qs.filter(**{f"{geom}__intersects": bbox_geom})
-                    else:
-                        qs = qs.filter(**{f"{geom}__intersects": Transform(bbox_geom, collection_srid)})
-                except ValueError:
-                    return HttpError(
-                        400, "Invalid bbox parameter. Expected format: minx,miny,maxx,maxy"
-                    )
-        return qs
 
     @router.get("")
     def list_collections(request: HttpRequest):
@@ -235,14 +238,18 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
     def create_item(
         request: HttpRequest,
         collection_id: str,
-        feature: Feature
+        feature: Feature,
+        crs: str | None = Header(alias="Content-Crs", default=CRS84_URI),
     ):
         collection = get_collection_authenticated(request, collection_id)
-        properties = feature.properties or {}
-        if (geom := collection.geometry_field) and feature.geometry:
-            properties[geom] = GEOSGeometry(feature.geometry)
-        item = collection.model_class.objects.create(**properties)
+        input = feature.properties or {}
+        if (geom_field := collection.geometry_field) and feature.geometry:
+            geometry = GEOSGeometry(feature.geometry.model_dump_json())
+            geometry.srid = get_srid_from_uri(crs)
+            input[geom_field] = geometry
+        item = collection.model_class.objects.create(**input)
         item.save()
+        item = query_collection(collection, CRS84_URI).get(pk=item.pk)
         return to_feature(collection, item)
     
     @router.patch("/{collection_id}/items/{item_id}")
@@ -250,13 +257,19 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
         request: HttpRequest,
         collection_id: str,
         item_id: str,
-        feature: Feature
+        feature: Feature,
+        crs: str | None = Header(alias="Content-Crs", default=CRS84_URI),
     ):
         collection = get_collection_authenticated(request, collection_id)
         item = get_object_or_404(collection.model_class, pk=item_id)
         for property, value in (feature.properties or {}).items():
             setattr(item, property, value)
+        if (geom_field := collection.geometry_field) and feature.geometry:
+            geometry = GEOSGeometry(feature.geometry.model_dump_json())
+            geometry.srid = get_srid_from_uri(crs)
+            setattr(item, geom_field, geometry)
         item.save()
+        item = query_collection(collection, CRS84_URI).get(pk=item_id)
         return to_feature(collection, item)
     
     @router.put("/{collection_id}/items/{item_id}")
@@ -264,14 +277,20 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
         request: HttpRequest,
         collection_id: str,
         item_id: str,
-        feature: Feature
+        feature: Feature,
+        crs: str | None = Header(alias="Content-Crs", default=CRS84_URI),
     ):
         collection = get_collection_authenticated(request, collection_id)
         item = get_object_or_404(collection.model_class, pk=item_id)
-        properties = feature.properties or {}
+        input = feature.properties or {}
         for field in collection.properties_fields:
-            setattr(item, field, properties.get(field))
+            setattr(item, field, input.get(field))
+        if (geom_field := collection.geometry_field) and feature.geometry:
+            geometry = GEOSGeometry(feature.geometry.model_dump_json())
+            geometry.srid = get_srid_from_uri(crs)
+            input[geom_field] = geometry
         item.save()
+        item = query_collection(collection, CRS84_URI).get(pk=item_id)
         return to_feature(collection, item)
     
     @router.delete("/{collection_id}/items/{item_id}")
