@@ -13,9 +13,11 @@ def create_conformance_router():
             conformsTo=[
                 "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/core",
                 "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/geojson",
+                "http://www.opengis.net/spec/ogcapi-features-1/1.0/req/oas31",
                 "http://www.opengis.net/spec/ogcapi-features-2/1.0/conf/crs",
-                "http://www.opengis.net/spec/ogcapi-features-1/1.0/req/oas30",
-                "http://www.opengis.net/spec/ogcapi-features-4/1.0/req/create-replace-delete"
+                "http://www.opengis.net/spec/ogcapi-features-4/1.0/req/create-replace-delete",
+                "http://www.opengis.net/spec/ogcapi-features-4/1.0/conf/update",
+                "http://www.opengis.net/spec/ogcapi-features-4/1.0/conf/features",
             ]
         )
 
