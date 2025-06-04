@@ -42,6 +42,7 @@ class OAPIFCollection(OAPIFBaseSchema):
     crs: Optional[list[str]] = None
     storageCrs: Optional[str] = None
     extent: Optional[OAPIFExtent] = None
+    itemType: str
 
 class OAPIFCollections(OAPIFBaseSchema):
     links: list[OAPIFLink]

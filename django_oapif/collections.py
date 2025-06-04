@@ -90,6 +90,7 @@ def get_collection_response(request: HttpRequest, collection: OAPIFCollectionEnt
         id = collection.id,
         title = collection.title,
         description = collection.description,
+        itemType="feature",
         links = [
             OAPIFLink(
                 href = request.build_absolute_uri(f"{uri_prefix}{collection.id}"),
