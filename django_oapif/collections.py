@@ -1,4 +1,4 @@
-from functools import cached_property
+import math
 from typing import Dict, Literal, NamedTuple
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
@@ -33,7 +33,7 @@ class OAPIFCollectionEntry(NamedTuple):
     geometry_field: str | None
     properties_fields: list[str]
 
-    @cached_property
+    @property
     def srid(self):
         if not self.geometry_field:
             return None
@@ -137,21 +137,17 @@ def query_collection(collection: OAPIFCollectionEntry, crs: str, bbox: str | Non
     output_srid = get_srid_from_uri(crs)
     qs = collection.model_class.objects.only("id", *collection.properties_fields)
     if (geom_field := collection.geometry_field):
-        if output_srid != collection.srid:
-            qs = qs.annotate(_oapif_geometry=Cast(AsGeoJSON(Transform(geom_field, output_srid)), models.JSONField()))
-        else:
-            qs = qs.annotate(_oapif_geometry=Cast(AsGeoJSON(geom_field), models.JSONField()))
+        geometry_query = geom_field if output_srid == collection.srid else Transform(geom_field, output_srid)
+        qs = qs.annotate(_oapif_geometry=Cast(AsGeoJSON(geometry_query, bbox=True), models.JSONField()))
         if bbox:
             try:
                 minx, miny, maxx, maxy = map(float, bbox.split(","))
                 bbox_geom: Polygon = Polygon.from_bbox((minx, miny, maxx, maxy))
                 bbox_geom.srid = get_srid_from_uri(bbox_crs)
-                if bbox_geom.srid == collection.srid:
-                    qs = qs.filter(**{f"{geom_field}__intersects": bbox_geom})
-                else:
-                    qs = qs.filter(**{f"{geom_field}__intersects": Transform(bbox_geom, collection.srid)})
+                bbox_expr = bbox_geom if bbox_geom.srid == collection.srid else Transform(bbox_geom, collection.srid)
+                qs = qs.filter(**{f"{geom_field}__intersects": bbox_expr})
             except ValueError:
-                return HttpError(
+                raise HttpError(
                     400, "Invalid bbox parameter. Expected format: minx,miny,maxx,maxy"
                 )
     return qs
@@ -210,12 +206,22 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
         total_count = query.count()
         result_count = len(paginated_query)
 
+        bbox = [math.inf, math.inf, -math.inf, -math.inf]
+        features=[]
+        for obj in paginated_query:
+            feature = to_feature(collection, obj)
+            features.append(feature)
+            bbox = [
+                min(bbox[0], feature.geometry.bbox[0]),
+                min(bbox[1], feature.geometry.bbox[1]),
+                max(bbox[2], feature.geometry.bbox[2]),
+                max(bbox[3], feature.geometry.bbox[3])
+            ]
+
         return OAPIFPagedFeatureCollection(
             type="FeatureCollection",
-            features=[
-                to_feature(collection, obj)
-                for obj in paginated_query
-            ],
+            features=features,
+            bbox=bbox,
             numberMatched=total_count,
             numberReturned=result_count,
             links=get_page_links(request, limit, offset, total_count, result_count)
