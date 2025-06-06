@@ -1,7 +1,6 @@
 
 from typing import Optional
 
-from geojson_pydantic import FeatureCollection
 from ninja import Schema
 
 
@@ -50,9 +49,3 @@ class OAPIFCollections(OAPIFBaseSchema):
 
 class OAPIFConformance(OAPIFBaseSchema):
     conformsTo: list[str]
-
-class OAPIFPagedFeatureCollection(FeatureCollection):
-    links: list[OAPIFLink]
-    numberReturned: int
-    numberMatched: int
-
