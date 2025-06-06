@@ -1,5 +1,6 @@
 from ninja.errors import AuthorizationError
 
+SAFE_METHODS = ('GET', 'HEAD', 'OPTIONS')
 
 class BasePermission():
     """
@@ -42,6 +43,19 @@ class IsAdminUser(BasePermission):
 
     def has_permission(self, request, model_class):
         return bool(request.user and request.user.is_staff)
+
+
+class IsAuthenticatedOrReadOnly(BasePermission):
+    """
+    The request is authenticated as a user, or is a read-only request.
+    """
+
+    def has_permission(self, request, view):
+        return bool(
+            request.method in SAFE_METHODS or
+            request.user and
+            request.user.is_authenticated
+        )
 
 
 class DjangoModelPermissions(BasePermission):

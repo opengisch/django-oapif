@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Type
 
 from django.db import models
 from ninja import NinjaAPI
@@ -29,8 +29,8 @@ class OAPIF:
             title: str | None = None,
             description: str | None = None,
             geometry_field: str = "geom",
-            properties_fields: list[str] = [],
-            auth: BasePermission = AllowAny,
+            properties_fields: list[str] | None = None,
+            auth: Type[BasePermission] = AllowAny,
     ):
         def decorator(model_class: models.Model):
             collection_id = id or model_class._meta.label_lower
