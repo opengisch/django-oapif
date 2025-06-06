@@ -3,8 +3,13 @@ from typing import Dict
 from django.db import models
 from ninja import NinjaAPI
 
-from django_oapif.collections import OAPIFCollectionEntry, create_collections_router
+from django_oapif.collections import (
+    OAPIFCollectionEntry,
+    create_collection_router,
+    create_collections_router,
+)
 from django_oapif.conformance import create_conformance_router
+from django_oapif.permissions import AllowAny, BasePermission
 from django_oapif.root import create_root_router
 
 
@@ -25,6 +30,7 @@ class OAPIF:
             description: str | None = None,
             geometry_field: str = "geom",
             properties_fields: list[str] = [],
+            auth: BasePermission = AllowAny,
     ):
         def decorator(model_class: models.Model):
             collection_id = id or model_class._meta.label_lower
@@ -35,12 +41,21 @@ class OAPIF:
                 description=description,
                 geometry_field=geometry_field,
                 properties_fields=properties_fields,
+                auth=auth,
             )
             
             return model_class
         
         return decorator
 
+    def _add_collections_routers(self):
+        for collection_id, collection_entry in self.collections.items():
+            self.api.add_router(
+                f"/collections/{collection_id}",
+                create_collection_router(collection_entry)
+            )
+
     @property
     def urls(self):
+        self._add_collections_routers()
         return self.api.urls

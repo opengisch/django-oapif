@@ -1,20 +1,20 @@
 import math
-from typing import Dict, Literal, NamedTuple
+from typing import Dict, NamedTuple
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
-# ninja_ogc/routers.py
 from django.contrib.gis.db.models import Extent
 from django.contrib.gis.db.models.functions import AsGeoJSON, Transform
 from django.contrib.gis.geos import GEOSGeometry, Polygon
 from django.db import models
 from django.db.models.functions import Cast
-from django.http import Http404, HttpRequest
+from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from geojson_pydantic import Feature
 from ninja import Header, Query, Router
-from ninja.errors import HttpError
+from ninja.errors import AuthorizationError, HttpError
 
 from django_oapif.crs import CRS84_URI, get_srid_from_uri
+from django_oapif.permissions import BasePermission
 from django_oapif.schema import (
     OAPIFCollection,
     OAPIFCollections,
@@ -32,6 +32,7 @@ class OAPIFCollectionEntry(NamedTuple):
     description: str
     geometry_field: str | None
     properties_fields: list[str]
+    auth: BasePermission
 
     @property
     def srid(self):
@@ -114,6 +115,7 @@ def get_collection_response(request: HttpRequest, collection: OAPIFCollectionEnt
     
     return response
 
+
 def to_feature(collection: OAPIFCollectionEntry, obj):
     return Feature(
         type="Feature",
@@ -122,21 +124,10 @@ def to_feature(collection: OAPIFCollectionEntry, obj):
         properties={field: getattr(obj, field) for field in collection.properties_fields}
     )
 
-def operation_for_method(http_method: str):
-    match http_method:
-        case "GET": return "view"
-        case "POST": return "create"
-        case "PUT" | "PATCH": return "change"
-        case "POST": return "add"
-
-
-def perm(permission: Literal["view", "add", "delete", "edit"], collection: OAPIFCollectionEntry):
-    return f"{collection.model_class._meta.app_label}.{permission}_{collection.model_class._meta.model_name}"
-
 
 def query_collection(collection: OAPIFCollectionEntry, crs: str, bbox: str | None = None, bbox_crs: str | None = None):
     output_srid = get_srid_from_uri(crs)
-    qs = collection.model_class.objects.only("id", *collection.properties_fields)
+    qs = collection.model_class.objects.only("pk", *collection.properties_fields)
     if (geom_field := collection.geometry_field):
         geometry_query = geom_field if output_srid == collection.srid else Transform(geom_field, output_srid)
         qs = qs.annotate(_oapif_geometry=Cast(AsGeoJSON(geometry_query, bbox=True), models.JSONField()))
@@ -157,16 +148,6 @@ def query_collection(collection: OAPIFCollectionEntry, crs: str, bbox: str | Non
 def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
     router = Router()
 
-    def get_collection_authenticated(request: HttpRequest, collection_id: str):
-        collection = collections.get(collection_id)
-        if collection is None:
-            raise Http404(f'Collection "{collection_id}" not found.')
-        operation = operation_for_method(request.method)
-        if not request.user.has_perm(perm(operation, collection)):
-            raise AuthorizationError()
-        return collection
-
-
     @router.get("")
     def list_collections(request: HttpRequest):
         return OAPIFCollections(
@@ -181,26 +162,34 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
             collections=[
                 get_collection_response(request, collection)
                 for collection in collections.values()
-                if request.user.has_perm(perm("view", collection))
+                if collection.auth().has_permission(request, collection.model_class)
             ]
         )
 
-    @router.get("/{collection_id}")
-    def get_collection(request, collection_id: str):
-        collection = get_collection_authenticated(request, collection_id)
+    return router
+
+def create_collection_router(collection: OAPIFCollectionEntry):
+    def authorize(request: HttpRequest):
+        if not collection.auth().has_permission(request, collection.model_class):
+            raise AuthorizationError()
+
+    router = Router()
+
+    @router.get("")
+    def get_collection(request):
+        authorize(request)
         return get_collection_response(request, collection)
     
-    @router.get("/{collection_id}/items")
+    @router.get("/items")
     def get_items(
         request: HttpRequest,
-        collection_id: str,
         limit: int = 1000,
         offset: int = 0,
         crs: str = CRS84_URI,
         bbox_crs: str = Query(CRS84_URI, alias="bbox-crs"),
         bbox: str | None = Query(None, description="BBOX in the format: minx,miny,maxx,maxy"),
     ):
-        collection = get_collection_authenticated(request, collection_id)
+        authorize(request)
         query = query_collection(collection, crs, bbox, bbox_crs)
         paginated_query = query[offset: offset + limit]
 
@@ -228,27 +217,24 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
             links=get_page_links(request, limit, offset, total_count, result_count)
         )
 
-    @router.get("/{collection_id}/items/{item_id}")
+    @router.get("/items/{item_id}")
     def get_item(
         request: HttpRequest,
-        collection_id: str,
         item_id: str,
         crs: str = CRS84_URI,
     ):
-        collection = get_collection_authenticated(request, collection_id)
-    
+        authorize(request)
         query = query_collection(collection, crs)
         item = get_object_or_404(query, pk=item_id)
         return to_feature(collection, item)
 
-    @router.post("/{collection_id}/items")
+    @router.post("/items")
     def create_item(
         request: HttpRequest,
-        collection_id: str,
         feature: Feature,
         crs: str | None = Header(alias="Content-Crs", default=CRS84_URI),
     ):
-        collection = get_collection_authenticated(request, collection_id)
+        authorize(request)
         input = feature.properties or {}
         if (geom_field := collection.geometry_field) and feature.geometry:
             geometry = GEOSGeometry(feature.geometry.model_dump_json())
@@ -259,15 +245,14 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
         item = query_collection(collection, CRS84_URI).get(pk=item.pk)
         return to_feature(collection, item)
     
-    @router.patch("/{collection_id}/items/{item_id}")
+    @router.patch("/items/{item_id}")
     def update_item(
         request: HttpRequest,
-        collection_id: str,
         item_id: str,
         feature: Feature,
         crs: str | None = Header(alias="Content-Crs", default=CRS84_URI),
     ):
-        collection = get_collection_authenticated(request, collection_id)
+        authorize(request)
         item = get_object_or_404(collection.model_class, pk=item_id)
         for property, value in (feature.properties or {}).items():
             setattr(item, property, value)
@@ -279,15 +264,14 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
         item = query_collection(collection, CRS84_URI).get(pk=item_id)
         return to_feature(collection, item)
     
-    @router.put("/{collection_id}/items/{item_id}")
+    @router.put("/items/{item_id}")
     def replace_item(
         request: HttpRequest,
-        collection_id: str,
         item_id: str,
         feature: Feature,
         crs: str | None = Header(alias="Content-Crs", default=CRS84_URI),
     ):
-        collection = get_collection_authenticated(request, collection_id)
+        authorize(request)
         item = get_object_or_404(collection.model_class, pk=item_id)
         input = feature.properties or {}
         for field in collection.properties_fields:
@@ -300,13 +284,12 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
         item = query_collection(collection, CRS84_URI).get(pk=item_id)
         return to_feature(collection, item)
     
-    @router.delete("/{collection_id}/items/{item_id}")
+    @router.delete("/items/{item_id}")
     def delete_item(
         request: HttpRequest,
-        collection_id: str,
         item_id: str,
     ):
-        collection = get_collection_authenticated(request, collection_id)
+        authorize(request)
         obj = get_object_or_404(collection.model_class, pk=item_id)
         obj.delete()
         

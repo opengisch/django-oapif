@@ -4,6 +4,8 @@ import uuid
 from django.contrib.gis.db import models
 from django.utils.translation import gettext as _
 
+from django_oapif.permissions import DjangoModelPermissions
+
 from .ogc import ogc_api
 
 logger = logging.getLogger(__name__)
@@ -187,6 +189,7 @@ class Polygon_2056(models.Model):
         "field_int",
         *[f"field_str_{i}" for i in range(10)],
     ],
+    auth = DjangoModelPermissions,
 )
 class SecretLayer(BaseModelWithTenFields):
     geom = models.PointField(srid=2056, verbose_name=_("Geometry"))
