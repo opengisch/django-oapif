@@ -12,6 +12,7 @@ from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from ninja import Header, ModelSchema, Query, Router
 from ninja.errors import AuthorizationError, HttpError
+from pydantic import ConfigDict
 
 from django_oapif.crs import CRS84_URI, get_srid_from_uri
 from django_oapif.geojson import (
@@ -182,6 +183,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             raise AuthorizationError()
 
     class PropertiesSchema(ModelSchema):
+        model_config = ConfigDict(extra='forbid')
         class Meta:
             model = collection.model_class
             fields = collection.properties_fields
@@ -216,8 +218,6 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         FeatureSchema: TypeAlias = Feature[None, PropertiesSchema]
     FeatureCollectionSchema: TypeAlias = FeatureCollection[FeatureSchema]
 
-    router = Router()
-
     def object_to_feature(obj):
         return FeatureSchema(
             type="Feature",
@@ -225,6 +225,8 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             geometry=getattr(obj, "_oapif_geometry", None),
             properties=obj
         )
+
+    router = Router()
 
     @router.get("", response=OAPIFCollection)
     def get_collection(request):
