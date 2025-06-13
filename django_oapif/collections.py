@@ -1,5 +1,5 @@
 import math
-from typing import Dict, NamedTuple, Type, TypeAlias
+from typing import Dict, NamedTuple, Optional, Type, TypeAlias
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from django.contrib.gis.db.models import Extent
@@ -212,8 +212,12 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             Coordinate: TypeAlias = Coordinate3D
         else:
             Coordinate: TypeAlias = Coordinate2D
+        
+        if geom_field.null:
+            FeatureSchema: TypeAlias = Feature[Optional[Geom[Coordinate]], PropertiesSchema]
+        else:
+            FeatureSchema: TypeAlias = Feature[Geom[Coordinate], PropertiesSchema]
 
-        FeatureSchema: TypeAlias = Feature[Geom[Coordinate], PropertiesSchema]
     else:
         FeatureSchema: TypeAlias = Feature[None, PropertiesSchema]
     FeatureCollectionSchema: TypeAlias = FeatureCollection[FeatureSchema]
