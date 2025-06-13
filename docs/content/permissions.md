@@ -5,23 +5,21 @@ hide:
 
 # Custom authentication & permissions
 
-By default the viewsets use `DjangoModelPermissionsOrAnonReadOnly` [permissions class from DRF](https://www.django-rest-framework.org/api-guide/permissions/#djangomodelpermissionsoranonreadonly).
+By default the viewsets use [`DjangoModelPermissionsOrAnonReadOnly`][django_oapif.permissions.DjangoModelPermissionsOrAnonReadOnly].
 
 This can be altered in the DRF settings by adapting `DEFAULT_PERMISSION_CLASSES`.
 
-You can also add custom permissions when registering their corresponding viewsets, as [`permission_classes`](https://www.django-rest-framework.org/api-guide/permissions/#api-reference).
+You can also add custom permissions when registering their corresponding viewsets, as [`permission_classes`][django_oapif.permissions].
 Example in `models.py`:
 
 ```python
-from rest_framework import permissions
 from django.contrib.gis.db import models
-from django_oapif import register_oapif_viewset
+from django_oapif import OAPIF
+from django_oapif.permissions import OAPIF, DjangoModelPermissionsOrAnonReadOnly
 
-@register_oapif_viewset(
-    custom_viewset_attrs={
-        "permission_classes": (permissions.DjangoModelPermissionsOrAnonReadOnly,)
-    }
-)
+ogc_api = OAPIF()
+
+@ogc_api.register(auth=DjangoModelPermissionsOrAnonReadOnly)
 class MyModel(models.Model):
     ...
 ```

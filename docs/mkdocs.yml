@@ -67,10 +67,31 @@ markdown_extensions:
   - admonition
   - codehilite
   - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - toc:
+      permalink: "#"
   - pymdownx.tabbed:
       alternate_style: true
-  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
 
 plugins:
   - search
-  - mkdocstrings
+  - autorefs
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_section_style: list
+            line_length: 80
+            merge_init_into_class: true
+            separate_signature: true
+            signature_crossrefs: true
+            show_source: false
+            show_root_heading: true
+            show_signature_annotations: true
+            show_object_full_path: false

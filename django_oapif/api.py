@@ -14,6 +14,7 @@ from django_oapif.root import create_root_router
 
 
 class OAPIF:
+    """Ninja API."""
 
     def __init__(self):
         self.api = NinjaAPI()
@@ -32,6 +33,8 @@ class OAPIF:
             properties_fields: list[str] | None = None,
             auth: Type[BasePermission] = AllowAny,
     ):
+        """Register a Django model in the API."""
+
         def decorator(model_class: models.Model):
             collection_id = id or model_class._meta.label_lower
             self.collections[collection_id] = OAPIFCollectionEntry(
