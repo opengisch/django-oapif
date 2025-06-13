@@ -1,3 +1,3 @@
-from django_oapif.api import OAPIF
+from django_oapif import OAPIF
 
 ogc_api = OAPIF()
