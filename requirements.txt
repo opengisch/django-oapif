@@ -1,10 +1,6 @@
 django>=5
-djangorestframework
 django-ninja
 psycopg2-binary
 inflection
 pyyaml
 uritemplate
-pyproj
-shapely
-geojson-pydantic
