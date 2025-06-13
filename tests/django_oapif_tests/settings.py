@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     "django_oapif_tests.tests",
     "computedfields",
     "debug_toolbar",
+    'ninja',
 ]
 
 MIDDLEWARE = [
