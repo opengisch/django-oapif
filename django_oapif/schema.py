@@ -26,7 +26,7 @@ class OAPIFRoot(OAPIFBaseSchema):
 
 
 class OAPIFSpatialExtent(OAPIFBaseSchema):
-    bbox: tuple[float, float, float, float]
+    bbox: list[tuple[float, float, float, float]]
     crs: str
 
 

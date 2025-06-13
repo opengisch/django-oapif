@@ -122,10 +122,10 @@ def get_collection_response(request: HttpRequest, collection: OAPIFCollectionEnt
     
     if (geom := collection.geometry_field):
         crs_uri = f"http://www.opengis.net/def/crs/EPSG/0/{collection.srid}"
-        extent = collection.model_class.objects.aggregate(extent=Extent(geom))["extent"]
-        response.extent = OAPIFExtent(spatial=OAPIFSpatialExtent(bbox=extent, crs=crs_uri))
         response.storageCrs = crs_uri
         response.crs = [CRS84_URI, crs_uri]
+        if (extent := collection.model_class.objects.aggregate(extent=Extent(geom))["extent"]):
+            response.extent = OAPIFExtent(spatial=OAPIFSpatialExtent(bbox=[extent], crs=crs_uri))
     
     return response
 
@@ -190,7 +190,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             exclude = [collection.model_class._meta.pk.name, collection.geometry_field] if not collection.properties_fields else None
 
     if collection.geometry_field:
-        geom_field = collection.model_class._meta.get_field(collection.geometry_field) 
+        geom_field = collection.model_class._meta.get_field(collection.geometry_field)
         if geom_field.geom_type.startswith("POINT"):
             Geom: TypeAlias = Point
         elif geom_field.geom_type.startswith("MULTIPOINT"):
