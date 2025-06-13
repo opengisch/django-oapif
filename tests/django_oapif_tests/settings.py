@@ -143,34 +143,12 @@ MEDIA_ROOT = os.getenv("DJANGO_MEDIA_ROOT", BASE_DIR.joinpath("media"))
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Django REST Framework
-REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": (
-        # "oauth2_provider.contrib.rest_framework.OAuth2Authentication",
-        "rest_framework.authentication.BasicAuthentication",
-        "rest_framework.authentication.SessionAuthentication",
-        # "geocity.auth.InternalTokenAuthentication",
-    ),
-    "DEFAULT_PAGINATION_CLASS": "django_oapif.pagination.OapifPagination",
-    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly",),
-    # "DEFAULT_THROTTLE_CLASSES": [
-    #     "rest_framework.throttling.ScopedRateThrottle",
-    # ],
-    # "DEFAULT_THROTTLE_RATES": {
-    #     # Full API for permits
-    #     "permits": os.getenv("DRF_THROTTLE_RATE_PERMITS_API"),
-    #     # Full API for permits_details
-    #     "permits_details": os.getenv("DRF_THROTTLE_RATE_PERMITS_DETAILS_API"),
-    #     # Limited pulic API used mainly by Geocalendar front app
-    #     "events": os.getenv("DRF_THROTTLE_RATE_EVENTS_API"),
-    #     # Full API for search
-    #     "search": os.getenv("DRF_THROTTLE_RATE_SEARCH_API"),
-    # },
-}
-
 OAPIF_TITLE = "DJANGO_OAPIF"
 OAPIF_DESCRIPTION = "Django OAPIF tests"
 
 INTERNAL_IPS = [
     "127.0.0.1",  # so that Django toolbar is displayed to localhost
 ]
+
+CSRF_TRUSTED_ORIGINS = ["http://*", "https://*"]
+CORS_ALLOWED_ORIGINS= ["*"]
