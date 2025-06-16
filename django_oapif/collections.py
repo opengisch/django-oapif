@@ -8,7 +8,7 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.contrib.gis.geos import Polygon as GEOSPolygon
 from django.db import models
 from django.db.models.functions import Cast
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404
 from ninja import Header, ModelSchema, Query, Router
 from ninja.errors import AuthorizationError, HttpError
@@ -274,6 +274,21 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             links=get_page_links(request, limit, offset, total_count, result_count)
         )
 
+    @router.api_operation(["OPTIONS"], "/items")
+    def options_items(
+        request: HttpRequest,
+        response: HttpResponse,
+    ):
+        authorize(request)
+        allowed = ["OPTIONS"]
+        for method in ["GET", "POST"]:
+            request.method = method
+            if collection.auth().has_permission(request, collection.model_class):
+                allowed.append(method)
+        response.headers["Allow"] = ", ".join(allowed)
+        return { "actions": dict.fromkeys(allowed, True) }
+
+    
     @router.get("/items/{item_id}", response=FeatureSchema)
     def get_item(
         request: HttpRequest,
@@ -302,6 +317,20 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         item = query_collection(collection, CRS84_URI).get(pk=item.pk)
         return object_to_feature(item)
     
+    @router.api_operation(["OPTIONS"], "/items/{item_id}")
+    def options_item(
+        request: HttpRequest,
+        response: HttpResponse,
+    ):
+        authorize(request)
+        allowed = ["OPTIONS"]
+        for method in ["GET", "PUT", "DELETE"]:
+            request.method = method
+            if collection.auth().has_permission(request, collection.model_class):
+                allowed.append(method)
+        response.headers["Allow"] = ", ".join(allowed)
+        return { "actions": dict.fromkeys(allowed, True) }
+
     @router.put("/items/{item_id}", response=FeatureSchema)
     def replace_item(
         request: HttpRequest,

@@ -9,7 +9,10 @@ from django_oapif.collections import (
     create_collections_router,
 )
 from django_oapif.conformance import create_conformance_router
-from django_oapif.permissions import AllowAny, BasePermission
+from django_oapif.permissions import (
+    BasePermission,
+    DjangoModelPermissionsOrAnonReadOnly,
+)
 from django_oapif.root import create_root_router
 
 
@@ -31,7 +34,7 @@ class OAPIF:
             description: str | None = None,
             geometry_field: str = "geom",
             properties_fields: list[str] | None = None,
-            auth: Type[BasePermission] = AllowAny,
+            auth: Type[BasePermission] = DjangoModelPermissionsOrAnonReadOnly,
     ):
         """Register a Django model in the API."""
 

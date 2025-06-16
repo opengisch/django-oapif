@@ -4,4 +4,3 @@ django-debug-toolbar
 django-computedfields
 flameprof
 gprof2dot
-djangorestframework
