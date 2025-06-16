@@ -87,7 +87,7 @@ GenericFeature = TypeVar("GenericFeature", bound=Geometry)
 class FeatureCollection(Schema, Generic[GenericFeature]):
     type: Literal["FeatureCollection"]
     features: List[GenericFeature]
-    bbox: Tuple[float, float, float, float]
+    bbox: Optional[Tuple[float, float, float, float]]
     links: list[OAPIFLink]
     numberReturned: int
     numberMatched: int
