@@ -76,9 +76,14 @@ FeatureProperties = TypeVar("FeatureProperties", bound=Schema)
 FeatureGeometry = TypeVar("FeatureGeometry", bound=Union[Geometry, None])
 
 
+class NewFeature(Schema, Generic[FeatureGeometry, FeatureProperties]):
+    type: Literal["Feature"]
+    properties: FeatureProperties
+    geometry: FeatureGeometry
+
 class Feature(Schema, Generic[FeatureGeometry, FeatureProperties]):
     type: Literal["Feature"]
-    id: int | str | None = None
+    id: int | str
     properties: FeatureProperties
     geometry: FeatureGeometry
 

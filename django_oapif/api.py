@@ -40,10 +40,11 @@ class OAPIF:
 
         def decorator(model_class: models.Model):
             collection_id = id or model_class._meta.label_lower
+            collection_title = id or model_class._meta.label
             self.collections[collection_id] = OAPIFCollectionEntry(
                 model_class=model_class,
                 id=collection_id,
-                title=title,
+                title=collection_title,
                 description=description,
                 geometry_field=geometry_field,
                 properties_fields=properties_fields,
