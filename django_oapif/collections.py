@@ -268,7 +268,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         return FeatureCollectionSchema(
             type="FeatureCollection",
             features=features,
-            bbox=bbox,
+            bbox=bbox if bbox != [math.inf, math.inf, -math.inf, -math.inf] else None,
             numberMatched=total_count,
             numberReturned=result_count,
             links=get_page_links(request, limit, offset, total_count, result_count)
