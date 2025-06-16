@@ -26,6 +26,7 @@ from django_oapif.geojson import (
     MultiLineString,
     MultiPoint,
     MultiPolygon,
+    NewFeature,
     Point,
     Polygon,
 )
@@ -214,12 +215,14 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             Coordinate: TypeAlias = Coordinate2D
         
         if geom_field.null:
-            FeatureSchema: TypeAlias = Feature[Optional[Geom[Coordinate]], PropertiesSchema]
+            GeometrySchema: TypeAlias = Optional[Geom[Coordinate]]
         else:
-            FeatureSchema: TypeAlias = Feature[Geom[Coordinate], PropertiesSchema]
-
+            GeometrySchema: TypeAlias = Geom[Coordinate]
     else:
-        FeatureSchema: TypeAlias = Feature[None, PropertiesSchema]
+        GeometrySchema: TypeAlias = None
+
+    FeatureSchema: TypeAlias = Feature[GeometrySchema, PropertiesSchema]
+    NewFeatureSchema: TypeAlias = NewFeature[GeometrySchema, PropertiesSchema]
     FeatureCollectionSchema: TypeAlias = FeatureCollection[FeatureSchema]
 
     def object_to_feature(obj):
@@ -236,7 +239,22 @@ def create_collection_router(collection: OAPIFCollectionEntry):
     def get_collection(request):
         authorize(request)
         return get_collection_response(request, collection)
-    
+
+    @router.get("/schema")
+    def get_schema(request: HttpRequest):
+        authorize(request)
+        schema = PropertiesSchema.json_schema()
+        if (geom_field := collection.geometry_field):
+            schema["properties"][geom_field] = {
+                "title" : "geometry",
+                "x-ogc-role" : "primary-geometry",
+                "format": f"geometry-{Geom.__name__.lower()}",
+            }
+        schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
+        schema["$id"] = request.build_absolute_uri()
+        schema["title"] = collection.title
+        return schema
+
     @router.get("/items", response=FeatureCollectionSchema)
     def get_items(
         request: HttpRequest,
@@ -253,22 +271,25 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         total_count = query.count()
         result_count = len(paginated_query)
 
-        bbox = [math.inf, math.inf, -math.inf, -math.inf]
         features=[]
-        for obj in paginated_query:
-            feature = object_to_feature(obj)
-            features.append(feature)
-            bbox = [
-                min(bbox[0], feature.geometry.bbox[0]),
-                min(bbox[1], feature.geometry.bbox[1]),
-                max(bbox[2], feature.geometry.bbox[2]),
-                max(bbox[3], feature.geometry.bbox[3])
-            ]
+        if result_count > 0:
+            bbox = [math.inf, math.inf, -math.inf, -math.inf]
+            for obj in paginated_query:
+                feature = object_to_feature(obj)
+                features.append(feature)
+                bbox = [
+                    min(bbox[0], feature.geometry.bbox[0]),
+                    min(bbox[1], feature.geometry.bbox[1]),
+                    max(bbox[2], feature.geometry.bbox[2]),
+                    max(bbox[3], feature.geometry.bbox[3])
+                ]
+        else:
+            bbox = None
 
         return FeatureCollectionSchema(
             type="FeatureCollection",
             features=features,
-            bbox=bbox if bbox != [math.inf, math.inf, -math.inf, -math.inf] else None,
+            bbox=bbox,
             numberMatched=total_count,
             numberReturned=result_count,
             links=get_page_links(request, limit, offset, total_count, result_count)
@@ -303,7 +324,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
     @router.post("/items", response=FeatureSchema)
     def create_item(
         request: HttpRequest,
-        feature: FeatureSchema,
+        feature: NewFeatureSchema,
         crs: str | None = Header(alias="Content-Crs", default=CRS84_URI),
     ):
         authorize(request)
@@ -335,7 +356,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
     def replace_item(
         request: HttpRequest,
         item_id: str,
-        feature: FeatureSchema,
+        feature: NewFeatureSchema,
         crs: str | None = Header(alias="Content-Crs", default=CRS84_URI),
     ):
         authorize(request)
