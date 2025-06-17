@@ -307,7 +307,6 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             if collection.auth().has_permission(request, collection.model_class):
                 allowed.append(method)
         response.headers["Allow"] = ", ".join(allowed)
-        return { "actions": dict.fromkeys(allowed, True) }
 
     
     @router.get("/items/{item_id}", response=FeatureSchema)
@@ -352,7 +351,6 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             if collection.auth().has_permission(request, collection.model_class):
                 allowed.append(method)
         response.headers["Allow"] = ", ".join(allowed)
-        return { "actions": dict.fromkeys(allowed, True) }
 
     @router.put("/items/{item_id}", response=FeatureSchema)
     def replace_item(
