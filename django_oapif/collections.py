@@ -321,9 +321,10 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         item = get_object_or_404(query, pk=item_id)
         return object_to_feature(item)
 
-    @router.post("/items", response=FeatureSchema)
+    @router.post("/items", response={ 201: FeatureSchema })
     def create_item(
         request: HttpRequest,
+        response: HttpResponse,
         feature: NewFeatureSchema,
         crs: str | None = Header(alias="Content-Crs", default=CRS84_URI),
     ):
@@ -336,7 +337,8 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         item = collection.model_class.objects.create(**input)
         item.save()
         item = query_collection(collection, CRS84_URI).get(pk=item.pk)
-        return object_to_feature(item)
+        response.headers["Location"] = request.build_absolute_uri(f"items/{item.pk}")
+        return 201, object_to_feature(item)
     
     @router.api_operation(["OPTIONS"], "/items/{item_id}")
     def options_item(
