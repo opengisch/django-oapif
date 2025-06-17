@@ -1,7 +1,11 @@
-from typing import Dict, Type
+from typing import Any, Dict, Optional, Type
 
+from django.conf import settings
+from django.contrib.auth import authenticate
 from django.db import models
+from django.http import HttpRequest
 from ninja import NinjaAPI
+from ninja.security import APIKeyCookie, HttpBasicAuth
 
 from django_oapif.collections import (
     OAPIFCollectionEntry,
@@ -16,11 +20,25 @@ from django_oapif.permissions import (
 from django_oapif.root import create_root_router
 
 
+class BasicAuth(HttpBasicAuth):
+    def authenticate(self, request, username, password):
+        if (user := authenticate(request, username=username, password=password)):
+            request.user = user
+        return request.user
+
+
+class DjangoAuth(APIKeyCookie):
+    param_name: str = settings.SESSION_COOKIE_NAME
+
+    def authenticate(self, request: HttpRequest, key: Optional[str]) -> Optional[Any]:
+        return request.user
+
+
 class OAPIF:
     """Ninja API."""
 
     def __init__(self):
-        self.api = NinjaAPI()
+        self.api = NinjaAPI(auth=[BasicAuth(), DjangoAuth()])
         self.collections: Dict[str, OAPIFCollectionEntry] = {}
         self.api.add_router("/", create_root_router())
         self.api.add_router("/conformance", create_conformance_router())
