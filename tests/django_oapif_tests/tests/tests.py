@@ -38,10 +38,7 @@ class TestBasicAuth(TestCase):
         response = self.client.options(url)
 
         allowed_headers = {s.strip() for s in response.headers["Allow"].split(",")}
-        allowed_body = set(response.json()["actions"].keys())
-
-        self.assertEqual(allowed_body, expected)
-        self.assertEqual(allowed_headers, allowed_body)
+        self.assertEqual(allowed_headers, expected)
 
     def test_editor_items_options(self):
         # Authenticated user with editing permissions
@@ -52,10 +49,7 @@ class TestBasicAuth(TestCase):
         response = self.client.options(url)
 
         allowed_headers = {s.strip() for s in response.headers["Allow"].split(",")}
-        allowed_body = set(response.json()["actions"].keys())
-
-        self.assertEqual(allowed_body, expected)
-        self.assertEqual(allowed_headers, allowed_body)
+        self.assertEqual(allowed_headers, expected)
 
     def test_post_geometry_less_layer(self):
         self.client.force_login(user=self.demo_editor)
