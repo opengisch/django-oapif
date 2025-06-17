@@ -24,14 +24,14 @@ jobs:
           key: ${{ secrets.KEY }}
           script: |
             cd /home/ubuntu/django-ogcapif
-            docker-compose down -v --remove-orphans
+            docker compose down -v --remove-orphans
             git checkout main && git pull -f
-            docker-compose up -d --build --force-recreate
-            docker-compose exec django python manage.py migrate --no-input
-            docker-compose exec django python manage.py collectstatic --no-input
-            docker-compose exec django python manage.py populate_users
-            docker-compose exec django python manage.py populate_data
+            docker compose up -d --build --force-recreate
+            docker compose exec django python manage.py migrate --no-input
+            docker compose exec django python manage.py collectstatic --no-input
+            docker compose exec django python manage.py populate_users
+            docker compose exec django python manage.py populate_data
 
       - name: Failure logs
         if: failure()
-        run: docker-compose logs django_oapif_tests
+        run: docker compose logs django_oapif_tests

@@ -76,4 +76,4 @@ jobs:
 
     - name: Failure logs
       if: failure()
-      run: docker-compose logs
+      run: docker compose logs
