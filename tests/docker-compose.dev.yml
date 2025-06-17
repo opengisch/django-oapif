@@ -36,7 +36,7 @@ services:
       - testing_conformance
 
   integration_tests:
-    image: opengisch/qgis:3.34-lunar
+    image: qgis/qgis:3.42.3-bookworm
     command: sh -c 'xvfb-run python3 -m unittest discover'
     tty: true
     volumes:
