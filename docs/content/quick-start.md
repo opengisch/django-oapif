@@ -17,7 +17,7 @@ pip install --user https://github.com/opengisch/django-oapif
 
 Edit settings.py
 
-```
+```python
 INSTALLED_APPS = [
     ...
     "django_oapif",
@@ -28,11 +28,13 @@ INSTALLED_APPS = [
 
 Add this to your `urls.py` :
 
+```python
 urlpatterns += [
     ...,
     path("oapif/", include(django_oapif.urls)),
     ...,
 ]
+```
 
 ## Register your models with the decorator:
 

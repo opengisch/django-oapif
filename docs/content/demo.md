@@ -25,9 +25,11 @@ docker compose exec django python manage.py migrate --no-input
 docker compose exec django python manage.py populate_users
 docker compose exec django python manage.py populate_data
 ```
+
 After waiting little you'll be able to access all collections at http://0.0.0.0:7180/oapif/collections.
 
 Three users are provided out of the box; they can be logged in with through basic authentication; all `123` for password:
+
 - `demo_viewer`
 - `demo_editor`
 - `admin`
@@ -40,7 +42,7 @@ When up and running you can access the REST API from QGIS like this:
 
 - Go to `Layers` > `Add layer` > `Add WFS Layer...`
 - Create a new connection
-  - URL: `https://0.0.0.0:7180/oapif/`
-  - Version: `OGC API - Features`
+    - URL: `https://0.0.0.0:7180/oapif/`
+    - Version: `OGC API - Features`
 - Click OK and ignore choose to ignore the invalid certificate error and store the exception
 - You should see the two layers in the list, select them and choose `add`.
