@@ -45,4 +45,4 @@ When up and running you can access the REST API from QGIS like this:
     - URL: `https://0.0.0.0:7180/oapif/`
     - Version: `OGC API - Features`
 - Click OK and ignore choose to ignore the invalid certificate error and store the exception
-- You should see the two layers in the list, select them and choose `add`.
+- You should see the two layers in the list, select them and choose `Add`.
