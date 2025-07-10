@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Type
+from typing import Any, Optional
 
 from django.conf import settings
 from django.contrib.auth import authenticate
@@ -22,7 +22,7 @@ from django_oapif.root import create_root_router
 
 class BasicAuth(HttpBasicAuth):
     def authenticate(self, request, username, password):
-        if (user := authenticate(request, username=username, password=password)):
+        if user := authenticate(request, username=username, password=password):
             request.user = user
         return request.user
 
@@ -39,20 +39,20 @@ class OAPIF:
 
     def __init__(self):
         self.api = NinjaAPI(auth=[BasicAuth(), DjangoAuth()])
-        self.collections: Dict[str, OAPIFCollectionEntry] = {}
+        self.collections: dict[str, OAPIFCollectionEntry] = {}
         self.api.add_router("/", create_root_router())
         self.api.add_router("/conformance", create_conformance_router())
         self.api.add_router("/collections", create_collections_router(self.collections))
 
     def register(
-            self,
-            /,
-            id: str | None = None,
-            title: str | None = None,
-            description: str | None = None,
-            geometry_field: str = "geom",
-            properties_fields: list[str] | None = None,
-            auth: Type[BasePermission] = DjangoModelPermissionsOrAnonReadOnly,
+        self,
+        /,
+        id: str | None = None,
+        title: str | None = None,
+        description: str | None = None,
+        geometry_field: str = "geom",
+        properties_fields: list[str] | None = None,
+        auth: type[BasePermission] = DjangoModelPermissionsOrAnonReadOnly,
     ):
         """Register a Django model in the API."""
 
@@ -68,17 +68,14 @@ class OAPIF:
                 properties_fields=properties_fields,
                 auth=auth,
             )
-            
+
             return model_class
-        
+
         return decorator
 
     def _add_collections_routers(self):
         for collection_id, collection_entry in self.collections.items():
-            self.api.add_router(
-                f"/collections/{collection_id}",
-                create_collection_router(collection_entry)
-            )
+            self.api.add_router(f"/collections/{collection_id}", create_collection_router(collection_entry))
 
     @property
     def urls(self):

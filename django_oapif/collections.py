@@ -1,5 +1,5 @@
 import math
-from typing import Dict, NamedTuple, Optional, Type, TypeAlias
+from typing import NamedTuple, Optional, TypeAlias
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from django.contrib.gis.db.models import Extent
@@ -47,7 +47,7 @@ class OAPIFCollectionEntry(NamedTuple):
     description: str
     geometry_field: str | None
     properties_fields: list[str] | None
-    auth: Type[BasePermission]
+    auth: type[BasePermission]
 
     @property
     def srid(self):
@@ -72,12 +72,7 @@ def replace_query_param(request, **kwargs):
 
 def get_page_links(request: HttpRequest, limit: int, offset: int, total_count: int, returned_count: int):
     links = [
-        OAPIFLink(
-            rel="self",
-            title="items (self)",
-            type="application/geo+json",
-            href=request.build_absolute_uri()
-        )
+        OAPIFLink(rel="self", title="items (self)", type="application/geo+json", href=request.build_absolute_uri())
     ]
     if offset > 0:
         links.append(
@@ -85,7 +80,7 @@ def get_page_links(request: HttpRequest, limit: int, offset: int, total_count: i
                 rel="prev",
                 title="items (prev)",
                 type="application/geo+json",
-                href=replace_query_param(request, offset= None if offset - limit <= 0 else offset - limit)
+                href=replace_query_param(request, offset=None if offset - limit <= 0 else offset - limit),
             )
         )
     if offset + limit < total_count:
@@ -94,7 +89,7 @@ def get_page_links(request: HttpRequest, limit: int, offset: int, total_count: i
                 rel="next",
                 title="items (next)",
                 type="application/geo+json",
-                href=replace_query_param(request, offset=offset + limit)
+                href=replace_query_param(request, offset=offset + limit),
             )
         )
     return links
@@ -103,31 +98,31 @@ def get_page_links(request: HttpRequest, limit: int, offset: int, total_count: i
 def get_collection_response(request: HttpRequest, collection: OAPIFCollectionEntry):
     uri_prefix = "collections/" if request.get_full_path().endswith("collections") else ""
     response = OAPIFCollection(
-        id = collection.id,
-        title = collection.title,
-        description = collection.description,
+        id=collection.id,
+        title=collection.title,
+        description=collection.description,
         itemType="feature",
-        links = [
+        links=[
             OAPIFLink(
-                href = request.build_absolute_uri(f"{uri_prefix}{collection.id}"),
-                rel = "self",
-                type = "application/json",
+                href=request.build_absolute_uri(f"{uri_prefix}{collection.id}"),
+                rel="self",
+                type="application/json",
             ),
             OAPIFLink(
-                href = request.build_absolute_uri(f"{uri_prefix}{collection.id}/items"),
-                rel = "items",
-                type = "application/geo+json",
-            )
-        ]
+                href=request.build_absolute_uri(f"{uri_prefix}{collection.id}/items"),
+                rel="items",
+                type="application/geo+json",
+            ),
+        ],
     )
-    
-    if (geom := collection.geometry_field):
+
+    if geom := collection.geometry_field:
         crs_uri = f"http://www.opengis.net/def/crs/EPSG/0/{collection.srid}"
         response.storageCrs = crs_uri
         response.crs = [CRS84_URI, crs_uri]
-        if (extent := collection.model_class.objects.aggregate(extent=Extent(geom))["extent"]):
+        if extent := collection.model_class.objects.aggregate(extent=Extent(geom))["extent"]:
             response.extent = OAPIFExtent(spatial=OAPIFSpatialExtent(bbox=[extent], crs=crs_uri))
-    
+
     return response
 
 
@@ -137,7 +132,7 @@ def query_collection(collection: OAPIFCollectionEntry, crs: str, bbox: str | Non
         qs = collection.model_class.objects.only("pk", *collection.properties_fields)
     else:
         qs = collection.model_class.objects
-    if (geom_field := collection.geometry_field):
+    if geom_field := collection.geometry_field:
         geometry_query = geom_field if output_srid == collection.srid else Transform(geom_field, output_srid)
         qs = qs.annotate(_oapif_geometry=Cast(AsGeoJSON(geometry_query, bbox=True), models.JSONField()))
         if bbox:
@@ -148,13 +143,11 @@ def query_collection(collection: OAPIFCollectionEntry, crs: str, bbox: str | Non
                 bbox_expr = bbox_geom if bbox_geom.srid == collection.srid else Transform(bbox_geom, collection.srid)
                 qs = qs.filter(**{f"{geom_field}__intersects": bbox_expr})
             except ValueError:
-                raise HttpError(
-                    400, "Invalid bbox parameter. Expected format: minx,miny,maxx,maxy"
-                )
+                raise HttpError(400, "Invalid bbox parameter. Expected format: minx,miny,maxx,maxy")
     return qs
 
 
-def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
+def create_collections_router(collections: dict[str, OAPIFCollectionEntry]):
     router = Router()
 
     @router.get("", response=OAPIFCollections)
@@ -162,17 +155,17 @@ def create_collections_router(collections: Dict[str, OAPIFCollectionEntry]):
         return OAPIFCollections(
             links=[
                 OAPIFLink(
-                    href = request.build_absolute_uri(),
-                    rel = "self",
-                    type = "application/json",
-                    title = "this document",
+                    href=request.build_absolute_uri(),
+                    rel="self",
+                    type="application/json",
+                    title="this document",
                 )
             ],
             collections=[
                 get_collection_response(request, collection)
                 for collection in collections.values()
                 if collection.auth().has_permission(request, collection.model_class)
-            ]
+            ],
         )
 
     return router
@@ -184,11 +177,16 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             raise AuthorizationError()
 
     class PropertiesSchema(ModelSchema):
-        model_config = ConfigDict(extra='forbid')
+        model_config = ConfigDict(extra="forbid")
+
         class Meta:
             model = collection.model_class
             fields = collection.properties_fields
-            exclude = [collection.model_class._meta.pk.name, collection.geometry_field] if not collection.properties_fields else None
+            exclude = (
+                [collection.model_class._meta.pk.name, collection.geometry_field]
+                if not collection.properties_fields
+                else None
+            )
 
     if collection.geometry_field:
         geom_field = collection.model_class._meta.get_field(collection.geometry_field)
@@ -213,7 +211,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             Coordinate: TypeAlias = Coordinate3D
         else:
             Coordinate: TypeAlias = Coordinate2D
-        
+
         if geom_field.null:
             GeometrySchema: TypeAlias = Optional[Geom[Coordinate]]
         else:
@@ -227,10 +225,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
 
     def object_to_feature(obj):
         return FeatureSchema(
-            type="Feature",
-            id=str(obj.pk),
-            geometry=getattr(obj, "_oapif_geometry", None),
-            properties=obj
+            type="Feature", id=str(obj.pk), geometry=getattr(obj, "_oapif_geometry", None), properties=obj
         )
 
     router = Router()
@@ -244,10 +239,10 @@ def create_collection_router(collection: OAPIFCollectionEntry):
     def get_schema(request: HttpRequest):
         authorize(request)
         schema = PropertiesSchema.json_schema()
-        if (geom_field := collection.geometry_field):
+        if geom_field := collection.geometry_field:
             schema["properties"][geom_field] = {
-                "title" : "geometry",
-                "x-ogc-role" : "primary-geometry",
+                "title": "geometry",
+                "x-ogc-role": "primary-geometry",
                 "format": f"geometry-{Geom.__name__.lower()}",
             }
         schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
@@ -266,12 +261,12 @@ def create_collection_router(collection: OAPIFCollectionEntry):
     ):
         authorize(request)
         query = query_collection(collection, crs, bbox, bbox_crs)
-        paginated_query = query[offset: offset + limit]
+        paginated_query = query[offset : offset + limit]
 
         total_count = query.count()
         result_count = len(paginated_query)
 
-        features=[]
+        features = []
         if result_count > 0:
             bbox = [math.inf, math.inf, -math.inf, -math.inf]
             for obj in paginated_query:
@@ -281,7 +276,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
                     min(bbox[0], feature.geometry.bbox[0]),
                     min(bbox[1], feature.geometry.bbox[1]),
                     max(bbox[2], feature.geometry.bbox[2]),
-                    max(bbox[3], feature.geometry.bbox[3])
+                    max(bbox[3], feature.geometry.bbox[3]),
                 ]
         else:
             bbox = None
@@ -292,7 +287,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             bbox=bbox,
             numberMatched=total_count,
             numberReturned=result_count,
-            links=get_page_links(request, limit, offset, total_count, result_count)
+            links=get_page_links(request, limit, offset, total_count, result_count),
         )
 
     @router.api_operation(["OPTIONS"], "/items")
@@ -308,7 +303,6 @@ def create_collection_router(collection: OAPIFCollectionEntry):
                 allowed.append(method)
         response.headers["Allow"] = ", ".join(allowed)
 
-    
     @router.get("/items/{item_id}", response=FeatureSchema)
     def get_item(
         request: HttpRequest,
@@ -320,7 +314,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         item = get_object_or_404(query, pk=item_id)
         return object_to_feature(item)
 
-    @router.post("/items", response={ 201: FeatureSchema })
+    @router.post("/items", response={201: FeatureSchema})
     def create_item(
         request: HttpRequest,
         response: HttpResponse,
@@ -338,7 +332,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         item = query_collection(collection, CRS84_URI).get(pk=item.pk)
         response.headers["Location"] = request.build_absolute_uri(f"items/{item.pk}")
         return 201, object_to_feature(item)
-    
+
     @router.api_operation(["OPTIONS"], "/items/{item_id}")
     def options_item(
         request: HttpRequest,
@@ -370,7 +364,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         item.save()
         item = query_collection(collection, CRS84_URI).get(pk=item_id)
         return object_to_feature(item)
-    
+
     @router.delete("/items/{item_id}")
     def delete_item(
         request: HttpRequest,
@@ -379,6 +373,5 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         authorize(request)
         obj = get_object_or_404(collection.model_class, pk=item_id)
         obj.delete()
-        
-        
+
     return router

@@ -1,11 +1,9 @@
-
 from typing import Optional
 
 from ninja import Schema
 
 
 class OAPIFBaseSchema(Schema):
-
     def model_dump(self, *, exclude_none=True, **kwargs):
         return super().model_dump(exclude_none=exclude_none, **kwargs)
 
@@ -32,7 +30,8 @@ class OAPIFSpatialExtent(OAPIFBaseSchema):
 
 class OAPIFExtent(OAPIFBaseSchema):
     spatial: OAPIFSpatialExtent
-    
+
+
 class OAPIFCollection(OAPIFBaseSchema):
     id: str
     title: Optional[str] = None
@@ -43,9 +42,11 @@ class OAPIFCollection(OAPIFBaseSchema):
     extent: Optional[OAPIFExtent] = None
     itemType: str
 
+
 class OAPIFCollections(OAPIFBaseSchema):
     links: list[OAPIFLink]
     collections: list[OAPIFCollection]
+
 
 class OAPIFConformance(OAPIFBaseSchema):
     conformsTo: list[str]

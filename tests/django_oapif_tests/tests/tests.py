@@ -11,6 +11,7 @@ collections_url = "/oapif/collections"
 
 headers = {"Content-Crs": "http://www.opengis.net/def/crs/EPSG/0/2056"}
 
+
 class TestBasicAuth(TestCase):
     @classmethod
     def setUpTestData(cls):

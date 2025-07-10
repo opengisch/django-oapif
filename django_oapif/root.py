@@ -1,5 +1,3 @@
-
-
 from django.http import HttpRequest
 from ninja import Router
 
@@ -17,22 +15,22 @@ def create_root_router():
             description="self.description",
             links=[
                 OAPIFLink(
-                    href = request.build_absolute_uri(""),
-                    rel = "self",
-                    type = "application/json",
-                    title = "this document",
+                    href=request.build_absolute_uri(""),
+                    rel="self",
+                    type="application/json",
+                    title="this document",
                 ),
                 OAPIFLink(
-                    href= request.build_absolute_uri("openapi.json"),
-                    rel= "service-desc",
-                    type= "application/vnd.oai.openapi+json;version=3.0",
-                    title= "the API definition",
+                    href=request.build_absolute_uri("openapi.json"),
+                    rel="service-desc",
+                    type="application/vnd.oai.openapi+json;version=3.0",
+                    title="the API definition",
                 ),
                 OAPIFLink(
-                    href = request.build_absolute_uri("conformance"),
-                    rel = "conformance",
-                    type = "application/json",
-                    title = "OGC API conformance classes implemented by this server",
+                    href=request.build_absolute_uri("conformance"),
+                    rel="conformance",
+                    type="application/json",
+                    title="OGC API conformance classes implemented by this server",
                 ),
                 OAPIFLink(
                     href=request.build_absolute_uri("collections"),
@@ -40,7 +38,7 @@ def create_root_router():
                     type="application/json",
                     title="Information about the feature collections",
                 ),
-            ]
+            ],
         )
 
     return router

@@ -29,14 +29,11 @@ class BaseModelWithTenFields(models.Model):
     field_str_8 = models.CharField(max_length=255, verbose_name=_("Field 8"), null=True, blank=True)
     field_str_9 = models.CharField(max_length=255, verbose_name=_("Field 9"), null=True, blank=True)
 
+
 @ogc_api.register(
     title="point_2056",
     description="yo",
-    properties_fields=[
-        "field_bool",
-        "field_int",
-        *[f"field_str_{i}" for i in range(10)]
-    ],
+    properties_fields=["field_bool", "field_int", *[f"field_str_{i}" for i in range(10)]],
 )
 class Point_2056_10fields(BaseModelWithTenFields):
     geom = models.PointField(srid=2056, verbose_name=_("Geometry"))
@@ -182,6 +179,7 @@ class Polygon_2056(models.Model):
     name = models.CharField(max_length=255, verbose_name=_("Name"), null=True, blank=True)
     geom = models.MultiPolygonField(srid=2056, verbose_name=_("Geometry"))
 
+
 @ogc_api.register(
     title="secret",
     properties_fields=[
@@ -189,7 +187,7 @@ class Polygon_2056(models.Model):
         "field_int",
         *[f"field_str_{i}" for i in range(10)],
     ],
-    auth = DjangoModelPermissions,
+    auth=DjangoModelPermissions,
 )
 class SecretLayer(BaseModelWithTenFields):
     geom = models.PointField(srid=2056, verbose_name=_("Geometry"))
