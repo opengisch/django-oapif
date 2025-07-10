@@ -12,7 +12,7 @@ CRS_URI_PATTERN = re.compile(
 
 
 def get_srid_from_uri(uri: str) -> int:
-    if (result := CRS_URI_PATTERN.match(uri)):
+    if result := CRS_URI_PATTERN.match(uri):
         auth, code = result.groups()
         if auth == "OGC" and code in ("CRS84", "CRS84h"):
             return CRS84_SRID

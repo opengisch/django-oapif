@@ -47,7 +47,7 @@ INSTALLED_APPS = [
     "django_oapif_tests.tests",
     "computedfields",
     "debug_toolbar",
-    'ninja',
+    "ninja",
 ]
 
 MIDDLEWARE = [
@@ -151,4 +151,4 @@ INTERNAL_IPS = [
 ]
 
 CSRF_TRUSTED_ORIGINS = ["http://*", "https://*"]
-CORS_ALLOWED_ORIGINS= ["*"]
+CORS_ALLOWED_ORIGINS = ["*"]
