@@ -50,7 +50,7 @@ class OAPIF:
         id: str | None = None,
         title: str | None = None,
         description: str | None = None,
-        geometry_field: str = "geom",
+        geometry_field: str | None = "geom",
         properties_fields: list[str] | None = None,
         auth: type[BasePermission] = DjangoModelPermissionsOrAnonReadOnly,
     ):
