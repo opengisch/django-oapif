@@ -46,7 +46,7 @@ class MultiLineString(GeometryBase):
 
 class MultiPolygon(GeometryBase):
     type: Literal["MultiPolygon"]
-    coordinates: list[list[Coordinate]]
+    coordinates: list[list[list[Coordinate]]]
 
 
 class GeometryCollection(GeometryBase):
