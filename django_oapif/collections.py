@@ -269,18 +269,18 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         result_count = len(paginated_query)
 
         features = []
-        if result_count > 0:
-            bbox = [math.inf, math.inf, -math.inf, -math.inf]
-            for obj in paginated_query:
-                feature = object_to_feature(obj)
-                features.append(feature)
+        bbox = [math.inf, math.inf, -math.inf, -math.inf]
+        for obj in paginated_query:
+            feature = object_to_feature(obj)
+            features.append(feature)
+            if geometry := feature.geometry:
                 bbox = [
-                    min(bbox[0], feature.geometry.bbox[0]),
-                    min(bbox[1], feature.geometry.bbox[1]),
-                    max(bbox[2], feature.geometry.bbox[2]),
-                    max(bbox[3], feature.geometry.bbox[3]),
+                    min(bbox[0], geometry.bbox[0]),
+                    min(bbox[1], geometry.bbox[1]),
+                    max(bbox[2], geometry.bbox[2]),
+                    max(bbox[3], geometry.bbox[3]),
                 ]
-        else:
+        if bbox == [math.inf, math.inf, -math.inf, -math.inf]:
             bbox = None
 
         return FeatureCollectionSchema(
