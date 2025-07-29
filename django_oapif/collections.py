@@ -131,7 +131,7 @@ def query_collection(collection: OAPIFCollectionEntry, crs: str, bbox: str | Non
     if collection.properties_fields:
         qs = collection.model_class.objects.only("pk", *collection.properties_fields)
     else:
-        qs = collection.model_class.objects
+        qs = collection.model_class.objects.all()
     if geom_field := collection.geometry_field:
         geometry_query = geom_field if output_srid == collection.srid else Transform(geom_field, output_srid)
         qs = qs.annotate(_oapif_geometry=Cast(AsGeoJSON(geometry_query, bbox=True), models.JSONField()))
