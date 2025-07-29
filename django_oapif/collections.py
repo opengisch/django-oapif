@@ -183,9 +183,11 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             model = collection.model_class
             fields = collection.properties_fields
             exclude = (
-                [collection.model_class._meta.pk.name, collection.geometry_field]
-                if not collection.properties_fields
-                else None
+                None
+                if collection.properties_fields
+                else [collection.model_class._meta.pk.name, collection.geometry_field]
+                if collection.geometry_field
+                else [collection.model_class._meta.pk.name]
             )
 
     if collection.geometry_field:
