@@ -177,7 +177,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             raise AuthorizationError()
 
     class PropertiesSchema(ModelSchema):
-        model_config = ConfigDict(extra="forbid", from_attributes=True)
+        model_config = ConfigDict(extra="forbid", from_attributes=True, populate_by_name=True)
 
         class Meta:
             model = collection.model_class
@@ -230,7 +230,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             type="Feature",
             id=str(obj.pk),
             geometry=getattr(obj, "_oapif_geometry", None),
-            properties=PropertiesSchema.from_orm(obj),
+            properties=obj,
         )
 
     router = Router()
