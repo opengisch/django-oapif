@@ -109,6 +109,11 @@ def get_collection_response(request: HttpRequest, collection: OAPIFCollectionEnt
                 type="application/json",
             ),
             OAPIFLink(
+                href=request.build_absolute_uri(f"{uri_prefix}{collection.id}/schema"),
+                rel="http://www.opengis.net/def/rel/ogc/1.0/schema",
+                type="application/json",
+            ),
+            OAPIFLink(
                 href=request.build_absolute_uri(f"{uri_prefix}{collection.id}/items"),
                 rel="items",
                 type="application/geo+json",
