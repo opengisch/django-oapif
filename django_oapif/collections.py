@@ -163,9 +163,10 @@ def get_json_schema(
     # from the list of required ones
     for field_name, field_props in schema["properties"].items():
         if field_name not in required_fields:
-            if (t := field_props.get("AnyOf")) and len(t) == 2 and t[1] == {"type": "null"}:
-                field_props["type"] = t[1]["type"]
-                del field_props["AnyOf"]
+            if (t := field_props.get("anyOf")) and len(t) == 2 and t[1] == {"type": "null"}:
+                for k, v in t[0].items():
+                    field_props[k] = v
+                del field_props["anyOf"]
 
     if geom_field := collection.geometry_field:
         schema["properties"][geom_field] = {
