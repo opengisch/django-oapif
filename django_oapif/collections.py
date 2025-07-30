@@ -163,7 +163,7 @@ def get_json_schema(
     # from the list of required ones
     for field_name, field_props in schema["properties"].items():
         if field_name not in required_files:
-            if (t := field_props["AnyOf"]) and len(t) == 2 and t[1] == {"type": "null"}:
+            if (t := field_props.get("AnyOf")) and len(t) == 2 and t[1] == {"type": "null"}:
                 field_props["type"] = t[1]["type"]
                 del field_props["AnyOf"]
 
