@@ -157,12 +157,12 @@ def get_json_schema(
     collection: OAPIFCollection, geom_schema: type[Schema], properties_schema: type[Schema]
 ) -> dict[str, Any]:
     schema = properties_schema.model_json_schema(by_alias=False, schema_generator=NinjaGenerateJsonSchema)
-    required_files = set(schema["required"])
+    required_fields = set(schema.get("required", []))
     # Optional fields are represented as a AnyOf union of their actual type and None
     # We patch this as it is unnecessary considering optional fields are already infered
     # from the list of required ones
     for field_name, field_props in schema["properties"].items():
-        if field_name not in required_files:
+        if field_name not in required_fields:
             if (t := field_props.get("AnyOf")) and len(t) == 2 and t[1] == {"type": "null"}:
                 field_props["type"] = t[1]["type"]
                 del field_props["AnyOf"]
