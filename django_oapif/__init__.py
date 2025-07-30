@@ -1,4 +1,3 @@
-from . import permissions
 from .api import OAPIF
 
 try:
@@ -8,7 +7,6 @@ except ImportError:
     __version_tuple__ = (0, 0, 0, "dev")
 
 __all__ = [
-    "permissions",
     "OAPIF",
     "__version__",
     "__version_tuple__",
