@@ -259,6 +259,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         else:
             GeometrySchema: TypeAlias = Geom[Coordinate]
     else:
+        Geom: TypeAlias = None
         GeometrySchema: TypeAlias = None
 
     FeatureSchema: TypeAlias = Feature[GeometrySchema, PropertiesSchema]
