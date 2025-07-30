@@ -1,5 +1,5 @@
 import math
-from typing import NamedTuple, Optional, TypeAlias
+from typing import Any, NamedTuple, Optional, TypeAlias
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from django.contrib.gis.db.models import Extent
@@ -10,7 +10,7 @@ from django.db import models
 from django.db.models.functions import Cast
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404
-from ninja import Header, ModelSchema, Query, Router
+from ninja import Header, ModelSchema, Query, Router, Schema
 from ninja.errors import AuthorizationError, HttpError
 from ninja.schema import NinjaGenerateJsonSchema
 from pydantic import ConfigDict
@@ -153,6 +153,40 @@ def query_collection(collection: OAPIFCollectionEntry, crs: str, bbox: str | Non
     return qs
 
 
+def get_json_schema(
+    collection: OAPIFCollection, geom_schema: type[Schema], properties_schema: type[Schema]
+) -> dict[str, Any]:
+    schema = properties_schema.model_json_schema(by_alias=False, schema_generator=NinjaGenerateJsonSchema)
+    required_files = set(schema["required"])
+    # Optional fields are represented as a AnyOf union of their actual type and None
+    # We patch this as it is unnecessary considering optional fields are already infered
+    # from the list of required ones
+    for field_name, field_props in schema["properties"].items():
+        if field_name not in required_files:
+            if (t := field_props["AnyOf"]) and len(t) == 2 and t[1] == {"type": "null"}:
+                field_props["type"] = t[1]["type"]
+                del field_props["AnyOf"]
+
+    if geom_field := collection.geometry_field:
+        schema["properties"][geom_field] = {
+            "title": "geometry",
+            "x-ogc-role": "primary-geometry",
+            "format": f"geometry-{geom_schema.__name__.lower()}",
+        }
+    schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
+    schema["title"] = collection.title
+    return schema
+
+
+def object_to_feature(feature_schema: type[Feature], obj):
+    return feature_schema(
+        type="Feature",
+        id=str(obj.pk),
+        geometry=getattr(obj, "_oapif_geometry", None),
+        properties=obj,
+    )
+
+
 def create_collections_router(collections: dict[str, OAPIFCollectionEntry]):
     router = Router()
 
@@ -231,13 +265,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
     NewFeatureSchema: TypeAlias = NewFeature[GeometrySchema, PropertiesSchema]
     FeatureCollectionSchema: TypeAlias = FeatureCollection[FeatureSchema]
 
-    def object_to_feature(obj):
-        return FeatureSchema(
-            type="Feature",
-            id=str(obj.pk),
-            geometry=getattr(obj, "_oapif_geometry", None),
-            properties=obj,
-        )
+    json_schema = get_json_schema(collection, Geom, PropertiesSchema)
 
     router = Router()
 
@@ -249,17 +277,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
     @router.get("/schema")
     def get_schema(request: HttpRequest):
         authorize(request)
-        schema = PropertiesSchema.model_json_schema(by_alias=False, schema_generator=NinjaGenerateJsonSchema)
-        if geom_field := collection.geometry_field:
-            schema["properties"][geom_field] = {
-                "title": "geometry",
-                "x-ogc-role": "primary-geometry",
-                "format": f"geometry-{Geom.__name__.lower()}",
-            }
-        schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
-        schema["$id"] = request.build_absolute_uri()
-        schema["title"] = collection.title
-        return schema
+        return {**json_schema, "$id": request.build_absolute_uri()}
 
     @router.get("/items", response=FeatureCollectionSchema)
     def get_items(
@@ -280,7 +298,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         features = []
         bbox = [math.inf, math.inf, -math.inf, -math.inf]
         for obj in paginated_query:
-            feature = object_to_feature(obj)
+            feature = object_to_feature(FeatureSchema, obj)
             features.append(feature)
             if geometry := feature.geometry:
                 bbox = [
@@ -323,7 +341,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         authorize(request)
         query = query_collection(collection, crs)
         item = get_object_or_404(query, pk=item_id)
-        return object_to_feature(item)
+        return object_to_feature(FeatureSchema, item)
 
     @router.post("/items", response={201: FeatureSchema})
     def create_item(
@@ -342,7 +360,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         item.save()
         item = query_collection(collection, CRS84_URI).get(pk=item.pk)
         response.headers["Location"] = request.build_absolute_uri(f"items/{item.pk}")
-        return 201, object_to_feature(item)
+        return 201, object_to_feature(FeatureSchema, item)
 
     @router.api_operation(["OPTIONS"], "/items/{item_id}")
     def options_item(
@@ -374,7 +392,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             setattr(item, geom_field, geometry)
         item.save()
         item = query_collection(collection, CRS84_URI).get(pk=item_id)
-        return object_to_feature(item)
+        return object_to_feature(FeatureSchema, item)
 
     @router.delete("/items/{item_id}")
     def delete_item(
