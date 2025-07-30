@@ -12,6 +12,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404
 from ninja import Header, ModelSchema, Query, Router
 from ninja.errors import AuthorizationError, HttpError
+from ninja.schema import NinjaGenerateJsonSchema
 from pydantic import ConfigDict
 
 from django_oapif.crs import CRS84_URI, get_srid_from_uri
@@ -248,7 +249,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
     @router.get("/schema")
     def get_schema(request: HttpRequest):
         authorize(request)
-        schema = PropertiesSchema.json_schema()
+        schema = PropertiesSchema.model_json_schema(by_alias=False, schema_generator=NinjaGenerateJsonSchema)
         if geom_field := collection.geometry_field:
             schema["properties"][geom_field] = {
                 "title": "geometry",
