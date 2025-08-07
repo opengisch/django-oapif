@@ -37,8 +37,8 @@ class DjangoAuth(APIKeyCookie):
 class OAPIF:
     """Ninja API."""
 
-    def __init__(self):
-        self.api = NinjaAPI(auth=[BasicAuth(), DjangoAuth()])
+    def __init__(self, auth=[BasicAuth(), DjangoAuth()], **kwargs):
+        self.api = NinjaAPI(auth=auth, **kwargs)
         self.collections: dict[str, OAPIFCollectionEntry] = {}
         self.api.add_router("/", create_root_router())
         self.api.add_router("/conformance", create_conformance_router())
