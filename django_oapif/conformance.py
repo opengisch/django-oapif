@@ -7,7 +7,7 @@ from django_oapif.schema import OAPIFConformance
 def create_conformance_router():
     router = Router()
 
-    @router.get("", response=OAPIFConformance)
+    @router.get("", response=OAPIFConformance, operation_id="get_conformance")
     def conformance(request: HttpRequest):
         return OAPIFConformance(
             conformsTo=[

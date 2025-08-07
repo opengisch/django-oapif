@@ -8,7 +8,7 @@ from django_oapif.schema import OAPIFRoot
 def create_root_router():
     router = Router()
 
-    @router.get("")
+    @router.get("", operation_id="get_root")
     def root(request: HttpRequest):
         return OAPIFRoot(
             title="self.title",

@@ -191,7 +191,7 @@ def object_to_feature(feature_schema: type[Feature], obj):
 def create_collections_router(collections: dict[str, OAPIFCollectionEntry]):
     router = Router()
 
-    @router.get("", response=OAPIFCollections)
+    @router.get("", response=OAPIFCollections, operation_id="get_collections")
     def list_collections(request: HttpRequest):
         return OAPIFCollections(
             links=[
@@ -271,17 +271,17 @@ def create_collection_router(collection: OAPIFCollectionEntry):
 
     router = Router()
 
-    @router.get("", response=OAPIFCollection)
+    @router.get("", response=OAPIFCollection, operation_id=f"get_{collection.id}")
     def get_collection(request):
         authorize(request)
         return get_collection_response(request, collection)
 
-    @router.get("/schema")
+    @router.get("/schema", operation_id=f"get_{collection.id}_schema")
     def get_schema(request: HttpRequest):
         authorize(request)
         return {**json_schema, "$id": request.build_absolute_uri()}
 
-    @router.get("/items", response=FeatureCollectionSchema)
+    @router.get("/items", response=FeatureCollectionSchema, operation_id=f"get_{collection.id}_items")
     def get_items(
         request: HttpRequest,
         limit: int = 100,
@@ -321,7 +321,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             links=get_page_links(request, limit, offset, total_count, result_count),
         )
 
-    @router.api_operation(["OPTIONS"], "/items")
+    @router.api_operation(["OPTIONS"], "/items", operation_id=f"get_{collection.id}_items_rights")
     def options_items(
         request: HttpRequest,
         response: HttpResponse,
@@ -334,7 +334,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
                 allowed.append(method)
         response.headers["Allow"] = ", ".join(allowed)
 
-    @router.get("/items/{item_id}", response=FeatureSchema)
+    @router.get("/items/{item_id}", response=FeatureSchema, operation_id=f"get_{collection.id}_item")
     def get_item(
         request: HttpRequest,
         item_id: str,
@@ -345,7 +345,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         item = get_object_or_404(query, pk=item_id)
         return object_to_feature(FeatureSchema, item)
 
-    @router.post("/items", response={201: FeatureSchema})
+    @router.post("/items", response={201: FeatureSchema}, operation_id=f"create_{collection.id}_item")
     def create_item(
         request: HttpRequest,
         response: HttpResponse,
@@ -364,7 +364,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         response.headers["Location"] = request.build_absolute_uri(f"items/{item.pk}")
         return 201, object_to_feature(FeatureSchema, item)
 
-    @router.api_operation(["OPTIONS"], "/items/{item_id}")
+    @router.api_operation(["OPTIONS"], "/items/{item_id}", operation_id=f"create_{collection.id}_item_rights")
     def options_item(
         request: HttpRequest,
         response: HttpResponse,
@@ -377,7 +377,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
                 allowed.append(method)
         response.headers["Allow"] = ", ".join(allowed)
 
-    @router.put("/items/{item_id}", response=FeatureSchema)
+    @router.put("/items/{item_id}", response=FeatureSchema, operation_id=f"replace_{collection.id}_item")
     def replace_item(
         request: HttpRequest,
         item_id: str,
@@ -396,7 +396,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         item = query_collection(collection, CRS84_URI).get(pk=item_id)
         return object_to_feature(FeatureSchema, item)
 
-    @router.delete("/items/{item_id}")
+    @router.delete("/items/{item_id}", operation_id=f"delete_{collection.id}_item")
     def delete_item(
         request: HttpRequest,
         item_id: str,
