@@ -388,9 +388,12 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         item = get_object_or_404(collection.model_class, pk=item_id)
         for field, value in feature.properties.model_dump().items():
             setattr(item, field, value)
-        if (geom_field := collection.geometry_field) and feature.geometry:
-            geometry = GEOSGeometry(feature.geometry.model_dump_json())
-            geometry.srid = get_srid_from_uri(crs)
+        if geom_field := collection.geometry_field:
+            if feature.geometry:
+                geometry = GEOSGeometry(feature.geometry.model_dump_json())
+                geometry.srid = get_srid_from_uri(crs)
+            else:
+                geometry = None
             setattr(item, geom_field, geometry)
         item.save()
         item = query_collection(collection, CRS84_URI).get(pk=item_id)
