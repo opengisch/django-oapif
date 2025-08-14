@@ -1,4 +1,4 @@
-from typing import Annotated, Generic, Literal, Optional, TypeAlias, TypeVar, Union
+from typing import Annotated, Any, Generic, Literal, Optional, TypeAlias, TypeVar, Union
 
 from ninja import Field, Schema
 
@@ -85,6 +85,15 @@ class Feature(Schema, Generic[FeatureGeometry, FeatureProperties]):
     id: int | str
     properties: FeatureProperties
     geometry: FeatureGeometry
+
+    @classmethod
+    def from_orm(cls, obj: Any):
+        return cls(
+            type="Feature",
+            id=str(obj.pk),
+            geometry=getattr(obj, "_oapif_geometry", None),
+            properties=obj,
+        )
 
 
 GenericFeature = TypeVar("GenericFeature", bound=Geometry)

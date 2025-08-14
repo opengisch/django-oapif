@@ -13,6 +13,7 @@ from django_oapif.collections import (
     create_collections_router,
 )
 from django_oapif.conformance import create_conformance_router
+from django_oapif.handler import QueryHandler
 from django_oapif.permissions import (
     BasePermission,
     DjangoModelPermissionsOrAnonReadOnly,
@@ -53,12 +54,13 @@ class OAPIF:
         geometry_field: str | None = "geom",
         properties_fields: list[str] | None = None,
         auth: type[BasePermission] = DjangoModelPermissionsOrAnonReadOnly,
+        handler: QueryHandler | None = None,
     ):
         """Register a Django model in the API."""
 
         def decorator(model_class: models.Model):
             collection_id = id or model_class._meta.label_lower
-            collection_title = id or model_class._meta.label
+            collection_title = title or model_class._meta.label
             self.collections[collection_id] = OAPIFCollectionEntry(
                 model_class=model_class,
                 id=collection_id,
@@ -67,6 +69,7 @@ class OAPIF:
                 geometry_field=geometry_field,
                 properties_fields=properties_fields,
                 auth=auth,
+                handler=handler or QueryHandler(model_class),
             )
 
             return model_class
