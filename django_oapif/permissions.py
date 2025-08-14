@@ -14,6 +14,12 @@ class BasePermission:
         """
         return True
 
+    def has_object_permission(self, request, obj):
+        """
+        Return `True` if permission is granted for the given object, `False` otherwise.
+        """
+        return True
+
 
 class AllowAny(BasePermission):
     """
@@ -23,8 +29,7 @@ class AllowAny(BasePermission):
     more explicit.
     """
 
-    def has_permission(self, request, model_class):
-        return True
+    ...
 
 
 class IsAuthenticated(BasePermission):
@@ -32,7 +37,7 @@ class IsAuthenticated(BasePermission):
     Allows access only to authenticated users.
     """
 
-    def has_permission(self, request, view):
+    def has_permission(self, request, model_class):
         return bool(request.user and request.user.is_authenticated)
 
 
@@ -50,7 +55,7 @@ class IsAuthenticatedOrReadOnly(BasePermission):
     The request is authenticated as a user, or is a read-only request.
     """
 
-    def has_permission(self, request, view):
+    def has_permission(self, request, model_class):
         return bool(request.method in SAFE_METHODS or request.user and request.user.is_authenticated)
 
 
