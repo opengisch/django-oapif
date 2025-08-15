@@ -47,6 +47,7 @@ class OAPIF:
 
     def register(
         self,
+        model_class: models.Model,
         /,
         id: str | None = None,
         title: str | None = None,
@@ -54,27 +55,22 @@ class OAPIF:
         geometry_field: str | None = "geom",
         properties_fields: list[str] | None = None,
         auth: type[BasePermission] = DjangoModelPermissionsOrAnonReadOnly,
-        handler: QueryHandler | None = None,
+        handler: type[QueryHandler] = QueryHandler,
     ):
         """Register a Django model in the API."""
 
-        def decorator(model_class: models.Model):
-            collection_id = id or model_class._meta.label_lower
-            collection_title = title or model_class._meta.label
-            self.collections[collection_id] = OAPIFCollectionEntry(
-                model_class=model_class,
-                id=collection_id,
-                title=collection_title,
-                description=description,
-                geometry_field=geometry_field,
-                properties_fields=properties_fields,
-                auth=auth,
-                handler=handler or QueryHandler(model_class),
-            )
-
-            return model_class
-
-        return decorator
+        collection_id = id or model_class._meta.label_lower
+        collection_title = title or model_class._meta.label
+        self.collections[collection_id] = OAPIFCollectionEntry(
+            model_class=model_class,
+            id=collection_id,
+            title=collection_title,
+            description=description,
+            geometry_field=geometry_field,
+            properties_fields=properties_fields,
+            auth=auth,
+            handler=handler(model_class),
+        )
 
     def _add_collections_routers(self):
         for collection_id, collection_entry in self.collections.items():
