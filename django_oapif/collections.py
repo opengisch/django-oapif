@@ -101,10 +101,13 @@ class OAPIFCollectionEntry(NamedTuple):
                     del field_props["anyOf"]
 
         if geom_field := self.geometry_field:
+            geom_type = geom_schema.__name__.lower()
+            if geom_type == "geometry":
+                geom_type = "any"
             schema["properties"][geom_field] = {
                 "title": "geometry",
                 "x-ogc-role": "primary-geometry",
-                "format": f"geometry-{geom_schema.__name__.lower()}",
+                "format": f"geometry-{geom_type}",
             }
         schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
         schema["title"] = self.title
