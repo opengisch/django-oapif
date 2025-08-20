@@ -1,68 +1,70 @@
-from typing import Annotated, Any, Generic, Literal, Optional, TypeAlias, TypeVar, Union
+from typing import Annotated, Any, Literal, Optional, Union
 
 from ninja import Field, Schema
 
 from django_oapif.schema import OAPIFLink
 
-Coordinate2D: TypeAlias = tuple[float, float]
-Coordinate3D: TypeAlias = tuple[float, float, float]
-
-# Define a TypeVar constrained to only the two aliases
-Coordinate = TypeVar("Coordinate", Coordinate2D, Coordinate3D)
+type Coordinate2D = tuple[float, float]
+type Coordinate3D = tuple[float, float, float]
+type Coordinate = Coordinate2D | Coordinate3D
 
 
-class GeometryBase(Schema, Generic[Coordinate]):
+class GeometryBase(Schema):
     bbox: Optional[tuple[float, float, float, float]] = None
 
 
-class Point(GeometryBase):
+class Point[C: Coordinate](GeometryBase):
     type: Literal["Point"]
-    coordinates: Coordinate
+    coordinates: C
 
 
-class LineString(GeometryBase):
+class LineString[C: Coordinate](GeometryBase):
     type: Literal["LineString"]
-    # coordinates: Annotated[List[Coordinate], Field(min_length=2)]
     coordinates: Union[
         Annotated[list[Coordinate], Field(min_length=0, max_length=0)],
         Annotated[list[Coordinate], Field(min_length=2)],
     ]
 
 
-class Polygon(GeometryBase):
+class Polygon[C: Coordinate](GeometryBase):
     type: Literal["Polygon"]
-    coordinates: list[Annotated[list[Coordinate], Field(min_length=4)]]
+    coordinates: list[Annotated[list[C], Field(min_length=4)]]
 
 
-class MultiPoint(GeometryBase):
+class MultiPoint[C: Coordinate](GeometryBase):
     type: Literal["MultiPoint"]
-    coordinates: list[Coordinate]
+    coordinates: list[C]
 
 
-class MultiLineString(GeometryBase):
+class MultiLineString[C: Coordinate](GeometryBase):
     type: Literal["MultiLineString"]
-    coordinates: list[list[Coordinate]]
+    coordinates: list[
+        Union[
+            Annotated[list[C], Field(min_length=0, max_length=0)],
+            Annotated[list[C], Field(min_length=2)],
+        ]
+    ]
 
 
-class MultiPolygon(GeometryBase):
+class MultiPolygon[C: Coordinate](GeometryBase):
     type: Literal["MultiPolygon"]
-    coordinates: list[list[list[Coordinate]]]
+    coordinates: list[list[Annotated[list[C], Field(min_length=4)]]]
 
 
-class GeometryCollection(GeometryBase):
+class GeometryCollection[C: Coordinate](GeometryBase):
     type: Literal["GeometryCollection"]
-    geometries: list["Geometry"]
+    geometries: list["Geometry[C]"]
 
 
-Geometry: TypeAlias = Annotated[
+type Geometry[C: Coordinate] = Annotated[
     Union[
-        Point,
-        MultiPoint,
-        LineString,
-        MultiLineString,
-        Polygon,
-        MultiPolygon,
-        GeometryCollection,
+        Point[C],
+        MultiPoint[C],
+        LineString[C],
+        MultiLineString[C],
+        Polygon[C],
+        MultiPolygon[C],
+        GeometryCollection[C],
     ],
     Field(discriminator="type"),
 ]
@@ -70,21 +72,17 @@ Geometry: TypeAlias = Annotated[
 GeometryCollection.model_rebuild()
 
 
-FeatureProperties = TypeVar("FeatureProperties", bound=Schema)
-FeatureGeometry = TypeVar("FeatureGeometry", bound=Union[Geometry, None])
-
-
-class NewFeature(Schema, Generic[FeatureGeometry, FeatureProperties]):
+class NewFeature[P: Schema, G: Geometry | None](Schema):
     type: Literal["Feature"]
-    properties: FeatureProperties
-    geometry: FeatureGeometry
+    properties: P
+    geometry: G
 
 
-class Feature(Schema, Generic[FeatureGeometry, FeatureProperties]):
+class Feature[P: Schema, G: Geometry | None](Schema):
     type: Literal["Feature"]
     id: int | str
-    properties: FeatureProperties
-    geometry: FeatureGeometry
+    properties: P
+    geometry: G
 
     @classmethod
     def from_orm(cls, obj: Any):
@@ -96,12 +94,9 @@ class Feature(Schema, Generic[FeatureGeometry, FeatureProperties]):
         )
 
 
-GenericFeature = TypeVar("GenericFeature", bound=Geometry)
-
-
-class FeatureCollection(Schema, Generic[GenericFeature]):
+class FeatureCollection[F: Feature](Schema):
     type: Literal["FeatureCollection"]
-    features: list[GenericFeature]
+    features: list[F]
     bbox: Optional[tuple[float, float, float, float]]
     links: list[OAPIFLink]
     numberReturned: int
