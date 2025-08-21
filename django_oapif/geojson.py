@@ -72,13 +72,13 @@ type Geometry[C: Coordinate] = Annotated[
 GeometryCollection.model_rebuild()
 
 
-class NewFeature[P: Schema, G: Geometry | None](Schema):
+class NewFeature[G: Geometry | None, P: Schema](Schema):
     type: Literal["Feature"]
     properties: P
     geometry: G
 
 
-class Feature[P: Schema, G: Geometry | None](Schema):
+class Feature[G: Geometry | None, P: Schema](Schema):
     type: Literal["Feature"]
     id: int | str
     properties: P
