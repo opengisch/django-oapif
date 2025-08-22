@@ -352,6 +352,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
     def options_item(
         request: HttpRequest,
         response: HttpResponse,
+        item_id: str,
     ):
         collection.check_permissions(request)
         allowed = ["OPTIONS"]
