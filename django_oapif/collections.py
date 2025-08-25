@@ -6,6 +6,7 @@ from django.contrib.gis.db.models.functions import AsGeoJSON, Transform
 from django.contrib.gis.geos import GEOSGeometry
 from django.contrib.gis.geos import Polygon as GEOSPolygon
 from django.db import models
+from django.db.models import ForeignKey
 from django.db.models.functions import Cast
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404
@@ -201,7 +202,13 @@ def create_collections_router(collections: dict[str, OAPIFCollectionEntry]):
 
 def create_collection_router(collection: OAPIFCollectionEntry):
     class PropertiesSchema(ModelSchema):
-        model_config = ConfigDict(extra="forbid", from_attributes=True, populate_by_name=True)
+        model_config = ConfigDict(
+            extra="forbid",
+            from_attributes=True,
+            validate_by_name=True,
+            serialize_by_alias=False,
+            loc_by_alias=False,
+        )
 
         class Meta:
             model = collection.model_class
@@ -250,6 +257,11 @@ def create_collection_router(collection: OAPIFCollectionEntry):
     NewFeatureSchema: TypeAlias = NewFeature[GeometrySchema, PropertiesSchema]
     FeatureCollectionSchema: TypeAlias = FeatureCollection[FeatureSchema]
 
+    foreign_keys = {
+        field.name: field.remote_field.model
+        for field in collection.model_class._meta.get_fields()
+        if isinstance(field, ForeignKey)
+    }
     json_schema = collection.json_schema(Geom, PropertiesSchema)
 
     router = Router()
@@ -342,6 +354,9 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             geometry = GEOSGeometry(feature.geometry.model_dump_json())
             geometry.srid = get_srid_from_uri(crs)
             input[geom_field] = geometry
+        for key, value in input.items():
+            if related_model := foreign_keys.get(key):
+                input[key] = related_model.objects.get(pk=value)
         item = collection.model_class.objects.create(**input)
         collection.handler.save_model(request, item, False)
         item = collection.query(request, CRS84_URI).get(pk=item.pk)
@@ -372,6 +387,8 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         collection.check_permissions(request)
         item = get_object_or_404(collection.model_class, pk=item_id)
         for field, value in feature.properties.model_dump().items():
+            if related_model := foreign_keys.get(field):
+                value = related_model.objects.get(pk=value)
             setattr(item, field, value)
         if geom_field := collection.geometry_field:
             if feature.geometry:
