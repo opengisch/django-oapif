@@ -355,7 +355,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             geometry.srid = get_srid_from_uri(crs)
             input[geom_field] = geometry
         for key, value in input.items():
-            if related_model := foreign_keys.get(key):
+            if value is not None and (related_model := foreign_keys.get(key)):
                 input[key] = related_model.objects.get(pk=value)
         item = collection.model_class.objects.create(**input)
         collection.handler.save_model(request, item, False)
@@ -387,7 +387,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         collection.check_permissions(request)
         item = get_object_or_404(collection.model_class, pk=item_id)
         for field, value in feature.properties.model_dump().items():
-            if related_model := foreign_keys.get(field):
+            if value is not None and (related_model := foreign_keys.get(field)):
                 value = related_model.objects.get(pk=value)
             setattr(item, field, value)
         if geom_field := collection.geometry_field:
