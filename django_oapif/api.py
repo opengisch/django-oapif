@@ -1,38 +1,15 @@
-from typing import Any, Optional
-
-from django.conf import settings
-from django.contrib.auth import authenticate
 from django.db import models
-from django.http import HttpRequest
 from ninja import NinjaAPI
-from ninja.security import APIKeyCookie, HttpBasicAuth
 
+from django_oapif.auth import BasicAuth, DjangoAuth
 from django_oapif.collections import (
     OAPIFCollectionEntry,
     create_collection_router,
     create_collections_router,
 )
 from django_oapif.conformance import create_conformance_router
-from django_oapif.handler import QueryHandler
-from django_oapif.permissions import (
-    BasePermission,
-    DjangoModelPermissionsOrAnonReadOnly,
-)
+from django_oapif.handler import DjangoModelPermissionsHandler, QueryHandler
 from django_oapif.root import create_root_router
-
-
-class BasicAuth(HttpBasicAuth):
-    def authenticate(self, request, username, password):
-        if user := authenticate(request, username=username, password=password):
-            request.user = user
-        return request.user
-
-
-class DjangoAuth(APIKeyCookie):
-    param_name: str = settings.SESSION_COOKIE_NAME
-
-    def authenticate(self, request: HttpRequest, key: Optional[str]) -> Optional[Any]:
-        return request.user
 
 
 class OAPIF:
@@ -54,8 +31,7 @@ class OAPIF:
         description: str | None = None,
         geometry_field: str | None = "geom",
         properties_fields: list[str] | None = None,
-        auth: type[BasePermission] = DjangoModelPermissionsOrAnonReadOnly,
-        handler: type[QueryHandler] = QueryHandler,
+        handler: type[QueryHandler] = DjangoModelPermissionsHandler,
     ):
         """Register a Django model in the API."""
 
@@ -68,7 +44,6 @@ class OAPIF:
             description=description,
             geometry_field=geometry_field,
             properties_fields=properties_fields,
-            auth=auth,
             handler=handler(model_class),
         )
 

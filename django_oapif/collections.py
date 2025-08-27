@@ -32,7 +32,6 @@ from django_oapif.geojson import (
     Polygon,
 )
 from django_oapif.handler import QueryHandler
-from django_oapif.permissions import BasePermission
 from django_oapif.schema import (
     OAPIFCollection,
     OAPIFCollections,
@@ -51,7 +50,6 @@ class OAPIFCollectionEntry(NamedTuple):
     geometry_field: str | None
     properties_fields: list[str] | None
     handler: QueryHandler
-    auth: type[BasePermission]
 
     @property
     def srid(self):
@@ -79,14 +77,6 @@ class OAPIFCollectionEntry(NamedTuple):
                 except ValueError:
                     raise HttpError(400, "Invalid bbox parameter. Expected format: minx,miny,maxx,maxy")
         return qs
-
-    def check_permissions(self, request: HttpRequest):
-        if not self.auth().has_permission(request, self.model_class):
-            raise AuthorizationError()
-
-    def check_object_permissions(self, request: HttpRequest, obj):
-        if not self.auth().has_object_permission(request, obj):
-            raise AuthorizationError()
 
     def json_schema(self, geom_schema: type[Schema], properties_schema: type[Schema]) -> dict[str, Any]:
         schema = properties_schema.model_json_schema(by_alias=False, schema_generator=NinjaGenerateJsonSchema)
@@ -193,7 +183,7 @@ def create_collections_router(collections: dict[str, OAPIFCollectionEntry]):
             collections=[
                 get_collection_response(request, collection)
                 for collection in collections.values()
-                if collection.auth().has_permission(request, collection.model_class)
+                if collection.handler.has_view_permission(request)
             ],
         )
 
@@ -268,12 +258,14 @@ def create_collection_router(collection: OAPIFCollectionEntry):
 
     @router.get("", response=OAPIFCollection, operation_id=f"get_{collection.id}")
     def get_collection(request):
-        collection.check_permissions(request)
+        if not collection.handler.has_view_permission(request):
+            raise AuthorizationError()
         return get_collection_response(request, collection)
 
     @router.get("/schema", operation_id=f"get_{collection.id}_schema")
     def get_schema(request: HttpRequest):
-        collection.check_permissions(request)
+        if not collection.handler.has_view_permission(request):
+            raise AuthorizationError()
         return {**json_schema, "$id": request.build_absolute_uri()}
 
     @router.get("/items", response=FeatureCollectionSchema, operation_id=f"get_{collection.id}_items")
@@ -285,7 +277,9 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         bbox_crs: str = Query(CRS84_URI, alias="bbox-crs"),
         bbox: str | None = Query(None, description="BBOX in the format: minx,miny,maxx,maxy"),
     ):
-        collection.check_permissions(request)
+        if not collection.handler.has_view_permission(request):
+            raise AuthorizationError()
+
         query = collection.query(request, crs, bbox, bbox_crs)
         paginated_query = query[offset : offset + limit]
 
@@ -321,12 +315,11 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         request: HttpRequest,
         response: HttpResponse,
     ):
-        collection.check_permissions(request)
         allowed = ["OPTIONS"]
-        for method in ["GET", "POST"]:
-            request.method = method
-            if collection.auth().has_permission(request, collection.model_class):
-                allowed.append(method)
+        if collection.handler.has_view_permission(request):
+            allowed.append("GET")
+        if collection.handler.has_add_permission(request):
+            allowed.append("POST")
         response.headers["Allow"] = ", ".join(allowed)
 
     @router.get("/items/{item_id}", response=FeatureSchema, operation_id=f"get_{collection.id}_item")
@@ -335,10 +328,10 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         item_id: str,
         crs: str = CRS84_URI,
     ):
-        collection.check_permissions(request)
         query = collection.query(request, crs)
         item = get_object_or_404(query, pk=item_id)
-        collection.check_object_permissions(request, item)
+        if not collection.handler.has_view_permission(request, item):
+            raise AuthorizationError()
         return FeatureSchema.from_orm(item)
 
     @router.post("/items", response={201: FeatureSchema}, operation_id=f"create_{collection.id}_item")
@@ -348,7 +341,6 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         feature: NewFeatureSchema,
         crs: str | None = Header(alias="Content-Crs", default=CRS84_URI),
     ):
-        collection.check_permissions(request)
         input = feature.properties.model_dump() or {}
         if (geom_field := collection.geometry_field) and feature.geometry:
             geometry = GEOSGeometry(feature.geometry.model_dump_json())
@@ -358,6 +350,8 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             if value is not None and (related_model := foreign_keys.get(key)):
                 input[key] = related_model.objects.get(pk=value)
         item = collection.model_class.objects.create(**input)
+        if not collection.handler.has_add_permission(request, item):
+            raise AuthorizationError()
         collection.handler.save_model(request, item, False)
         item = collection.query(request, CRS84_URI).get(pk=item.pk)
         response.headers["Location"] = request.build_absolute_uri(f"items/{item.pk}")
@@ -369,12 +363,15 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         response: HttpResponse,
         item_id: str,
     ):
-        collection.check_permissions(request)
+        query = collection.handler.get_queryset(request)
+        item = get_object_or_404(query, pk=item_id)
         allowed = ["OPTIONS"]
-        for method in ["GET", "PUT", "DELETE"]:
-            request.method = method
-            if collection.auth().has_permission(request, collection.model_class):
-                allowed.append(method)
+        if collection.handler.has_view_permission(request, item):
+            allowed.append("GET")
+        if collection.handler.has_change_permission(request, item):
+            allowed.append("PUT")
+        if collection.handler.has_delete_permission(request, item):
+            allowed.append("DELETE")
         response.headers["Allow"] = ", ".join(allowed)
 
     @router.put("/items/{item_id}", response=FeatureSchema, operation_id=f"replace_{collection.id}_item")
@@ -384,8 +381,10 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         feature: NewFeatureSchema,
         crs: str | None = Header(alias="Content-Crs", default=CRS84_URI),
     ):
-        collection.check_permissions(request)
-        item = get_object_or_404(collection.model_class, pk=item_id)
+        query = collection.handler.get_queryset(request)
+        item = get_object_or_404(query, pk=item_id)
+        if not collection.handler.has_change_permission(request, item):
+            raise AuthorizationError()
         for field, value in feature.properties.model_dump().items():
             if value is not None and (related_model := foreign_keys.get(field)):
                 value = related_model.objects.get(pk=value)
@@ -406,8 +405,10 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         request: HttpRequest,
         item_id: str,
     ):
-        collection.check_permissions(request)
-        item = get_object_or_404(collection.model_class, pk=item_id)
+        query = collection.handler.get_queryset(request)
+        item = get_object_or_404(query, pk=item_id)
+        if not collection.handler.has_view_permission(request, item):
+            raise AuthorizationError()
         collection.handler.delete_model(request, item)
 
     return router
