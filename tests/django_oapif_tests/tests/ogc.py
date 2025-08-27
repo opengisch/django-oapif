@@ -1,5 +1,5 @@
 from django_oapif import OAPIF
-from django_oapif.permissions import DjangoModelPermissions
+from django_oapif.handler import DjangoModelPermissionsHandler
 
 from .models import (
     Line_2056_10fields,
@@ -70,5 +70,5 @@ ogc_api.register(
         "field_int",
         *[f"field_str_{i}" for i in range(10)],
     ],
-    auth=DjangoModelPermissions,
+    handler=DjangoModelPermissionsHandler,
 )
