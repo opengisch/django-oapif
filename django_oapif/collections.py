@@ -196,7 +196,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         include_fields = collection.properties_fields
         exclude_fields = None
     else:
-        include_fields = None
+        include_fields = None if collection.geometry_field else "__all__"
         exclude_fields = [collection.geometry_field] if collection.geometry_field else None
 
     class PropertiesSchema(ModelSchema):
