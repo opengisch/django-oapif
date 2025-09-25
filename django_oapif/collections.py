@@ -12,6 +12,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404
 from ninja import Header, ModelSchema, Query, Router, Schema
 from ninja.errors import AuthorizationError, HttpError
+from ninja.orm.fields import get_schema_field
 from ninja.schema import NinjaGenerateJsonSchema
 from pydantic import ConfigDict
 
@@ -247,6 +248,8 @@ def create_collection_router(collection: OAPIFCollectionEntry):
     NewFeatureSchema: TypeAlias = NewFeature[GeometrySchema, PropertiesSchema]
     FeatureCollectionSchema: TypeAlias = FeatureCollection[FeatureSchema]
 
+    PrimaryKeyType, _ = get_schema_field(collection.model_class._meta.pk)
+
     foreign_keys = {
         field.name: field.remote_field.model
         for field in collection.model_class._meta.get_fields()
@@ -325,7 +328,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
     @router.get("/items/{item_id}", response=FeatureSchema, operation_id=f"get_{collection.id}_item")
     def get_item(
         request: HttpRequest,
-        item_id: str,
+        item_id: PrimaryKeyType,
         crs: str = CRS84_URI,
     ):
         query = collection.query(request, crs)
@@ -377,7 +380,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
     @router.put("/items/{item_id}", response=FeatureSchema, operation_id=f"replace_{collection.id}_item")
     def replace_item(
         request: HttpRequest,
-        item_id: str,
+        item_id: PrimaryKeyType,
         feature: NewFeatureSchema,
         crs: str | None = Header(alias="Content-Crs", default=CRS84_URI),
     ):
@@ -403,7 +406,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
     @router.delete("/items/{item_id}", operation_id=f"delete_{collection.id}_item")
     def delete_item(
         request: HttpRequest,
-        item_id: str,
+        item_id: PrimaryKeyType,
     ):
         query = collection.handler.get_queryset(request)
         item = get_object_or_404(query, pk=item_id)
