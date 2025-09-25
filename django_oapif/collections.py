@@ -192,6 +192,13 @@ def create_collections_router(collections: dict[str, OAPIFCollectionEntry]):
 
 
 def create_collection_router(collection: OAPIFCollectionEntry):
+    if collection.properties_fields:
+        include_fields = collection.properties_fields
+        exclude_fields = None
+    else:
+        include_fields = None
+        exclude_fields = [collection.geometry_field] if collection.geometry_field else None
+
     class PropertiesSchema(ModelSchema):
         model_config = ConfigDict(
             extra="forbid",
@@ -203,14 +210,8 @@ def create_collection_router(collection: OAPIFCollectionEntry):
 
         class Meta:
             model = collection.model_class
-            fields = collection.properties_fields
-            exclude = (
-                None
-                if collection.properties_fields
-                else [collection.model_class._meta.pk.name, collection.geometry_field]
-                if collection.geometry_field
-                else [collection.model_class._meta.pk.name]
-            )
+            fields = include_fields
+            exclude = exclude_fields
 
     if collection.geometry_field:
         geom_field = collection.model_class._meta.get_field(collection.geometry_field)
