@@ -209,7 +209,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
                 if collection.properties_fields
                 else [collection.geometry_field]
                 if collection.geometry_field
-                else None
+                else []
             )
 
     if collection.geometry_field:
