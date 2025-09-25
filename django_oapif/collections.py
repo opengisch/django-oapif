@@ -364,7 +364,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
     def options_item(
         request: HttpRequest,
         response: HttpResponse,
-        item_id: str,
+        item_id: PrimaryKeyType,
     ):
         query = collection.handler.get_queryset(request)
         item = get_object_or_404(query, pk=item_id)
