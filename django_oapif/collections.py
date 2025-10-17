@@ -6,7 +6,7 @@ from django.contrib.gis.db.models.functions import AsGeoJSON, Transform
 from django.contrib.gis.geos import GEOSGeometry
 from django.contrib.gis.geos import Polygon as GEOSPolygon
 from django.db import models
-from django.db.models import ForeignKey
+from django.db.models import ForeignKey, ManyToManyRel, ManyToOneRel
 from django.db.models.functions import Cast
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404
@@ -22,13 +22,13 @@ from django_oapif.geojson import (
     Coordinate3D,
     Feature,
     FeatureCollection,
+    FeatureWithoutId,
     Geometry,
     GeometryCollection,
     LineString,
     MultiLineString,
     MultiPoint,
     MultiPolygon,
-    NewFeature,
     Point,
     Polygon,
 )
@@ -58,7 +58,13 @@ class OAPIFCollectionEntry(NamedTuple):
             return None
         return self.model_class._meta.get_field(self.geometry_field).srid
 
-    def query(self, request: HttpRequest, crs: str, bbox: str | None = None, bbox_crs: str | None = None):
+    def query(
+        self,
+        request: HttpRequest,
+        crs: str,
+        bbox: str | None = None,
+        bbox_crs: str | None = None,
+    ):
         output_srid = get_srid_from_uri(crs)
         qs = self.handler.get_queryset(request)
         if self.properties_fields:
@@ -71,12 +77,22 @@ class OAPIFCollectionEntry(NamedTuple):
             if bbox:
                 try:
                     minx, miny, maxx, maxy = map(float, bbox.split(","))
-                    bbox_geom: GEOSPolygon = GEOSPolygon.from_bbox((minx, miny, maxx, maxy))
+                    bbox_geom: GEOSPolygon = GEOSPolygon.from_bbox(
+                        (
+                            minx,
+                            miny,
+                            maxx,
+                            maxy,
+                        )
+                    )
                     bbox_geom.srid = get_srid_from_uri(bbox_crs)
                     bbox_expr = bbox_geom if bbox_geom.srid == self.srid else Transform(bbox_geom, self.srid)
                     qs = qs.filter(**{f"{geom_field}__intersects": bbox_expr})
                 except ValueError:
-                    raise HttpError(400, "Invalid bbox parameter. Expected format: minx,miny,maxx,maxy")
+                    raise HttpError(
+                        400,
+                        "Invalid bbox parameter. Expected format: minx,miny,maxx,maxy",
+                    )
         return qs
 
     def json_schema(self, geom_schema: type[Schema], properties_schema: type[Schema]) -> dict[str, Any]:
@@ -108,7 +124,12 @@ class OAPIFCollectionEntry(NamedTuple):
 
 def get_page_links(request: HttpRequest, limit: int, offset: int, total_count: int, returned_count: int):
     links = [
-        OAPIFLink(rel="self", title="items (self)", type="application/geo+json", href=request.build_absolute_uri())
+        OAPIFLink(
+            rel="self",
+            title="items (self)",
+            type="application/geo+json",
+            href=request.build_absolute_uri(),
+        )
     ]
     if offset > 0:
         links.append(
@@ -192,15 +213,19 @@ def create_collections_router(collections: dict[str, OAPIFCollectionEntry]):
 
 
 def create_collection_router(collection: OAPIFCollectionEntry):
-    if collection.properties_fields:
-        include_fields = collection.properties_fields
-        exclude_fields = None
-    elif collection.geometry_field:
-        include_fields = None
-        exclude_fields = [collection.geometry_field]
-    else:
-        include_fields = "__all__"
-        exclude_fields = None
+    include_fields = (
+        set(collection.properties_fields)
+        if collection.properties_fields is not None
+        else {
+            f.name
+            for f in collection.model_class._meta.get_fields()
+            if not isinstance(f, (ManyToOneRel, ManyToManyRel)) and not f.name == collection.geometry_field
+        }
+    )
+
+    readonly_fields = {
+        f.name for f in collection.model_class._meta.get_fields() if isinstance(f, models.GeneratedField)
+    }
 
     class PropertiesSchema(ModelSchema):
         model_config = ConfigDict(
@@ -214,7 +239,19 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         class Meta:
             model = collection.model_class
             fields = include_fields
-            exclude = exclude_fields
+
+    class EditablePropertiesSchema(ModelSchema):
+        model_config = ConfigDict(
+            extra="forbid",
+            from_attributes=True,
+            validate_by_name=True,
+            serialize_by_alias=False,
+            loc_by_alias=False,
+        )
+
+        class Meta:
+            model = collection.model_class
+            fields = include_fields - readonly_fields
 
     if collection.geometry_field:
         geom_field = collection.model_class._meta.get_field(collection.geometry_field)
@@ -249,7 +286,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         GeometrySchema: TypeAlias = None
 
     FeatureSchema: TypeAlias = Feature[GeometrySchema, PropertiesSchema]
-    NewFeatureSchema: TypeAlias = NewFeature[GeometrySchema, PropertiesSchema]
+    EditableFeatureSchema: TypeAlias = FeatureWithoutId[GeometrySchema, EditablePropertiesSchema]
     FeatureCollectionSchema: TypeAlias = FeatureCollection[FeatureSchema]
 
     PrimaryKeyType, _ = get_schema_field(collection.model_class._meta.pk)
@@ -263,19 +300,30 @@ def create_collection_router(collection: OAPIFCollectionEntry):
 
     router = Router()
 
-    @router.get("", response=OAPIFCollection, operation_id=f"get_{collection.id}")
+    @router.get(
+        "",
+        response=OAPIFCollection,
+        operation_id=f"get_{collection.id}",
+    )
     def get_collection(request):
         if not collection.handler.has_view_permission(request):
             raise AuthorizationError()
         return get_collection_response(request, collection)
 
-    @router.get("/schema", operation_id=f"get_{collection.id}_schema")
+    @router.get(
+        "/schema",
+        operation_id=f"get_{collection.id}_schema",
+    )
     def get_schema(request: HttpRequest):
         if not collection.handler.has_view_permission(request):
             raise AuthorizationError()
         return {**json_schema, "$id": request.build_absolute_uri()}
 
-    @router.get("/items", response=FeatureCollectionSchema, operation_id=f"get_{collection.id}_items")
+    @router.get(
+        "/items",
+        response=FeatureCollectionSchema,
+        operation_id=f"get_{collection.id}_items",
+    )
     def get_items(
         request: HttpRequest,
         limit: int = 100,
@@ -317,7 +365,11 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             links=get_page_links(request, limit, offset, total_count, result_count),
         )
 
-    @router.api_operation(["OPTIONS"], "/items", operation_id=f"get_{collection.id}_items_rights")
+    @router.api_operation(
+        ["OPTIONS"],
+        "/items",
+        operation_id=f"get_{collection.id}_items_rights",
+    )
     def options_items(
         request: HttpRequest,
         response: HttpResponse,
@@ -329,7 +381,11 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             allowed.append("POST")
         response.headers["Allow"] = ", ".join(allowed)
 
-    @router.get("/items/{item_id}", response=FeatureSchema, operation_id=f"get_{collection.id}_item")
+    @router.get(
+        "/items/{item_id}",
+        response=FeatureSchema,
+        operation_id=f"get_{collection.id}_item",
+    )
     def get_item(
         request: HttpRequest,
         item_id: PrimaryKeyType,
@@ -341,11 +397,15 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             raise AuthorizationError()
         return FeatureSchema.from_orm(item)
 
-    @router.post("/items", response={201: FeatureSchema}, operation_id=f"create_{collection.id}_item")
+    @router.post(
+        "/items",
+        response={201: FeatureSchema},
+        operation_id=f"create_{collection.id}_item",
+    )
     def create_item(
         request: HttpRequest,
         response: HttpResponse,
-        feature: NewFeatureSchema,
+        feature: EditableFeatureSchema,
         crs: str | None = Header(alias="Content-Crs", default=CRS84_URI),
     ):
         input = feature.properties.model_dump() or {}
@@ -364,7 +424,11 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         response.headers["Location"] = request.build_absolute_uri(f"items/{item.pk}")
         return 201, FeatureSchema.from_orm(item)
 
-    @router.api_operation(["OPTIONS"], "/items/{item_id}", operation_id=f"create_{collection.id}_item_rights")
+    @router.api_operation(
+        ["OPTIONS"],
+        "/items/{item_id}",
+        operation_id=f"create_{collection.id}_item_rights",
+    )
     def options_item(
         request: HttpRequest,
         response: HttpResponse,
@@ -381,11 +445,15 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             allowed.append("DELETE")
         response.headers["Allow"] = ", ".join(allowed)
 
-    @router.put("/items/{item_id}", response=FeatureSchema, operation_id=f"replace_{collection.id}_item")
+    @router.put(
+        "/items/{item_id}",
+        response=FeatureSchema,
+        operation_id=f"replace_{collection.id}_item",
+    )
     def replace_item(
         request: HttpRequest,
         item_id: PrimaryKeyType,
-        feature: NewFeatureSchema,
+        feature: EditableFeatureSchema,
         crs: str | None = Header(alias="Content-Crs", default=CRS84_URI),
     ):
         query = collection.handler.get_queryset(request)
