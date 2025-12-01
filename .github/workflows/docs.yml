@@ -25,7 +25,7 @@ jobs:
     # Skip if this job was scheduled and the runner belongs to a fork (i.e. forks have no use for this action)
     if: (github.event_name == 'schedule' && github.repository == 'opengisch/django-oapif') || (github.event_name != 'schedule')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: actions/setup-python@v5
         with:
