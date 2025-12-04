@@ -28,7 +28,7 @@ jobs:
       COMPOSE_DOCKER_CLI_BUILD: 1
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: Create env
       run: cp .env.example .env

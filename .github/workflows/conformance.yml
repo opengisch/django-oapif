@@ -19,7 +19,7 @@ jobs:
       pull-requests: write  # to write comment
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Create env
         run: cp .env.example .env
@@ -64,7 +64,7 @@ jobs:
           echo "EXIT_CODE=${EXIT_CODE}" >> $GITHUB_OUTPUT
 
       - name: Commit baseline if improved >> checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE == '1' }}
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
