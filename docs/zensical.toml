@@ -1,0 +1,74 @@
+[project]
+site_name = "Django-OAPIF"
+site_url = "https://opengisch.github.io/django-oapif/"
+site_author = "OPENGIS.ch"
+
+docs_dir = "content"
+
+repo_name = "opengisch/django-oapif"
+repo_url = "https://github.com/opengisch/django-oapif"
+edit_uri = "https://github.com/opengisch/django-oapif/tree/main/docs/content/"
+
+copyright = 'Copyright &copy; 2023-2026 <a href="https://OPENGIS.ch">OPENGIS.ch</a>'
+
+[project.theme]
+language = "en"
+features = [
+    "navigation.instant",
+    "navigation.instant.prefetch",
+    "navigation.tabs",
+    "navigation.tabs.sticky",
+    "navigation.sections",
+    "navigation.tracking",
+    "search.suggest",
+    "search.highlight"
+]
+
+# Palette toggle for automatic mode
+[[project.theme.palette]]
+media = "(prefers-color-scheme)"
+toggle.icon = "lucide/sun-moon"
+toggle.name = "Switch to light mode"
+
+# Palette toggle for light mode
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+# Palette toggle for dark mode
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to system preference"
+
+nav = [
+  {"Home" = "index.md"},
+  {"Quick start" = "quick-start.md"},
+  {"Demo" = "demo.md"},
+  {"API" = "api.md"},
+  {"Permissions" = "permissions.md"},
+  {"Test and conformance" = "tests.md"}
+]
+ 
+[project.extra]
+# Remove "Made with Material for MkDocs" from footer
+generator = false
+
+[project.plugins.mkdocstrings.handlers.python]
+inventories = ["https://docs.python.org/3/objects.inv"]
+paths = ["src"]
+
+[project.plugins.mkdocstrings.handlers.python.options]
+docstring_section_style = "list"
+line_length = 80
+merge_init_into_class = true
+separate_signature = true
+signature_crossrefs = true
+show_source = false
+show_root_heading = true
+show_signature_annotations = true
+show_object_full_path = false
+

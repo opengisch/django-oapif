@@ -62,7 +62,7 @@ extra:
 markdown_extensions:
   - attr_list
   - md_in_html
-  - fancyboxmd
+  #- fancyboxmd
   - sane_lists
   - admonition
   - codehilite

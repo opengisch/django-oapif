@@ -5,7 +5,7 @@
         members: [register]
 
 
-::: django_oapif.permissions
+<!-- ::: django_oapif.permissions
     options:
         members:
             - BasePermission
@@ -13,4 +13,4 @@
             - IsAdminUser
             - IsAuthenticatedOrReadOnly
             - DjangoModelPermissions
-            - DjangoModelPermissionsOrAnonReadOnly
+            - DjangoModelPermissionsOrAnonReadOnly -->
