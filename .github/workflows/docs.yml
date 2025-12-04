@@ -42,7 +42,7 @@ jobs:
       - name: Build documentation
         run: mkdocs build
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: ${{ github.event_name == 'pull_request' }}
         with:
           name: Django-OAPIF-documentation
