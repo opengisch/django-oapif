@@ -1,9 +1,9 @@
 # Courtesy of https://github.com/opengeospatial/ets-ogcapi-features10/issues/197
 
-FROM maven:3.8-openjdk-18
+FROM maven:3.9-eclipse-temurin-24
 
 # Copy actual source files
-ARG VERSION=1.6
+ARG VERSION=1.9
 RUN git clone --depth 1 --branch ${VERSION} https://github.com/opengeospatial/ets-ogcapi-features10.git /build
 
 WORKDIR /build/

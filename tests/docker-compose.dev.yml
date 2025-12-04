@@ -1,13 +1,11 @@
 # overrides for local development (mounts the source, enables debug, live-reload, etc.)
 # DO NOT USE ON PRODUCTION !!!
 
-version: '3.7'
-
 services:
 
-  caddy:
-    volumes:
-      - ./tests/docker/caddy:/etc/caddy
+  # caddy:
+  #   volumes:
+  #     - ./tests/docker/caddy:/etc/caddy
 
   django:
     environment:
@@ -38,7 +36,7 @@ services:
       - testing_conformance
 
   integration_tests:
-    image: opengisch/qgis:3.34-lunar
+    image: qgis/qgis:3.42.3-bookworm
     command: sh -c 'xvfb-run python3 -m unittest discover'
     tty: true
     volumes:

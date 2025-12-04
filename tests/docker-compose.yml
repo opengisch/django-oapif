@@ -1,7 +1,5 @@
 # default stack
 
-version: '3.7'
-
 services:
 
   caddy:
@@ -48,13 +46,13 @@ services:
     command: python3 manage.py runserver 0.0.0.0:8000
 
   postgres:
-    image: postgis/postgis:13-3.1
+    image: postgis/postgis:17-3.5
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
       POSTGRES_DB: ${POSTGRES_DB:?}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: psql -U ${POSTGRES_USER} -d ${POSTGRES_DB} -c 'SELECT ST_MakePoint(0,0)'
       interval: 5s
       timeout: 5s
       retries: 5

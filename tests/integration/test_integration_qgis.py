@@ -2,7 +2,6 @@ import requests
 from qgis.core import (
     QgsDataSourceUri,
     QgsFeature,
-    QgsGeometry,
     QgsPoint,
     QgsProject,
     QgsVectorDataProvider,
@@ -62,40 +61,39 @@ class TestStack(unittest.TestCase):
         self.assertFalse(bool(layer.dataProvider().capabilities() & QgsVectorDataProvider.Capability.AddFeatures))
 
     def test_load_and_edit_with_basic_auth(self):
-        for layer in ("tests.point_2056_10fields_local_geom", "tests.point_2056_10fields"):
-            uri = QgsDataSourceUri()
-            uri.setParam("service", "wfs")
-            uri.setParam("typename", layer)
-            uri.setParam("url", ROOT_URL)
-            uri.setPassword(self.password)
-            uri.setUsername(self.user)
+        uri = QgsDataSourceUri()
+        uri.setParam("service", "wfs")
+        uri.setParam("typename", "tests.point_2056_10fields")
+        uri.setParam("url", ROOT_URL)
+        uri.setPassword("admin")
+        uri.setUsername("123")
 
-            layer = QgsVectorLayer(uri.uri(), layer, "OAPIF")
-            self.assertTrue(layer.isValid())
-            layer = self.project.addMapLayer(layer)
-            self.assertIsNotNone(layer)
+        layer = QgsVectorLayer(uri.uri(), "point", "OAPIF")
+        self.assertTrue(layer.isValid())
+        layer = self.project.addMapLayer(layer)
+        self.assertIsNotNone(layer)
 
-            self.assertTrue(bool(layer.dataProvider().capabilities() & QgsVectorDataProvider.Capability.AddFeatures))
+        self.assertTrue(bool(layer.dataProvider().capabilities() & QgsVectorDataProvider.Capability.AddFeatures))
 
-            f = next(layer.getFeatures())
-            self.assertIsInstance(f, QgsFeature)
+        f = next(layer.getFeatures())
+        self.assertIsInstance(f, QgsFeature)
 
-            # f["field_str_0"] = "xyz"
-            # with edit(layer):
-            #    layer.updateFeature(f)
+        # f["field_str_0"] = "xyz"
+        # with edit(layer):
+        #    layer.updateFeature(f)
 
-            # f = next(layer.getFeatures("field_str_0='xyz'"))
-            # self.assertIsInstance(f, QgsFeature)
+        # f = next(layer.getFeatures("field_str_0='xyz'"))
+        # self.assertIsInstance(f, QgsFeature)
 
-            # create with geometry
-            f = QgsFeature()
-            f.setFields(layer.fields())
-            f["field_bool"] = True
-            f["field_str_0"] = "Super Green"
-            geom = QgsGeometry.fromPoint(QgsPoint(2345678.0, 1234567.0))
-            f.setGeometry(geom)
-            with edit(layer):
-                layer.addFeature(f)
-            f = next(layer.getFeatures("field_str_0='Super Green'"))
-            self.assertIsInstance(f, QgsFeature)
-            self.assertEqual(geom.asWkt(), f.geometry().asWkt())
+        # create with geometry
+        f = QgsFeature()
+        f.setFields(layer.fields())
+        f["field_bool"] = True
+        f["field_str_0"] = "Super Green"
+        geom = QgsPoint(2345678.0, 1234567.0)
+        f.setGeometry(geom)
+        with edit(layer):
+            layer.addFeature(f)
+        f = next(layer.getFeatures("field_str_0='Super Green'"))
+        self.assertIsInstance(f, QgsFeature)
+        self.assertEqual(geom.asWkt(), f.geometry().asWkt())

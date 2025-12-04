@@ -21,7 +21,7 @@ jobs:
       COMPOSE_DOCKER_CLI_BUILD: 1
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: Create env
       run: cp .env.example .env
@@ -45,4 +45,4 @@ jobs:
 
     - name: Failure logs
       if: failure()
-      run: docker-compose logs
+      run: docker compose logs

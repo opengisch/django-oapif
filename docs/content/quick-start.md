@@ -21,13 +21,11 @@ Edit settings.py
 INSTALLED_APPS = [
     ...
     "django_oapif",
-    "rest_framework",
-    "rest_framework_gis",
+    "ninja",
 ]
 ```
 
 Add this to your `urls.py` :
-
 ```python
 urlpatterns += [
     ...,
@@ -42,25 +40,13 @@ urlpatterns += [
 # models.py
 
 from django.contrib.gis.db import models
-from django_oapif.decorators import register_oapif_viewset
+from django_oapif import OAPIF
+
+ogc_api = OAPIF()
 
 
-@register_oapif_viewset()
+@ogc_api.register()
 class TestingDecorator(models.Model):
     name = models.CharField(max_length=10)
     geom = models.PointField(srid=2056)
 ```
-
-## Configure global settings
-
-Optionally specify your endpoint's metadata in `settings.py`:
-
-```python
-# settings.py
-...
-
-OAPIF_TITLE = "My Endpoint"
-OAPIF_DESCRIPTION = "Description"
-```
-
-Voilà ! Your OAPIF endpoint should be ready to use.

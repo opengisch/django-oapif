@@ -12,12 +12,12 @@ SIZE=${1:-100}
 LAYERS=( point_2056_10fields point_2056_10fields_local_geom nogeom_10fields nogeom_100fields line_2056_10fields line_2056_10fields_local_geom polygon_2056 polygon_2056_local_geom secretlayer )
 
 
-echo "::group::setup ${SIZE}"
-docker compose exec django python manage.py flush --no-input
-docker compose exec django python manage.py populate_users
-docker compose exec django python manage.py populate_data -s ${SIZE}
-docker compose exec django python manage.py loaddata polygon_2056 polygon_2056_local_geom
-echo "::endgroup::"
+# echo "::group::setup ${SIZE}"
+# docker compose exec django python manage.py flush --no-input
+# docker compose exec django python manage.py populate_users
+# docker compose exec django python manage.py populate_data -s ${SIZE}
+# docker compose exec django python manage.py loaddata polygon_2056
+# echo "::endgroup::"
 
 for LAYER in "${LAYERS[@]}"; do
   ACTUAL_SIZE=$SIZE
