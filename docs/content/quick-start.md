@@ -26,8 +26,6 @@ INSTALLED_APPS = [
 ```
 
 Add this to your `urls.py` :
-
-
 ```python
 urlpatterns += [
     ...,
