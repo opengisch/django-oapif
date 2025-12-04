@@ -52,7 +52,7 @@ nav = [
   {"Permissions" = "permissions.md"},
   {"Test and conformance" = "tests.md"}
 ]
- 
+
 [project.extra]
 # Remove "Made with Material for MkDocs" from footer
 generator = false
@@ -71,4 +71,3 @@ show_source = false
 show_root_heading = true
 show_signature_annotations = true
 show_object_full_path = false
-
