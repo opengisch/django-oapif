@@ -1,54 +1,72 @@
-name: 🚧 Website MkDocs
+name: "📚 Documentation Builder"
+
+# Allow one concurrent deployment
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'docs/**'
-      - '.github/workflows/docs.yml'
   push:
     branches:
-      - main
+        - main
+        - zensical
     paths:
-      - 'docs/**'
-      - '.github/workflows/docs.yml'
-  workflow_dispatch: # useful for testing tx pushes
-  workflow_call: # call from release
+      - .github/workflows/docs.yml
+      - django_oapif/**/*.py
+      - docs/**/*
+    tags:
+      - "*"
 
-defaults:
-  run:
-    working-directory: docs
+  pull_request:
+    branches:
+        - main
+    paths:
+      - .github/workflows/docs.yml
+      - django_oapif/**/*.py
+      - docs/**/*
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
-  website:
+  build-docs:
+
     runs-on: ubuntu-latest
-    # Skip if this job was scheduled and the runner belongs to a fork (i.e. forks have no use for this action)
-    if: (github.event_name == 'schedule' && github.repository == 'opengisch/django-oapif') || (github.event_name != 'schedule')
+
     steps:
-      - uses: actions/checkout@v6
+    - name: Get source code
+      uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
+    - uses: actions/setup-python@v6
+      with:
+        python-version: '3.12'
 
-      - name: Install Python docs requirements
-        run: |
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+    - name: Install dependencies
+      run: |
+        python -m pip install -r requirements.txt
+        python -m pip install -r docs/requirements.txt
 
-      - name: Install Django-OAPIF
-        run: python -m pip install -e ..
+    - name: Install Django-OAPIF
+      run: python -m pip install .
 
-      - name: Build documentation
-        run: mkdocs build
+    - name: Build documentation
+      run: zensical build -f docs/mkdocs.yml
 
-      - uses: actions/upload-artifact@v5
-        if: ${{ github.event_name == 'pull_request' }}
-        with:
-          name: Django-OAPIF-documentation
-          path: docs/site
-          if-no-files-found: error
+    - uses: actions/upload-pages-artifact@v4
+      with:
+        path: docs/site
 
+  deploy:
+    needs: build-docs
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' }}
+    environment:
+      name: github-pages
+    steps:
       - name: Deploy to GitHub Pages
-        if: contains(fromJSON('["push", "workflow_dispatch"]'), github.event_name)
-        run: mkdocs gh-deploy --force
+        id: deployment
+        uses: actions/deploy-pages@v4
