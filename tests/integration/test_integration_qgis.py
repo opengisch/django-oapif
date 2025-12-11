@@ -89,7 +89,7 @@ class TestStack(unittest.TestCase):
         f["field_bool"] = True
         f["field_str_0"] = "Super Green"
         geom = QgsPoint(2345678.0, 1234567.0)
-        f.setGeometry(geom)
+        f.setGeometry(geom.clone())
         with edit(layer):
             layer.addFeature(f)
         f = next(layer.getFeatures("field_str_0='Super Green'"))
