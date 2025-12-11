@@ -1,12 +1,11 @@
 import math
-from typing import Any, NamedTuple, Optional, TypeAlias
+from typing import Any, NamedTuple, cast
 
-from django.contrib.gis.db.models import Extent
+from django.contrib.gis.db.models import Extent, GeometryField
 from django.contrib.gis.db.models.functions import AsGeoJSON, Transform
 from django.contrib.gis.geos import GEOSGeometry
 from django.contrib.gis.geos import Polygon as GEOSPolygon
-from django.db import models
-from django.db.models import ForeignKey, ManyToManyRel, ManyToOneRel
+from django.db.models import ForeignKey, GeneratedField, JSONField, ManyToManyRel, ManyToOneRel, Model, QuerySet
 from django.db.models.functions import Cast
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404
@@ -44,19 +43,20 @@ from django_oapif.utils import replace_query_param
 
 
 class OAPIFCollectionEntry(NamedTuple):
-    model_class: models.Model
+    model_class: type[Model]
     id: str
     title: str
-    description: str
+    description: str | None
     geometry_field: str | None
     properties_fields: list[str] | None
     handler: QueryHandler
 
     @property
-    def srid(self):
+    def srid(self) -> int | None:
         if not self.geometry_field:
             return None
-        return self.model_class._meta.get_field(self.geometry_field).srid
+        field = cast("GeometryField", self.model_class._meta.get_field(self.geometry_field))
+        return field.srid  # type: ignore[]
 
     def query(
         self,
@@ -64,35 +64,31 @@ class OAPIFCollectionEntry(NamedTuple):
         crs: str,
         bbox: str | None = None,
         bbox_crs: str | None = None,
-    ):
+    ) -> QuerySet:
         output_srid = get_srid_from_uri(crs)
         qs = self.handler.get_queryset(request)
-        if self.properties_fields:
-            qs = qs.only("pk", *self.properties_fields)
-        else:
-            qs = qs.all()
+        qs = qs.only("pk", *self.properties_fields) if self.properties_fields else qs.all()
         if geom_field := self.geometry_field:
             geometry_query = geom_field if output_srid == self.srid else Transform(geom_field, output_srid)
-            qs = qs.annotate(_oapif_geometry=Cast(AsGeoJSON(geometry_query, bbox=True), models.JSONField()))
-            if bbox:
+            qs = qs.annotate(_oapif_geometry=Cast(AsGeoJSON(geometry_query, bbox=True), JSONField()))
+            if bbox is not None:
+                assert bbox_crs is not None
                 try:
                     minx, miny, maxx, maxy = map(float, bbox.split(","))
-                    bbox_geom: GEOSPolygon = GEOSPolygon.from_bbox(
-                        (
-                            minx,
-                            miny,
-                            maxx,
-                            maxy,
-                        )
-                    )
+                    bbox_geom: GEOSPolygon = GEOSPolygon.from_bbox((
+                        minx,
+                        miny,
+                        maxx,
+                        maxy,
+                    ))
                     bbox_geom.srid = get_srid_from_uri(bbox_crs)
                     bbox_expr = bbox_geom if bbox_geom.srid == self.srid else Transform(bbox_geom, self.srid)
                     qs = qs.filter(**{f"{geom_field}__intersects": bbox_expr})
-                except ValueError:
+                except ValueError as err:
                     raise HttpError(
                         400,
                         "Invalid bbox parameter. Expected format: minx,miny,maxx,maxy",
-                    )
+                    ) from err
         return qs
 
     def json_schema(self, geom_schema: type[Schema], properties_schema: type[Schema]) -> dict[str, Any]:
@@ -122,7 +118,7 @@ class OAPIFCollectionEntry(NamedTuple):
         return schema
 
 
-def get_page_links(request: HttpRequest, limit: int, offset: int, total_count: int, returned_count: int):
+def get_page_links(request: HttpRequest, limit: int, offset: int, total_count: int) -> list[OAPIFLink]:
     links = [
         OAPIFLink(
             rel="self",
@@ -223,9 +219,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         }
     )
 
-    readonly_fields = {
-        f.name for f in collection.model_class._meta.get_fields() if isinstance(f, models.GeneratedField)
-    }
+    readonly_fields = {f.name for f in collection.model_class._meta.get_fields() if isinstance(f, GeneratedField)}
 
     class PropertiesSchema(ModelSchema):
         model_config = ConfigDict(
@@ -254,40 +248,41 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             fields = include_fields - readonly_fields
 
     if collection.geometry_field:
-        geom_field = collection.model_class._meta.get_field(collection.geometry_field)
-        if geom_field.geom_type.startswith("POINT"):
-            Geom: TypeAlias = Point
-        elif geom_field.geom_type.startswith("MULTIPOINT"):
-            Geom: TypeAlias = MultiPoint
-        elif geom_field.geom_type.startswith("LINESTRING"):
-            Geom: TypeAlias = LineString
-        elif geom_field.geom_type.startswith("MULTILINESTRING"):
-            Geom: TypeAlias = MultiLineString
-        elif geom_field.geom_type.startswith("POLYGON"):
-            Geom: TypeAlias = Polygon
-        elif geom_field.geom_type.startswith("MULTIPOLYGON"):
-            Geom: TypeAlias = MultiPolygon
-        elif geom_field.geom_type.startswith("GEOMETRYCOLLECTION"):
-            Geom: TypeAlias = GeometryCollection
-        else:
-            Geom: TypeAlias = Geometry
+        geom_field = cast("GeometryField", collection.model_class._meta.get_field(collection.geometry_field))
 
         if geom_field.geom_type.endswith("Z") or geom_field.geom_type.endswith("ZM"):
-            Coordinate: TypeAlias = Coordinate3D
+            Coordinate = Coordinate3D
         else:
-            Coordinate: TypeAlias = Coordinate2D
+            Coordinate = Coordinate2D
 
-        if geom_field.null:
-            GeometrySchema: TypeAlias = Optional[Geom[Coordinate]]
+        if geom_field.geom_type.startswith("POINT"):
+            GeometryType = Point[Coordinate]
+        elif geom_field.geom_type.startswith("MULTIPOINT"):
+            GeometryType = MultiPoint[Coordinate]
+        elif geom_field.geom_type.startswith("LINESTRING"):
+            GeometryType = LineString[Coordinate]
+        elif geom_field.geom_type.startswith("MULTILINESTRING"):
+            GeometryType = MultiLineString[Coordinate]
+        elif geom_field.geom_type.startswith("POLYGON"):
+            GeometryType = Polygon[Coordinate]
+        elif geom_field.geom_type.startswith("MULTIPOLYGON"):
+            GeometryType = MultiPolygon[Coordinate]
+        elif geom_field.geom_type.startswith("GEOMETRYCOLLECTION"):
+            GeometryType = GeometryCollection[Coordinate]
         else:
-            GeometrySchema: TypeAlias = Geom[Coordinate]
+            GeometryType = Geometry[Coordinate]
+
+        if not geom_field.null:
+            GeometrySchema = GeometryType
+        else:
+            GeometrySchema = GeometryType | None
     else:
-        Geom: TypeAlias = None
-        GeometrySchema: TypeAlias = None
+        GeometryType = None
+        GeometrySchema = None
 
-    FeatureSchema: TypeAlias = Feature[GeometrySchema, PropertiesSchema]
-    EditableFeatureSchema: TypeAlias = FeatureWithoutId[GeometrySchema, EditablePropertiesSchema]
-    FeatureCollectionSchema: TypeAlias = FeatureCollection[FeatureSchema]
+    FeatureSchema = Feature[GeometrySchema, PropertiesSchema]
+    EditableFeatureSchema = FeatureWithoutId[GeometrySchema, EditablePropertiesSchema]
+    FeatureCollectionSchema = FeatureCollection[FeatureSchema]
 
     PrimaryKeyType, _ = get_schema_field(collection.model_class._meta.pk)
 
@@ -296,7 +291,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         for field in collection.model_class._meta.get_fields()
         if isinstance(field, ForeignKey)
     }
-    json_schema = collection.json_schema(Geom, PropertiesSchema)
+    json_schema = collection.json_schema(GeometryType, PropertiesSchema)
 
     router = Router()
 
@@ -342,27 +337,27 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         result_count = len(paginated_query)
 
         features = []
-        bbox = [math.inf, math.inf, -math.inf, -math.inf]
+        results_bbox = (math.inf, math.inf, -math.inf, -math.inf)
         for obj in paginated_query:
             feature = FeatureSchema.from_orm(obj)
             features.append(feature)
             if geometry := feature.geometry:
-                bbox = [
-                    min(bbox[0], geometry.bbox[0]),
-                    min(bbox[1], geometry.bbox[1]),
-                    max(bbox[2], geometry.bbox[2]),
-                    max(bbox[3], geometry.bbox[3]),
-                ]
-        if bbox == [math.inf, math.inf, -math.inf, -math.inf]:
-            bbox = None
+                results_bbox = (
+                    min(results_bbox[0], geometry.bbox[0]),
+                    min(results_bbox[1], geometry.bbox[1]),
+                    max(results_bbox[2], geometry.bbox[2]),
+                    max(results_bbox[3], geometry.bbox[3]),
+                )
+        if results_bbox == (math.inf, math.inf, -math.inf, -math.inf):
+            results_bbox = None
 
         return FeatureCollectionSchema(
             type="FeatureCollection",
             features=features,
-            bbox=bbox,
+            bbox=results_bbox,
             numberMatched=total_count,
             numberReturned=result_count,
-            links=get_page_links(request, limit, offset, total_count, result_count),
+            links=get_page_links(request, limit, offset, total_count),
         )
 
     @router.api_operation(
@@ -406,7 +401,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         request: HttpRequest,
         response: HttpResponse,
         feature: EditableFeatureSchema,
-        crs: str | None = Header(alias="Content-Crs", default=CRS84_URI),
+        crs: str = Header(alias="Content-Crs", default=CRS84_URI),
     ):
         input = feature.properties.model_dump() or {}
         if (geom_field := collection.geometry_field) and feature.geometry:
@@ -421,7 +416,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             raise AuthorizationError()
         collection.handler.save_model(request, item, False)
         item = collection.query(request, CRS84_URI).get(pk=item.pk)
-        response.headers["Location"] = request.build_absolute_uri(f"items/{item.pk}")
+        response.headers["Location"] = request.build_absolute_uri(f"items/{item.pk}")  # type: ignore
         return 201, FeatureSchema.from_orm(item)
 
     @router.api_operation(
@@ -443,7 +438,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             allowed.append("PUT")
         if collection.handler.has_delete_permission(request, item):
             allowed.append("DELETE")
-        response.headers["Allow"] = ", ".join(allowed)
+        response.headers["Allow"] = ", ".join(allowed)  # type: ignore
 
     @router.put(
         "/items/{item_id}",

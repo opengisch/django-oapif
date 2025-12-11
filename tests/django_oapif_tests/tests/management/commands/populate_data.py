@@ -2,6 +2,7 @@ import math
 import random
 import string
 from copy import deepcopy
+from typing import Any
 
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
@@ -47,11 +48,11 @@ class Command(BaseCommand):
                 geom_line_wkt = (
                     f"LineString("
                     f"{x:4f} {y:4f}, "
-                    f"{x+random.randint(10,50):4f} {y+random.randint(10,50):4f})"
-                    f"{x+random.randint(10,50):4f} {y+random.randint(10,50):4f})"
+                    f"{x + random.randint(10, 50):4f} {y + random.randint(10, 50):4f})"
+                    f"{x + random.randint(10, 50):4f} {y + random.randint(10, 50):4f})"
                 )
 
-                fields = {"field_int": random.randint(1, 999)}
+                fields: dict[str, Any] = {"field_int": random.randint(1, 999)}
                 for f in range(10):
                     fields[f"field_str_{f}"] = "".join(random.choice(letters) for i in range(10))
 
@@ -60,7 +61,7 @@ class Command(BaseCommand):
 
                 no_geom_100fields = deepcopy(fields)
                 for f in range(90):
-                    no_geom_100fields[f"field_str_{10+f}"] = "".join(random.choice(letters) for i in range(10))
+                    no_geom_100fields[f"field_str_{10 + f}"] = "".join(random.choice(letters) for i in range(10))
                 no_geom_100fields = NoGeom_100fields(**no_geom_100fields)
                 no_geoms_100fields.append(no_geom_100fields)
 

@@ -1,12 +1,12 @@
-from typing import Annotated, Any, Literal, Optional, Union
+from typing import Annotated, Any, Literal, Optional, TypeAlias, Union
 
 from ninja import Field, Schema
 
 from django_oapif.schema import OAPIFLink
 
-type Coordinate2D = tuple[float, float]
-type Coordinate3D = tuple[float, float, float]
-type Coordinate = Coordinate2D | Coordinate3D
+Coordinate2D: TypeAlias = tuple[float, float]
+Coordinate3D: TypeAlias = tuple[float, float, float]
+Coordinate: TypeAlias = Coordinate2D | Coordinate3D
 
 
 class GeometryBase(Schema):
@@ -89,7 +89,7 @@ class Feature[G: Geometry | None, P: Schema](Schema):
         return cls(
             type="Feature",
             id=str(obj.pk),
-            geometry=getattr(obj, "_oapif_geometry", None),
+            geometry=getattr(obj, "_oapif_geometry", None),  # type: ignore
             properties=obj,
         )
 

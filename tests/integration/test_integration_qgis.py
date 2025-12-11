@@ -53,10 +53,8 @@ class TestStack(unittest.TestCase):
         layer = self.project.addMapLayer(layer)
         self.assertIsNotNone(layer)
 
-        f = None
         for f in layer.getFeatures("field_str_0 is not null"):
-            pass
-        self.assertIsInstance(f, QgsFeature)
+            self.assertIsInstance(f, QgsFeature)
 
         self.assertFalse(bool(layer.dataProvider().capabilities() & QgsVectorDataProvider.Capability.AddFeatures))
 

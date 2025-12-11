@@ -3,7 +3,7 @@ requires = ["setuptools>=45", "setuptools-git-versioning<2"]
 build-backend = "setuptools.build_meta"
 
 [project]
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 name = "django-oapif"
 authors = [
     {name = "OPENGIS.ch", email = "info@opengis.ch"},
@@ -36,8 +36,18 @@ readme = {file = ["README.md"], content-type = "text/markdown"}
 dependencies = {file = ["requirements.txt"]}
 optional-dependencies.dev = {file = ["requirements-dev.txt"]}
 
-[tool.isort]
-profile = "black"
+[tool.pyright]
+typeCheckingMode = "basic"
+reportPrivateImportUsage = "none"
 
-[tool.black]
+[tool.ruff]
+target-version="py312"
 line-length = 120
+lint.pydocstyle.convention = "google"
+lint.fixable = ["ALL"]
+extend-exclude = [
+    "tests/django_oapif_tests/tests/migrations/*",
+]
+
+[tool.ruff.format]
+preview = true

@@ -42,7 +42,7 @@ class Command(BaseCommand):
         viewer, _ = User.objects.get_or_create(username="demo_viewer")
         viewer_wo_secret, _ = User.objects.get_or_create(username="demo_viewer_without_secret")
         editor, _ = User.objects.get_or_create(username="demo_editor")
-        super_user = User.objects.create_superuser(username="admin", is_staff=True)
+        super_user = User.objects.create_superuser(username="admin", is_staff=True, email=None, password=None)
 
         for user in (viewer, viewer_wo_secret, editor, super_user):
             user.set_password("123")
