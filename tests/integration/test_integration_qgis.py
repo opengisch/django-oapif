@@ -63,8 +63,8 @@ class TestStack(unittest.TestCase):
         uri.setParam("service", "wfs")
         uri.setParam("typename", "tests.point_2056_10fields")
         uri.setParam("url", ROOT_URL)
-        uri.setPassword("admin")
-        uri.setUsername("123")
+        uri.setUsername("admin")
+        uri.setPassword("123")
 
         layer = QgsVectorLayer(uri.uri(), "point", "OAPIF")
         self.assertTrue(layer.isValid())
