@@ -1,4 +1,7 @@
+import logging
+
 from django.db import models
+from django.urls import URLPattern, URLResolver
 from ninja import NinjaAPI
 
 from django_oapif.auth import BasicAuth, DjangoAuth
@@ -15,7 +18,7 @@ from django_oapif.root import create_root_router
 class OAPIF:
     """Ninja API."""
 
-    def __init__(self, api: NinjaAPI | None = None):
+    def __init__(self, api: NinjaAPI | None = None) -> None:
         self.api = api or NinjaAPI(auth=[BasicAuth(), DjangoAuth()])
         self.collections: dict[str, OAPIFCollectionEntry] = {}
         self.api.add_router("/", create_root_router())
@@ -24,7 +27,7 @@ class OAPIF:
 
     def register(
         self,
-        model_class: models.Model,
+        model_class: type[models.Model],
         /,
         id: str | None = None,
         title: str | None = None,
@@ -32,11 +35,11 @@ class OAPIF:
         geometry_field: str | None = "geom",
         properties_fields: list[str] | None = None,
         handler: type[QueryHandler] = DjangoModelPermissionsHandler,
-    ):
+    ) -> None:
         """Register a Django model in the API."""
-
         collection_id = id or model_class._meta.label_lower
         collection_title = title or model_class._meta.label
+        logging.info(f"{collection_id}, {collection_title}")
         self.collections[collection_id] = OAPIFCollectionEntry(
             model_class=model_class,
             id=collection_id,
@@ -47,11 +50,11 @@ class OAPIF:
             handler=handler(model_class),
         )
 
-    def _add_collections_routers(self):
+    def _add_collections_routers(self) -> None:
         for collection_id, collection_entry in self.collections.items():
             self.api.add_router(f"/collections/{collection_id}", create_collection_router(collection_entry))
 
     @property
-    def urls(self):
+    def urls(self) -> tuple[list[URLResolver | URLPattern], str, str]:
         self._add_collections_routers()
         return self.api.urls

@@ -1,7 +1,10 @@
+from typing import Any
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
+from django.http import HttpRequest
 
-def replace_query_param(request, **kwargs):
+
+def replace_query_param(request: HttpRequest, **kwargs: Any) -> str:
     url = request.build_absolute_uri()
     parsed = urlparse(url)
     query = parse_qs(parsed.query)

@@ -35,13 +35,13 @@ with open(f"{output_path}/benchmark.dat") as csvfile:
         data[layer][size] = (time, std)
 
 
-def create_fig(title: str = None, showlegend: bool = True) -> go.Figure:
+def create_fig(title: str | None = None, showlegend: bool = True) -> go.Figure:
     _fig = go.Figure()
     configure(_fig, title, showlegend)
     return _fig
 
 
-def configure(_fig: go.Figure, title: str = None, showlegend: bool = True):
+def configure(_fig: go.Figure, title: str | None = None, showlegend: bool = True):
     if title:
         fig.update_layout(title_text=title)
     _fig.update_layout(margin=dict(l=5, r=5, t=5, b=5))
@@ -154,11 +154,11 @@ for geom, data in plots.items():
             row=1,
             col=c,
         )
-fig.layout.yaxis4.range = [0, 210]
-fig.layout.yaxis5.range = [0, 210]
-fig.layout.yaxis6.range = [0, 210]
-fig.layout.yaxis1.title.text = "Fetching time per feature (s)"
-fig.layout.yaxis4.title.text = "Gain (%)"
+fig.layout.yaxis4.range = [0, 210]  # type: ignore
+fig.layout.yaxis5.range = [0, 210]  # type: ignore
+fig.layout.yaxis6.range = [0, 210]  # type: ignore
+fig.layout.yaxis1.title.text = "Fetching time per feature (s)"  # type: ignore
+fig.layout.yaxis4.title.text = "Gain (%)"  # type: ignore
 
 fig.update_layout(legend=dict(traceorder="reversed"))
 fig.write_image(f"{output_path}/local_vs_db_geom_serialization.png", scale=6)

@@ -1,5 +1,4 @@
-"""
-ASGI config for django_oapif_tests oapif project.
+"""ASGI config for django_oapif_tests oapif project.
 
 It exposes the ASGI callable as a module-level variable named ``application``.
 

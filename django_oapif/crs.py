@@ -16,15 +16,13 @@ def get_srid_from_uri(uri: str) -> int:
         auth, code = result.groups()
         if auth == "OGC" and code in ("CRS84", "CRS84h"):
             return CRS84_SRID
-        elif auth == "EPSG" and code.isnumeric():
+        if auth == "EPSG" and code.isnumeric():
             return int(code)
-        else:
-            msg = f"CRS could not be identified from URI (Authority: {auth}, Code: {code})."
-            raise RuntimeError(msg)
-    else:
-        msg = (
-            f"CRS could not be identified from URI {uri!r}. CRS URIs must follow the format "
-            "'http://www.opengis.net/def/crs/{authority}/{version}/{code}' "
-            "(see https://docs.opengeospatial.org/is/18-058r1/18-058r1.html#crs-overview)."  # noqa
-        )
-        raise AttributeError(msg)
+        msg = f"CRS could not be identified from URI (Authority: {auth}, Code: {code})."
+        raise RuntimeError(msg)
+    msg = (
+        f"CRS could not be identified from URI {uri!r}. CRS URIs must follow the format "
+        "'http://www.opengis.net/def/crs/{authority}/{version}/{code}' "
+        "(see https://docs.opengeospatial.org/is/18-058r1/18-058r1.html#crs-overview)."
+    )
+    raise AttributeError(msg)

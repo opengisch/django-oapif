@@ -11,28 +11,12 @@ repos:
         args:
           - '--fix=lf'
 
-  # Remove unused imports/variables
-  - repo: https://github.com/myint/autoflake
-    rev: v2.2.0
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.8
     hooks:
-      - id: autoflake
-        args:
-          - "--in-place"
-          - "--remove-all-unused-imports"
-          - "--remove-unused-variables"
-
-  # Sort imports
-  - repo: https://github.com/pycqa/isort
-    rev: "5.12.0"
-    hooks:
-      - id: isort
-
-  # Black formatting
-  - repo: https://github.com/psf/black
-    rev: 23.7.0
-    hooks:
-      - id: black
-        exclude: migrations/
+      - id: ruff-check
+        args: [ --fix ]
+      - id: ruff-format
 
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.15.2

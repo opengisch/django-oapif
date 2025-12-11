@@ -1,5 +1,5 @@
 from django_oapif import OAPIF
-from django_oapif.handler import DjangoModelPermissionsHandler
+from django_oapif.handler import DjangoModelPermissionsHandler, DjangoModelPermissionsOrAnonReadOnly
 
 from .models import (
     Line_2056_10fields,
@@ -17,6 +17,7 @@ ogc_api.register(
     title="point_2056",
     description="yo",
     properties_fields=["field_bool", "field_int", *[f"field_str_{i}" for i in range(10)]],
+    handler=DjangoModelPermissionsOrAnonReadOnly,
 )
 
 ogc_api.register(
@@ -29,6 +30,7 @@ ogc_api.register(
         "field_int",
         *[f"field_str_{i}" for i in range(10)],
     ],
+    handler=DjangoModelPermissionsOrAnonReadOnly,
 )
 
 ogc_api.register(
@@ -41,6 +43,7 @@ ogc_api.register(
         "field_int",
         *[f"field_str_{i}" for i in range(100)],
     ],
+    handler=DjangoModelPermissionsOrAnonReadOnly,
 )
 
 ogc_api.register(
@@ -52,6 +55,7 @@ ogc_api.register(
         "field_int",
         *[f"field_str_{i}" for i in range(10)],
     ],
+    handler=DjangoModelPermissionsOrAnonReadOnly,
 )
 
 ogc_api.register(
@@ -59,6 +63,7 @@ ogc_api.register(
     title="polygon_2056",
     description="yo",
     properties_fields=["name"],
+    handler=DjangoModelPermissionsOrAnonReadOnly,
 )
 
 

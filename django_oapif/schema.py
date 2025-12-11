@@ -1,5 +1,3 @@
-from typing import Optional
-
 from ninja import Schema
 
 
@@ -10,16 +8,16 @@ class OAPIFBaseSchema(Schema):
 
 class OAPIFLink(OAPIFBaseSchema):
     href: str
-    rel: Optional[str] = None
-    type: Optional[str] = None
-    hreflang: Optional[str] = None
-    title: Optional[str] = None
-    length: Optional[int] = None
+    rel: str | None = None
+    type: str | None = None
+    hreflang: str | None = None
+    title: str | None = None
+    length: int | None = None
 
 
 class OAPIFRoot(OAPIFBaseSchema):
-    title: Optional[str] = None
-    description: Optional[str] = None
+    title: str | None = None
+    description: str | None = None
     links: list[OAPIFLink]
 
 
@@ -34,12 +32,12 @@ class OAPIFExtent(OAPIFBaseSchema):
 
 class OAPIFCollection(OAPIFBaseSchema):
     id: str
-    title: Optional[str] = None
-    description: Optional[str] = None
+    title: str | None = None
+    description: str | None = None
     links: list[OAPIFLink]
-    crs: Optional[list[str]] = None
-    storageCrs: Optional[str] = None
-    extent: Optional[OAPIFExtent] = None
+    crs: list[str] | None = None
+    storageCrs: str | None = None
+    extent: OAPIFExtent | None = None
     itemType: str
 
 
