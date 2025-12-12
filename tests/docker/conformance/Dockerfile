@@ -1,6 +1,6 @@
 # Courtesy of https://github.com/opengeospatial/ets-ogcapi-features10/issues/197
 
-FROM maven:3.9-eclipse-temurin-24
+FROM maven:3.9-eclipse-temurin-25
 
 # Copy actual source files
 ARG VERSION=1.9
