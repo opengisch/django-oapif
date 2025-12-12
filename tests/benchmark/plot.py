@@ -10,13 +10,10 @@ output_path = "tests/benchmark/output"
 
 def tr(layer: str) -> str:
     dictionary = {
-        "point_2056_10fields": "Point, 10 string fields, geometry serialized in DB",
-        "point_2056_10fields_local_geom": "Point with 12 fields",
-        "line_2056_10fields": "Line, 10 string fields, geometry serialized in DB",
-        "line_2056_10fields_local_geom": "Line (3 points) and 12 fields",
-        "polygon_2056": "Polygon, geometry serialized in DB",
-        "polygon_2056_local_geom": "Complex polygon (Swiss Municipalities)",
-        "nogeom_10fields": "No geometry, 12 fields",
+        "point_2056_10fields": "Point, 10 string fields",
+        "line_2056_10fields": "Line, 10 string fields",
+        "polygon_2056": "Polygon",
+        "nogeom_10fields": "No geometry, 10 fields",
         "nogeom_100fields": "No geometry, 100 fields",
     }
     return dictionary[layer]
