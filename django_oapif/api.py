@@ -11,7 +11,7 @@ from django_oapif.collections import (
     create_collections_router,
 )
 from django_oapif.conformance import create_conformance_router
-from django_oapif.handler import DjangoModelPermissionsHandler, QueryHandler
+from django_oapif.handler import DjangoModelPermissionsOrAnonReadOnly, QueryHandler
 from django_oapif.root import create_root_router
 
 
@@ -34,7 +34,7 @@ class OAPIF:
         description: str | None = None,
         geometry_field: str | None = "geom",
         properties_fields: list[str] | None = None,
-        handler: type[QueryHandler] = DjangoModelPermissionsHandler,
+        handler: type[QueryHandler] = DjangoModelPermissionsOrAnonReadOnly,
     ) -> None:
         """Register a Django model in the API."""
         collection_id = id or model_class._meta.label_lower
