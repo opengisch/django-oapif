@@ -14,7 +14,7 @@ RUN mvn --version
 RUN mvn dependency:resolve dependency:resolve-plugins dependency:copy-dependencies dependency:go-offline -Pdocker
 
 # Install offline to avoid triggering new dependency update
-RUN mvn install -DskipTests -Dmaven.javadoc.skip -DskipSite
+RUN mvn install -DskipTests -Dmaven.javadoc.skip -DskipSite -Dmaven.site.skip=true
 
 ENV VERSION=${VERSION}
 
