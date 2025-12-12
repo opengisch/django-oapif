@@ -4,7 +4,7 @@ FROM maven:4.0.0-rc-5-eclipse-temurin-25
 
 # Copy actual source files
 ARG VERSION=1.9
-RUN git clone --depth 1 --branch ${VERSION} https://github.com/opengeospatial/ets-ogcapi-features10.git /build
+RUN git clone --depth 1 --branch upgradeSiteDescriptor-71 https://github.com/opengeospatial/ets-ogcapi-features10.git /build
 
 WORKDIR /build/
 
