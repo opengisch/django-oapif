@@ -20,24 +20,38 @@ class QueryHandler[M: Model]:
         return obj.delete()
 
     def has_view_permission(self, _request: HttpRequest, _obj: M | None = None) -> bool:
+        """Return True if the given request has permission to view objects in the collection,
+        or a given object if defined.
+        """
         return True
 
     def has_add_permission(self, _request: HttpRequest, _obj: M | None = None) -> bool:
+        """Return True if the given request has permission to create objects in the collection,
+        or a given object if defined.
+        """
         return True
 
     def has_change_permission(self, _request: HttpRequest, _obj: M | None = None) -> bool:
+        """Return True if the given request has permission to change objects in the collection,
+        or a given object if defined.
+        """
         return True
 
     def has_delete_permission(self, _request: HttpRequest, _obj: M | None = None) -> bool:
+        """Return True if the given request has permission to delete objects in the collection,
+        or a given object if defined.
+        """
         return True
 
 
-class AllowAnyHandler(QueryHandler):
+class AllowAny(QueryHandler):
+    """Allows full access to everyone."""
+
     pass
 
 
-class AuthenticatedHandler[M: Model](QueryHandler):
-    """Allows access only to authenticated users."""
+class IsAuthenticated[M: Model](QueryHandler):
+    """Allows full access to authenticated users only."""
 
     def has_view_permission(self, request: HttpRequest, _obj: M | None = None) -> bool:
         return bool(request.user and request.user.is_authenticated)
@@ -52,14 +66,16 @@ class AuthenticatedHandler[M: Model](QueryHandler):
         return bool(request.user and request.user.is_authenticated)
 
 
-class AuthenticatedOrReadOnlyHandler[M: Model](AuthenticatedHandler):
-    """Allows access only to authenticated users."""
+class IsAuthenticatedOrReadOnly[M: Model](IsAuthenticated):
+    """Allows full access to authenticated users only, but allows readonly access to everyone."""
 
     def has_view_permission(self, _request: HttpRequest, _obj: M | None = None) -> bool:
         return True
 
 
-class DjangoModelPermissionsHandler[M: Model](QueryHandler):
+class DjangoModelPermissions[M: Model](QueryHandler):
+    """Reuses all Django permissions for a given model."""
+
     def has_view_permission(self, request: HttpRequest, _obj: M | None = None) -> bool:
         codename = get_permission_codename("view", self.opts)
         return request.user.has_perm(f"{self.opts.app_label}.{codename}")
@@ -77,6 +93,8 @@ class DjangoModelPermissionsHandler[M: Model](QueryHandler):
         return request.user.has_perm(f"{self.opts.app_label}.{codename}")
 
 
-class DjangoModelPermissionsOrAnonReadOnly[M: Model](DjangoModelPermissionsHandler):
+class DjangoModelPermissionsOrAnonReadOnly[M: Model](DjangoModelPermissions):
+    """Reuses all Django permissions for a given model, but allows readonly access to everyone."""
+
     def has_view_permission(self, _request: HttpRequest, _obj: M | None = None) -> bool:
         return True

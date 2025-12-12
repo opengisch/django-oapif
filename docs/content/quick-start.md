@@ -25,28 +25,44 @@ INSTALLED_APPS = [
 ]
 ```
 
-Add this to your `urls.py` :
-```python
-urlpatterns += [
-    ...,
-    path("oapif/", include(django_oapif.urls)),
-    ...,
-]
-```
-
-## Register your models with the decorator:
+## Declare your models:
 
 ```python
 # models.py
 
 from django.contrib.gis.db import models
+
+class TestModel(models.Model):
+    name = models.CharField(max_length=10)
+    geom = models.PointField(srid=2056)
+
+class OtherTestModel(models.Model):
+    id = models.CharField(max_length=10)
+    geom = models.PolygonField(srid=2056)
+```
+
+## Declare a new OAPIF and register your models:
+
+```python
+# ogc.py
+
+from .models import TestModel
 from django_oapif import OAPIF
 
 ogc_api = OAPIF()
 
+@ogc_api.register(TestModel)
+@ogc_api.register(OtherTestModel)
+```
 
-@ogc_api.register()
-class TestingDecorator(models.Model):
-    name = models.CharField(max_length=10)
-    geom = models.PointField(srid=2056)
+
+## Add the API to the Django URLs:
+```python
+# urls.py
+
+urlpatterns += [
+    ...,
+    path("oapif/", include(django_oapif.urls)),
+    ...,
+]
 ```

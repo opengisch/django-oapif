@@ -20,8 +20,7 @@ docker compose up --build -d
 docker compose exec django python manage.py collectstatic --no-input
 docker compose exec django python manage.py migrate --no-input
 
-# A convenience start-up Django command is there
-# to populate the database with testdata
+# A convenience start-up Django command is there to populate the database with testdata
 docker compose exec django python manage.py populate_users
 docker compose exec django python manage.py populate_data
 ```
