@@ -1,6 +1,6 @@
 # Courtesy of https://github.com/opengeospatial/ets-ogcapi-features10/issues/197
 
-FROM maven:3.9-eclipse-temurin-25
+FROM maven:4.0.0-rc-5-eclipse-temurin-25
 
 # Copy actual source files
 ARG VERSION=1.9
@@ -14,7 +14,7 @@ RUN mvn --version
 RUN mvn dependency:resolve dependency:resolve-plugins dependency:copy-dependencies dependency:go-offline -Pdocker
 
 # Install offline to avoid triggering new dependency update
-RUN mvn install -DskipTests -Dmaven.javadoc.skip -DskipSite -Dmaven.site.skip=true
+RUN mvn install -DskipTests -Dmaven.javadoc.skip
 
 ENV VERSION=${VERSION}
 
