@@ -1,5 +1,5 @@
 import math
-from typing import Any, NamedTuple, cast
+from typing import Any, NamedTuple, Optional, cast
 
 from django.contrib.gis.db.models import Extent, GeometryField
 from django.contrib.gis.db.models.functions import AsGeoJSON, Transform
@@ -219,34 +219,15 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         }
     )
 
+    properties_model_config = ConfigDict(
+        extra="forbid",
+        from_attributes=True,
+        validate_by_name=True,
+        serialize_by_alias=False,
+        loc_by_alias=False,
+    )
+
     readonly_fields = {f.name for f in collection.model_class._meta.get_fields() if isinstance(f, GeneratedField)}
-
-    class PropertiesSchema(ModelSchema):
-        model_config = ConfigDict(
-            extra="forbid",
-            from_attributes=True,
-            validate_by_name=True,
-            serialize_by_alias=False,
-            loc_by_alias=False,
-        )
-
-        class Meta:
-            model = collection.model_class
-            fields = include_fields
-
-    class EditablePropertiesSchema(ModelSchema):
-        model_config = ConfigDict(
-            extra="forbid",
-            from_attributes=True,
-            validate_by_name=True,
-            serialize_by_alias=False,
-            loc_by_alias=False,
-        )
-
-        class Meta:
-            model = collection.model_class
-            fields = include_fields - readonly_fields
-
     if collection.geometry_field:
         geom_field = cast("GeometryField", collection.model_class._meta.get_field(collection.geometry_field))
 
@@ -256,37 +237,69 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             Coordinate = Coordinate2D
 
         if geom_field.geom_type.startswith("POINT"):
-            GeometryType = Point[Coordinate]
+            GeometryType = Point
         elif geom_field.geom_type.startswith("MULTIPOINT"):
-            GeometryType = MultiPoint[Coordinate]
+            GeometryType = MultiPoint
         elif geom_field.geom_type.startswith("LINESTRING"):
-            GeometryType = LineString[Coordinate]
+            GeometryType = LineString
         elif geom_field.geom_type.startswith("MULTILINESTRING"):
-            GeometryType = MultiLineString[Coordinate]
+            GeometryType = MultiLineString
         elif geom_field.geom_type.startswith("POLYGON"):
-            GeometryType = Polygon[Coordinate]
+            GeometryType = Polygon
         elif geom_field.geom_type.startswith("MULTIPOLYGON"):
-            GeometryType = MultiPolygon[Coordinate]
+            GeometryType = MultiPolygon
         elif geom_field.geom_type.startswith("GEOMETRYCOLLECTION"):
-            GeometryType = GeometryCollection[Coordinate]
+            GeometryType = GeometryCollection
         else:
-            GeometryType = Geometry[Coordinate]
+            GeometryType = Geometry
 
-        if not geom_field.null:
-            GeometrySchema = GeometryType
+        if geom_field.null:
+            GeometrySchema = Optional[GeometryType[Coordinate]]
         else:
-            GeometrySchema = GeometryType | None
+            GeometrySchema = GeometryType[Coordinate]
     else:
-        GeometryType = None
-        GeometrySchema = None
+        GeometryType = type(None)
+        GeometrySchema = type(None)
 
-    FeatureSchema = Feature[GeometrySchema, PropertiesSchema]
-    EditableFeatureSchema = FeatureWithoutId[GeometrySchema, EditablePropertiesSchema]
+    class PropertiesSchema(ModelSchema):
+        model_config = properties_model_config
+
+        class Meta:
+            model = collection.model_class
+            fields = include_fields
+
+    class CreatePropertiesSchema(ModelSchema):
+        model_config = properties_model_config
+
+        class Meta:
+            model = collection.model_class
+            fields = include_fields - readonly_fields
+
+    class PatchPropertiesSchema(ModelSchema):
+        model_config = properties_model_config
+
+        class Meta:
+            model = collection.model_class
+            fields = include_fields - readonly_fields
+            fields_optional = "__all__"
+
+    class FeatureSchema(Feature):
+        geometry: GeometrySchema
+        properties: PropertiesSchema
+
+    class CreateFeatureSchema(FeatureWithoutId):
+        geometry: GeometrySchema
+        properties: CreatePropertiesSchema
+
+    class PatchFeatureSchema(FeatureWithoutId):
+        geometry: Optional[GeometrySchema] = None
+        properties: PatchPropertiesSchema
+
     FeatureCollectionSchema = FeatureCollection[FeatureSchema]
 
     PrimaryKeyType, _ = get_schema_field(collection.model_class._meta.pk)
 
-    foreign_keys = {
+    foreign_key_fields = {
         field.name: field.remote_field.model
         for field in collection.model_class._meta.get_fields()
         if isinstance(field, ForeignKey)
@@ -400,18 +413,18 @@ def create_collection_router(collection: OAPIFCollectionEntry):
     def create_item(
         request: HttpRequest,
         response: HttpResponse,
-        feature: EditableFeatureSchema,
+        feature: CreateFeatureSchema,
         crs: str = Header(alias="Content-Crs", default=CRS84_URI),
     ):
-        input = feature.properties.model_dump() or {}
+        item_properties = feature.properties.model_dump() or {}
         if (geom_field := collection.geometry_field) and feature.geometry:
             geometry = GEOSGeometry(feature.geometry.model_dump_json())
             geometry.srid = get_srid_from_uri(crs)
-            input[geom_field] = geometry
-        for key, value in input.items():
-            if value is not None and (related_model := foreign_keys.get(key)):
-                input[key] = related_model.objects.get(pk=value)
-        item = collection.model_class.objects.create(**input)
+            item_properties[geom_field] = geometry
+        for field, value in item_properties.items():
+            if value is not None and (related_model := foreign_key_fields.get(field)):
+                item_properties[field] = related_model.objects.get(pk=value)
+        item = collection.model_class.objects.create(**item_properties)
         if not collection.handler.has_add_permission(request, item):
             raise AuthorizationError()
         collection.handler.save_model(request, item, False)
@@ -436,6 +449,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             allowed.append("GET")
         if collection.handler.has_change_permission(request, item):
             allowed.append("PUT")
+            allowed.append("PATCH")
         if collection.handler.has_delete_permission(request, item):
             allowed.append("DELETE")
         response.headers["Allow"] = ", ".join(allowed)  # type: ignore
@@ -448,18 +462,48 @@ def create_collection_router(collection: OAPIFCollectionEntry):
     def replace_item(
         request: HttpRequest,
         item_id: PrimaryKeyType,
-        feature: EditableFeatureSchema,
-        crs: str | None = Header(alias="Content-Crs", default=CRS84_URI),
+        feature: CreateFeatureSchema,
+        crs: str = Header(alias="Content-Crs", default=CRS84_URI),
     ):
         query = collection.handler.get_queryset(request)
         item = get_object_or_404(query, pk=item_id)
         if not collection.handler.has_change_permission(request, item):
             raise AuthorizationError()
         for field, value in feature.properties.model_dump().items():
-            if value is not None and (related_model := foreign_keys.get(field)):
+            if value is not None and (related_model := foreign_key_fields.get(field)):
                 value = related_model.objects.get(pk=value)
             setattr(item, field, value)
         if geom_field := collection.geometry_field:
+            if feature.geometry:
+                geometry = GEOSGeometry(feature.geometry.model_dump_json())
+                geometry.srid = get_srid_from_uri(crs)
+            else:
+                geometry = None
+            setattr(item, geom_field, geometry)
+        collection.handler.save_model(request, item, True)
+        item = collection.query(request, CRS84_URI).get(pk=item_id)
+        return FeatureSchema.from_orm(item)
+
+    @router.patch(
+        "/items/{item_id}",
+        response=FeatureSchema,
+        operation_id=f"update_{collection.id}_item",
+    )
+    def update_item(
+        request: HttpRequest,
+        item_id: PrimaryKeyType,
+        feature: PatchFeatureSchema,
+        crs: str = Header(alias="Content-Crs", default=CRS84_URI),
+    ):
+        query = collection.handler.get_queryset(request)
+        item = get_object_or_404(query, pk=item_id)
+        if not collection.handler.has_change_permission(request, item):
+            raise AuthorizationError()
+        for field, value in feature.properties.model_dump(exclude_unset=True).items():
+            if value is not None and (related_model := foreign_key_fields.get(field)):
+                value = related_model.objects.get(pk=value)
+            setattr(item, field, value)
+        if (geom_field := collection.geometry_field) and "geometry" in feature.model_fields_set:
             if feature.geometry:
                 geometry = GEOSGeometry(feature.geometry.model_dump_json())
                 geometry.srid = get_srid_from_uri(crs)
