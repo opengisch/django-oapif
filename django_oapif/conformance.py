@@ -23,6 +23,7 @@ def create_conformance_router():
                 "http://www.opengis.net/spec/ogcapi-features-1/1.0/req/oas31",
                 "http://www.opengis.net/spec/ogcapi-features-2/1.0/conf/crs",
                 "http://www.opengis.net/spec/ogcapi-features-4/1.0/req/create-replace-delete",
+                "http://www.opengis.net/spec/ogcapi-features-4/1.0/conf/update",
                 "http://www.opengis.net/spec/ogcapi-features-4/1.0/conf/features",
                 "http://www.opengis.net/spec/ogcapi-features-5/1.0/conf/schemas",
             ]
