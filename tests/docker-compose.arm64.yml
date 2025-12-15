@@ -7,3 +7,5 @@ services:
     platform: linux/amd64
   integration_tests:
     platform: linux/amd64
+  conformance_test:
+    platform: linux/amd64
