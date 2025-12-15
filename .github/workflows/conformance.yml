@@ -103,6 +103,12 @@ jobs:
         run: |
           python tests/conformance/parse_report.py tests/output/emailable-report.html tests/conformance/conformance-baseline.json
 
+      - name: Fail if results are worse
+        run: |
+          if [[ ${{ steps.baseline.outputs.EXIT_CODE }} == 2 ]]; then
+            exit 1
+          fi
+
       - name: Failure logs
         if: failure()
         run: docker compose logs
