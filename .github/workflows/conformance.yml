@@ -8,6 +8,11 @@ on:
     branches:
       - main
 
+
+permissions:
+  contents: write
+  pull-requests: write  # to write comment
+
 jobs:
   conformance:
     runs-on: ubuntu-latest
@@ -87,6 +92,13 @@ jobs:
           cwd: ./baseline_repo
           message: update conformance baseline
 
+      - name: Commit if baseline is worse and on main branch
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.baseline.outputs.EXIT_CODE == '2' }}
+        uses: EndBug/add-and-commit@v9
+        with:
+          add: tests/conformance/conformance-baseline.json
+          message: update conformance baseline
+
       - name: 💬 Prepare comment
         id: prepare_comment
         if: ${{ github.event_name == 'pull_request' && steps.baseline.outputs.EXIT_CODE != '0' }}
@@ -122,10 +134,8 @@ jobs:
           python tests/conformance/parse_report.py tests/output/emailable-report.html tests/conformance/conformance-baseline.json
 
       - name: Fail if results are worse
-        run: |
-          if [[ ${{ steps.baseline.outputs.EXIT_CODE }} == 2 ]]; then
-            exit 1
-          fi
+        if: ${{ github.event_name == 'pull_request' && steps.baseline.outputs.EXIT_CODE == '2' }}
+        run: exit 1
 
       - name: Failure logs
         if: failure()
