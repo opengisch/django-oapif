@@ -5,6 +5,7 @@ export COMPOSE_FILE=tests/docker-compose.yml:tests/docker-compose.dev.yml:tests/
 #docker compose --profile testing_integration up --build -d
 docker compose down -v || true
 docker compose up --build -d
+docker compose exec django python manage.py makemigrations
 docker compose exec django python manage.py migrate --no-input
 docker compose exec django python manage.py populate_users
 docker compose exec django python manage.py populate_data
