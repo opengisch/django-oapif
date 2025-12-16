@@ -91,20 +91,28 @@ jobs:
         id: prepare_comment
         if: ${{ github.event_name == 'pull_request' && steps.baseline.outputs.EXIT_CODE != '0' }}
         run : |
-          COMMENT="$(python tests/conformance/format_conformance_comment.py \
+          python tests/conformance/format_conformance_comment.py \
             --exit-code ${{ steps.baseline.outputs.EXIT_CODE }} \
-            --diff-json tests/conformance/conformance-diff.json)"
-          {
-            echo "comment<<'EOF'"
-            echo "$COMMENT"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+            --diff-json tests/conformance/conformance-diff.json \
+            --out tests/conformance/conformance-comment.md
+
+          COMMENT="$(cat tests/conformance/conformance-comment.md)"
+          echo "comment=$COMMENT" >> "$GITHUB_OUTPUT"
 
       - name: 💬 Create comment
         uses: marocchino/sticky-pull-request-comment@v2
         if: ${{ github.event_name == 'pull_request' && steps.baseline.outputs.EXIT_CODE != '0' }}
         with:
           message: ${{ steps.prepare_comment.outputs.comment }}
+
+      - name: Archive conformance comment + diff
+        if: ${{ github.event_name == 'pull_request' && steps.baseline.outputs.EXIT_CODE != '0' }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: conformance-comment-and-diff
+          path: |
+            tests/conformance/conformance-comment.md
+            tests/conformance/conformance-diff.json
 
       - name: Recheck baseline
         run: |

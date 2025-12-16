@@ -11,6 +11,8 @@ def _fmt_list(items: list[str]) -> str:
 
 def _fmt_section(diff: dict, name: str) -> str:
     section = diff.get(name, {}) if isinstance(diff, dict) else {}
+    if not isinstance(section, dict):
+        section = {}
     added = section.get("added", []) or []
     removed = section.get("removed", []) or []
 
@@ -47,6 +49,11 @@ def main() -> int:
         default=None,
         help="Path to conformance-diff.json written by parse_report.py",
     )
+    parser.add_argument(
+        "--out",
+        default=None,
+        help="Optional path to write the formatted comment to a file (prints to stdout if omitted)",
+    )
     args = parser.parse_args()
 
     diff: dict | None = None
@@ -55,7 +62,11 @@ def main() -> int:
         if p.exists():
             diff = json.loads(p.read_text())
 
-    print(build_comment(args.exit_code, diff))
+    comment = build_comment(args.exit_code, diff)
+    if args.out:
+        Path(args.out).write_text(comment + "\n")
+    else:
+        print(comment)
     return 0
 
 
