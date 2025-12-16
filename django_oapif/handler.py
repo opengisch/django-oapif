@@ -20,25 +20,25 @@ class QueryHandler[M: Model]:
         return obj.delete()
 
     def has_view_permission(self, _request: HttpRequest, _obj: M | None = None) -> bool:
-        """Return True if the given request has permission to view objects in the collection,
+        """Returns True if the given request has permission to view objects in the collection,
         or a given object if defined.
         """
         return True
 
     def has_add_permission(self, _request: HttpRequest, _obj: M | None = None) -> bool:
-        """Return True if the given request has permission to create objects in the collection,
+        """Returns True if the given request has permission to create objects in the collection,
         or a given object if defined.
         """
         return True
 
     def has_change_permission(self, _request: HttpRequest, _obj: M | None = None) -> bool:
-        """Return True if the given request has permission to change objects in the collection,
+        """Returns True if the given request has permission to change objects in the collection,
         or a given object if defined.
         """
         return True
 
     def has_delete_permission(self, _request: HttpRequest, _obj: M | None = None) -> bool:
-        """Return True if the given request has permission to delete objects in the collection,
+        """Returns True if the given request has permission to delete objects in the collection,
         or a given object if defined.
         """
         return True
