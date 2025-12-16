@@ -97,7 +97,7 @@ jobs:
             --out tests/conformance/conformance-comment.md
 
           {
-            echo "comment<<'EOF'"
+            echo "comment<<EOF"
             cat tests/conformance/conformance-comment.md
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
