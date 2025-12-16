@@ -8,16 +8,14 @@ class OAPIFBaseSchema(Schema):
 
 class OAPIFLink(OAPIFBaseSchema):
     href: str
-    rel: str | None = None
-    type: str | None = None
-    hreflang: str | None = None
-    title: str | None = None
-    length: int | None = None
+    rel: str
+    type: str
+    title: str
 
 
 class OAPIFRoot(OAPIFBaseSchema):
-    title: str | None = None
-    description: str | None = None
+    title: str
+    description: str
     links: list[OAPIFLink]
 
 

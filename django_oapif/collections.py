@@ -1,5 +1,5 @@
 import math
-from typing import Any, NamedTuple, Optional, cast
+from typing import Any, NamedTuple, Optional, Union, cast, get_args, get_origin
 
 from django.contrib.gis.db.models import Extent, GeometryField
 from django.contrib.gis.db.models.functions import AsGeoJSON, Transform
@@ -157,19 +157,22 @@ def get_collection_response(request: HttpRequest, collection: OAPIFCollectionEnt
         itemType="feature",
         links=[
             OAPIFLink(
-                href=request.build_absolute_uri(f"{uri_prefix}{collection.id}"),
                 rel="self",
+                title="Collection",
                 type="application/json",
+                href=request.build_absolute_uri(f"{uri_prefix}{collection.id}"),
             ),
             OAPIFLink(
-                href=request.build_absolute_uri(f"{uri_prefix}{collection.id}/schema"),
                 rel="http://www.opengis.net/def/rel/ogc/1.0/schema",
+                title="Collection schema",
                 type="application/json",
+                href=request.build_absolute_uri(f"{uri_prefix}{collection.id}/schema"),
             ),
             OAPIFLink(
-                href=request.build_absolute_uri(f"{uri_prefix}{collection.id}/items"),
                 rel="items",
+                title="Collection items",
                 type="application/geo+json",
+                href=request.build_absolute_uri(f"{uri_prefix}{collection.id}/items"),
             ),
         ],
     )
@@ -298,6 +301,9 @@ def create_collection_router(collection: OAPIFCollectionEntry):
     FeatureCollectionSchema = FeatureCollection[FeatureSchema]
 
     PrimaryKeyType, _ = get_schema_field(collection.model_class._meta.pk)
+    # get_schema_field returns type as Union[int, None] if there is a default value
+    if get_origin(PrimaryKeyType) is Union:
+        PrimaryKeyType = get_args(PrimaryKeyType)[0]
 
     foreign_key_fields = {
         field.name: field.remote_field.model
