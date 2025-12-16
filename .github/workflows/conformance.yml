@@ -96,8 +96,11 @@ jobs:
             --diff-json tests/conformance/conformance-diff.json \
             --out tests/conformance/conformance-comment.md
 
-          COMMENT="$(cat tests/conformance/conformance-comment.md)"
-          echo "comment=$COMMENT" >> "$GITHUB_OUTPUT"
+          {
+            echo "comment<<'EOF'"
+            cat tests/conformance/conformance-comment.md
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: 💬 Create comment
         uses: marocchino/sticky-pull-request-comment@v2
