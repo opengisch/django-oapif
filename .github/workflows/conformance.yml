@@ -72,31 +72,24 @@ jobs:
             || EXIT_CODE=$?
           echo "EXIT_CODE=${EXIT_CODE}" >> $GITHUB_OUTPUT
 
-      - name: Commit baseline if improved >> checkout
+      - name: Commit baseline if changed >> checkout
         uses: actions/checkout@v6
-        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE == '1' }}
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE != '0' }}
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
           path: ./baseline_repo
 
-      - name: Commit baseline if improved >> copy baseline file
-        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE == '1' }}
+      - name: Commit baseline if changed >> copy baseline file
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE != '0' }}
         run: cp tests/conformance/conformance-baseline.json baseline_repo/tests/conformance/conformance-baseline.json
 
-      - name: Commit baseline if improved >> commit
-        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE == '1' }}
+      - name: Commit baseline if changed >> commit
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE != '0' }}
         uses: EndBug/add-and-commit@v9
         with:
           add: tests/conformance/conformance-baseline.json
           cwd: ./baseline_repo
-          message: update conformance baseline
-
-      - name: Commit if baseline is worse and on main branch
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.baseline.outputs.EXIT_CODE == '2' }}
-        uses: EndBug/add-and-commit@v9
-        with:
-          add: tests/conformance/conformance-baseline.json
           message: update conformance baseline
 
       - name: 💬 Prepare comment
