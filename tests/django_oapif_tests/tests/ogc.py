@@ -8,6 +8,7 @@ from .models import (
     Point_2056_10fields,
     Polygon_2056,
     SecretLayer,
+    MandatoryField,
 )
 
 ogc_api = OAPIF()
@@ -71,4 +72,12 @@ ogc_api.register(
         *[f"field_str_{i}" for i in range(10)],
     ],
     handler=DjangoModelPermissions,
+)
+
+ogc_api.register(
+    MandatoryField,
+    title="mandatory_field",
+    properties_fields=[
+        "text_mandatory_field",
+    ],
 )

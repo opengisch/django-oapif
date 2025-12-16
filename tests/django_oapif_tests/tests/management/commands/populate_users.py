@@ -21,6 +21,7 @@ class Command(BaseCommand):
             "line_2056_10fields",
             "polygon_2056",
             "secretlayer",
+            "mandatoryfield",
         ):
             adding.append(Permission.objects.get(codename=f"add_{model}"))
             modifying.append(Permission.objects.get(codename=f"change_{model}"))
