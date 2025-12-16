@@ -28,12 +28,14 @@ services:
       - ${HOST_POSTGRES_PORT:?}:5432
 
   conformance_test:
-    build: docker/conformance
+    image: pdok/ets-ogcapi-features10-docker:latest
     volumes:
       - ./conformance:/build/run
       - ./output:/build/output
     profiles:
       - testing_conformance
+    entrypoint: []
+    command: ["/bin/sh", "-c", "/build/run/run.sh"]
 
   integration_tests:
     image: qgis/qgis:3.42.3-bookworm
