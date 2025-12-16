@@ -41,7 +41,7 @@ class OtherTestModel(models.Model):
     geom = models.PolygonField(srid=2056)
 ```
 
-## Declare a new OAPIF and register your models:
+## Instantiate `OAPIF` and register your models:
 
 ```python
 # ogc.py
