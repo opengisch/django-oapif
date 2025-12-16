@@ -3,6 +3,8 @@
 expects the followings paths as arguments:
 - path of the conformance report
 - path of the resulting JSON file (this doesn't need to exist; it will be created if it doesn't)
+Optional:
+- path of a diff output file (writes passing/failing/skipping changes compared to baseline)
 It will terminate with exit code:
 - 0 if the current result is ** equal ** to the baseline (baseline = the previous recorded result).
 - 1 if the current result ** surpasses ** the baseline.
@@ -10,10 +12,11 @@ It will terminate with exit code:
 """
 
 import json
+import argparse
 from enum import Enum
 from itertools import islice
 from os import path
-from sys import argv, exit
+from sys import exit
 from typing import NamedTuple
 
 from lxml import etree  # type: ignore
@@ -71,6 +74,26 @@ class Result(NamedTuple):
             fh.write("\n")
         print("Results written to disk.")
 
+    def diff(self, other: "Result") -> dict[str, dict[str, list[str]]]:
+        """Return changes vs another result.
+
+        The returned dict is stable-json-friendly and uses sorted lists.
+        """
+
+        def _delta(new: list[str], old: list[str]) -> dict[str, list[str]]:
+            new_set = set(new)
+            old_set = set(old)
+            return {
+                "added": sorted(new_set - old_set),
+                "removed": sorted(old_set - new_set),
+            }
+
+        return {
+            "passed": _delta(self.passed, other.passed),
+            "failed": _delta(self.failed, other.failed),
+            "skipped": _delta(self.skipped, other.skipped),
+        }
+
     def compare(self, other: "Result") -> Cmp:
         """Compares the result with another one and returns if it is better, equal or worse than the other one"""
         if len(self.passed) < len(other.passed):
@@ -85,13 +108,32 @@ class Result(NamedTuple):
 
 
 if __name__ == "__main__":
-    report_path = path.relpath(argv[1])
-    baseline_path = path.relpath(argv[2])
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("report_path", help="Path to the conformance HTML report")
+    parser.add_argument("baseline_path", help="Path to the baseline JSON file")
+    parser.add_argument(
+        "--diff-out",
+        dest="diff_out",
+        default=None,
+        help="Optional path to write a JSON diff vs baseline",
+    )
+    args = parser.parse_args()
+
+    report_path = path.relpath(args.report_path)
+    baseline_path = path.relpath(args.baseline_path)
 
     _current = Result.load(baseline_path)
 
     assert path.exists(report_path)
     _new = Result.parse(report_path)
+
+    if args.diff_out:
+        diff_path = path.relpath(args.diff_out)
+        with open(diff_path, "w") as fh:
+            json.dump(_new.diff(_current), fh, indent=2)
+            fh.write("\n")
+        print(f"Diff written to {diff_path}.")
+
     _new.write()
 
     _cmp = _new.compare(_current)
