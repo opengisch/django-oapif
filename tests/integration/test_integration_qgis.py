@@ -1,6 +1,7 @@
 import requests
 from qgis.core import (
     QgsDataSourceUri,
+    QgsEditError,
     QgsFeature,
     QgsPoint,
     QgsProject,
@@ -24,6 +25,12 @@ class TestStack(unittest.TestCase):
         cls.project = QgsProject.instance()
         cls.user = "admin"
         cls.password = "123"
+
+    def assertEndsWith(self, s, suffix, msg=None):
+        """Check that the expression is true."""
+        if not s.endswith(suffix):
+            msg = self._formatMessage(msg, f"{unittest.util.safe_repr(s)} does not ends with '{suffix}'")
+            raise self.failureException(msg)
 
     def test_endpoint_ok(self):
         root_response = requests.get(ROOT_URL)
@@ -95,3 +102,35 @@ class TestStack(unittest.TestCase):
         f = next(layer.getFeatures("field_str_0='Super Green'"))
         self.assertIsInstance(f, QgsFeature)
         self.assertEqual(geom.asWkt(), f.geometry().asWkt())
+
+    def test_load_and_edit_with_missing_field(self):
+        uri = QgsDataSourceUri()
+        uri.setParam("service", "wfs")
+        uri.setParam("typename", "tests.mandatoryfield")
+        uri.setParam("url", ROOT_URL)
+        uri.setUsername("admin")
+        uri.setPassword("123")
+
+        layer = QgsVectorLayer(uri.uri(), "point", "OAPIF")
+        self.assertTrue(layer.isValid())
+        layer = self.project.addMapLayer(layer)
+        self.assertIsNotNone(layer)
+
+        self.assertTrue(bool(layer.dataProvider().capabilities() & QgsVectorDataProvider.Capability.AddFeatures))
+
+        f = QgsFeature()
+        f.setFields(layer.fields())
+        f.setGeometry(QgsPoint(2345678.0, 1234567.0))
+        f["text_mandatory_field"] = None
+        error = None
+        try:
+            with edit(layer):
+                layer.addFeature(f)
+        except QgsEditError as e:
+            error = e
+
+        self.assertIsNotNone(error)
+        self.assertEndsWith(str(error), "server replied: Unprocessable Entity']")
+
+        f = next(layer.getFeatures())
+        self.assertIsInstance(f, QgsFeature)

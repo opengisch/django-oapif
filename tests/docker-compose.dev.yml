@@ -38,7 +38,7 @@ services:
     command: ["/bin/sh", "-c", "/build/run/run.sh"]
 
   integration_tests:
-    image: qgis/qgis:3.42.3-bookworm
+    image: qgis/qgis:3.44-noble
     command: sh -c 'xvfb-run python3 -m unittest discover'
     tty: true
     volumes:

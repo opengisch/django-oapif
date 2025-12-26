@@ -1,14 +1,14 @@
 from django_oapif import OAPIF
-from django_oapif.handler import DjangoModelPermissions, DjangoModelPermissionsOrAnonReadOnly
+from django_oapif.handler import DjangoModelPermissions
 
 from .models import (
     Line_2056_10fields,
+    MandatoryField,
     NoGeom_10fields,
     NoGeom_100fields,
     Point_2056_10fields,
     Polygon_2056,
     SecretLayer,
-    MandatoryField,
 )
 
 ogc_api = OAPIF()
