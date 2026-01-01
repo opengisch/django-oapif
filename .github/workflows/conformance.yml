@@ -52,7 +52,7 @@ jobs:
         run: docker compose run conformance_test
 
       - name: Archive production artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: emailable-report
           path: |
@@ -115,7 +115,7 @@ jobs:
 
       - name: Archive conformance comment + diff
         if: ${{ github.event_name == 'pull_request' && steps.baseline.outputs.EXIT_CODE != '0' }}
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: conformance-comment-and-diff
           path: |
