@@ -1,3 +1,4 @@
+/* Prevent selection of prompts and outputs in pyconsole code blocks */
 .gp, .go {
     user-select: none;
 }
