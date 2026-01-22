@@ -1,10 +1,11 @@
+from collections.abc import Sequence
+from importlib.metadata import version
 from typing import (
     Any,
     Callable,
     Optional,
     Union,
 )
-from collections.abc import Sequence
 
 from django.db import models
 from django.urls import URLPattern, URLResolver
@@ -47,7 +48,7 @@ class OAPIF:
         self,
         *,
         title: str = "OAPIF",
-        version: str = "1.0.0",
+        version: str = version("django-oapif"),
         description: str = "",
         docs: DocsBase = Swagger(),
         docs_url: Optional[str] = "/docs",
