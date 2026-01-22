@@ -89,7 +89,7 @@ class OAPIF:
         /,
         id: str | None = None,
         title: str | None = None,
-        description: str = "",
+        description: str | None = None,
         geometry_field: str | None = "geom",
         properties_fields: list[str] | None = None,
         handler: type[QueryHandler] = DjangoModelPermissionsOrAnonReadOnly,
