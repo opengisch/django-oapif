@@ -2,8 +2,8 @@
 site_name = "Django-OAPIF"
 site_url = "https://opengisch.github.io/django-oapif/"
 site_author = "OPENGIS.ch"
-
 docs_dir = "content"
+extra_css = ["style/style.css"]
 
 repo_name = "opengisch/django-oapif"
 repo_url = "https://github.com/opengisch/django-oapif"

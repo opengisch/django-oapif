@@ -7,6 +7,7 @@ from qgis.core import (
     QgsProject,
     QgsVectorDataProvider,
     QgsVectorLayer,
+    QgsWkbTypes,
     edit,
 )
 from qgis.testing import start_app, unittest
@@ -26,20 +27,14 @@ class TestStack(unittest.TestCase):
         cls.user = "admin"
         cls.password = "123"
 
-    def assertEndsWith(self, s, suffix, msg=None):
-        """Check that the expression is true."""
-        if not s.endswith(suffix):
-            msg = self._formatMessage(msg, f"{unittest.util.safe_repr(s)} does not ends with '{suffix}'")
-            raise self.failureException(msg)
-
     def test_endpoint_ok(self):
         root_response = requests.get(ROOT_URL)
         collections_response = requests.get(COLLECTIONS_URL)
         points_response = requests.get(POINTS_URL)
 
-        self.assertTrue(root_response.status_code == 200)
-        self.assertTrue(collections_response.status_code == 200)
-        self.assertTrue(points_response.status_code == 200)
+        self.assertEqual(root_response.status_code, 200)
+        self.assertEqual(collections_response.status_code, 200)
+        self.assertEqual(points_response.status_code, 200)
 
     def test_collection_exists(self):
         res = requests.get(COLLECTIONS_URL).json()
@@ -122,15 +117,48 @@ class TestStack(unittest.TestCase):
         f.setFields(layer.fields())
         f.setGeometry(QgsPoint(2345678.0, 1234567.0))
         f["text_mandatory_field"] = None
-        error = None
-        try:
+
+        with self.assertRaises(QgsEditError) as ctx:
             with edit(layer):
                 layer.addFeature(f)
-        except QgsEditError as e:
-            error = e
 
-        self.assertIsNotNone(error)
-        self.assertEndsWith(str(error), "server replied: Unprocessable Entity']")
+        self.assertEqual(
+            str(ctx.exception),
+            """[\'ERROR: 1 feature(s) not added.\', \'\\n  Provider errors:\', \'    Feature creation failed: Create Feature request failed: Error transferring http://django:8000/oapif/collections/tests.mandatoryfield/items - server replied: Unprocessable Entity\\n    Server response: {"detail": [{"type": "string_type", "loc": ["body", "feature", "properties", "text_mandatory_field"], "msg": "Input should be a valid string"}]}\']""",
+        )
 
         f = next(layer.getFeatures())
         self.assertIsInstance(f, QgsFeature)
+
+    def test_load_layer_with_point_type(self):
+        uri = QgsDataSourceUri()
+        uri.setParam("service", "wfs")
+        uri.setParam("typename", "tests.point_2056_10fields")
+        uri.setParam("url", ROOT_URL)
+        layer = QgsVectorLayer(uri.uri(), "point", "OAPIF")
+        self.assertTrue(layer.isValid())
+        layer = self.project.addMapLayer(layer)
+        self.assertIsNotNone(layer)
+        self.assertEqual(layer.geometryType(), QgsWkbTypes.PointGeometry)
+
+    def test_load_layer_with_linestring_type(self):
+        uri = QgsDataSourceUri()
+        uri.setParam("service", "wfs")
+        uri.setParam("typename", "tests.line_2056_10fields")
+        uri.setParam("url", ROOT_URL)
+        layer = QgsVectorLayer(uri.uri(), "line", "OAPIF")
+        self.assertTrue(layer.isValid())
+        layer = self.project.addMapLayer(layer)
+        self.assertIsNotNone(layer)
+        self.assertEqual(layer.geometryType(), QgsWkbTypes.LineGeometry)
+
+    def test_load_layer_with_multipolygon_type(self):
+        uri = QgsDataSourceUri()
+        uri.setParam("service", "wfs")
+        uri.setParam("typename", "tests.polygon_2056")
+        uri.setParam("url", ROOT_URL)
+        layer = QgsVectorLayer(uri.uri(), "polygon", "OAPIF")
+        self.assertTrue(layer.isValid())
+        layer = self.project.addMapLayer(layer)
+        self.assertIsNotNone(layer)
+        self.assertEqual(layer.geometryType(), QgsWkbTypes.PolygonGeometry)

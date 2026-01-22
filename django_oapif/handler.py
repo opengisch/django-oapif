@@ -4,11 +4,14 @@ from django.http import HttpRequest
 
 
 class QueryHandler[M: Model]:
+    """Base class used to customize authorization and model operations."""
+
     def __init__(self, model: type[M]) -> None:
         self.model = model
         self.opts = model._meta
 
     def get_queryset(self, _request: HttpRequest) -> QuerySet[M]:
+        """Return the model queryset."""
         return self.model._default_manager.get_queryset()
 
     def save_model(self, _request: HttpRequest, obj: M, _change: bool) -> None:
