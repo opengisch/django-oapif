@@ -1,16 +1,16 @@
-from typing import Annotated, Any, Literal, Optional, TypeAlias, Union
+from typing import Annotated, Any, Literal
 
 from ninja import Field, Schema
 
 from django_oapif.schema import OAPIFLink
 
-Coordinate2D: TypeAlias = tuple[float, float]
-Coordinate3D: TypeAlias = tuple[float, float, float]
-Coordinate: TypeAlias = Coordinate2D | Coordinate3D
+type Coordinate2D = tuple[float, float]
+type Coordinate3D = tuple[float, float, float]
+type Coordinate = Coordinate2D | Coordinate3D
 
 
 class GeometryBase(Schema):
-    bbox: Optional[tuple[float, float, float, float]] = None
+    bbox: tuple[float, float, float, float] | None = None
 
 
 class Point[C: Coordinate](GeometryBase):
@@ -20,10 +20,10 @@ class Point[C: Coordinate](GeometryBase):
 
 class LineString[C: Coordinate](GeometryBase):
     type: Literal["LineString"]
-    coordinates: Union[
-        Annotated[list[Coordinate], Field(min_length=0, max_length=0)],
-        Annotated[list[Coordinate], Field(min_length=2)],
-    ]
+    coordinates: (
+        Annotated[list[Coordinate], Field(min_length=0, max_length=0)]
+        | Annotated[list[Coordinate], Field(min_length=2)]
+    )
 
 
 class Polygon[C: Coordinate](GeometryBase):
@@ -38,12 +38,7 @@ class MultiPoint[C: Coordinate](GeometryBase):
 
 class MultiLineString[C: Coordinate](GeometryBase):
     type: Literal["MultiLineString"]
-    coordinates: list[
-        Union[
-            Annotated[list[C], Field(min_length=0, max_length=0)],
-            Annotated[list[C], Field(min_length=2)],
-        ]
-    ]
+    coordinates: list[Annotated[list[C], Field(min_length=0, max_length=0)] | Annotated[list[C], Field(min_length=2)]]
 
 
 class MultiPolygon[C: Coordinate](GeometryBase):
@@ -57,15 +52,13 @@ class GeometryCollection[C: Coordinate](GeometryBase):
 
 
 type Geometry[C: Coordinate] = Annotated[
-    Union[
-        Point[C],
-        MultiPoint[C],
-        LineString[C],
-        MultiLineString[C],
-        Polygon[C],
-        MultiPolygon[C],
-        GeometryCollection[C],
-    ],
+    Point[C]
+    | MultiPoint[C]
+    | LineString[C]
+    | MultiLineString[C]
+    | Polygon[C]
+    | MultiPolygon[C]
+    | GeometryCollection[C],
     Field(discriminator="type"),
 ]
 
@@ -97,7 +90,7 @@ class Feature[G: Geometry | None, P: Schema](Schema):
 class FeatureCollection[F: Feature](Schema):
     type: Literal["FeatureCollection"]
     features: list[F]
-    bbox: Optional[tuple[float, float, float, float]]
+    bbox: tuple[float, float, float, float] | None
     links: list[OAPIFLink]
     numberReturned: int
     numberMatched: int

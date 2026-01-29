@@ -2,10 +2,8 @@ from collections.abc import Sequence
 from importlib.metadata import version
 from typing import (
     Any,
-    Callable,
-    Optional,
-    Union,
 )
+from collections.abc import Callable
 
 from django.db import models
 from django.urls import URLPattern, URLResolver
@@ -51,16 +49,16 @@ class OAPIF:
         version: str = version("django-oapif"),
         description: str = "",
         docs: DocsBase = Swagger(),
-        docs_url: Optional[str] = "/docs",
-        docs_decorator: Optional[Callable[[TCallable], TCallable]] = None,
-        servers: Optional[list[DictStrAny]] = None,
-        urls_namespace: Optional[str] = None,
-        auth: Optional[Union[Sequence[Callable], Callable, NOT_SET_TYPE]] = NOT_SET,
-        throttle: Union[BaseThrottle, list[BaseThrottle], NOT_SET_TYPE] = NOT_SET,
-        renderer: Optional[BaseRenderer] = None,
-        parser: Optional[Parser] = None,
-        default_router: Optional[Router] = None,
-        openapi_extra: Optional[dict[str, Any]] = None,
+        docs_url: str | None = "/docs",
+        docs_decorator: Callable[[TCallable], TCallable] | None = None,
+        servers: list[DictStrAny] | None = None,
+        urls_namespace: str | None = None,
+        auth: Sequence[Callable] | Callable | NOT_SET_TYPE | None = NOT_SET,
+        throttle: BaseThrottle | list[BaseThrottle] | NOT_SET_TYPE = NOT_SET,
+        renderer: BaseRenderer | None = None,
+        parser: Parser | None = None,
+        default_router: Router | None = None,
+        openapi_extra: dict[str, Any] | None = None,
     ) -> None:
         self.api = NinjaAPI(
             title=title,
