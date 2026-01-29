@@ -1,5 +1,5 @@
 import math
-from typing import Any, NamedTuple, Optional, Union, cast, get_args, get_origin
+from typing import Any, NamedTuple, Union, cast, get_args, get_origin
 
 from django.contrib.gis.db.models import Extent, GeometryField
 from django.contrib.gis.db.models.functions import AsGeoJSON, Transform
@@ -257,7 +257,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             GeometryType = Geometry
 
         if geom_field.null:
-            GeometrySchema = Optional[GeometryType[Coordinate]]
+            GeometrySchema = GeometryType[Coordinate] | None
         else:
             GeometrySchema = GeometryType[Coordinate]
     else:
@@ -295,7 +295,7 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         properties: CreatePropertiesSchema
 
     class PatchFeatureSchema(FeatureWithoutId):
-        geometry: Optional[GeometrySchema] = None
+        geometry: GeometrySchema | None = None
         properties: PatchPropertiesSchema
 
     FeatureCollectionSchema = FeatureCollection[FeatureSchema]

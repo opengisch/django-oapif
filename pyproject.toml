@@ -43,12 +43,10 @@ reportPrivateImportUsage = "none"
 [tool.ruff]
 target-version="py312"
 line-length = 120
-lint.pydocstyle.convention = "google"
-lint.fixable = ["ALL"]
-extend-select = ["UP"]
 extend-exclude = [
     "tests/django_oapif_tests/tests/migrations/*",
 ]
-
-[tool.ruff.format]
-preview = true
+lint.pydocstyle.convention = "google"
+lint.fixable = ["ALL"]
+lint.extend-select = ["UP"]
+format.preview = true
