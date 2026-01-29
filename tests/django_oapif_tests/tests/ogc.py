@@ -9,6 +9,7 @@ from .models import (
     NoGeom_10fields,
     NoGeom_100fields,
     Point_2056_10fields,
+    Point_2056_Empty,
     Polygon_2056,
     SecretLayer,
 )
@@ -92,4 +93,9 @@ ogc_api.register(
 ogc_api.register(
     Geometry_2056,
     title="geometry_2056",
+)
+
+ogc_api.register(
+    Point_2056_Empty,
+    title="point_2056_empty",
 )

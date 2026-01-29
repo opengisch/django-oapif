@@ -162,3 +162,15 @@ class TestStack(unittest.TestCase):
         layer = self.project.addMapLayer(layer)
         self.assertIsNotNone(layer)
         self.assertEqual(layer.geometryType(), QgsWkbTypes.PolygonGeometry)
+
+    def test_load_empty_layer_with_point_type(self):
+        uri = QgsDataSourceUri()
+        uri.setParam("service", "wfs")
+        uri.setParam("typename", "tests.point_2056_empty")
+        uri.setParam("url", ROOT_URL)
+        layer = QgsVectorLayer(uri.uri(), "point", "OAPIF")
+        self.assertTrue(layer.isValid())
+        layer = self.project.addMapLayer(layer)
+        self.assertIsNotNone(layer)
+        self.assertEqual(layer.featureCount(), 0)
+        self.assertEqual(layer.geometryType(), QgsWkbTypes.PointGeometry)
