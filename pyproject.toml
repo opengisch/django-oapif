@@ -29,7 +29,7 @@ packages = ["django_oapif"]
 
 [tool.setuptools-git-versioning]
 enabled = true
-version_callback = "0.0.0.dev"
+starting_version = "0.0.0.dev"
 
 [tool.setuptools.dynamic]
 readme = {file = ["README.md"], content-type = "text/markdown"}
@@ -45,6 +45,7 @@ target-version="py312"
 line-length = 120
 lint.pydocstyle.convention = "google"
 lint.fixable = ["ALL"]
+extend-select = ["UP"]
 extend-exclude = [
     "tests/django_oapif_tests/tests/migrations/*",
 ]
