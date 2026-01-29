@@ -1,17 +1,20 @@
 from django_oapif import OAPIF
+from django_oapif.auth import BasicAuth, DjangoAuth
 from django_oapif.handler import DjangoModelPermissions
 
 from .models import (
+    Geometry_2056,
     Line_2056_10fields,
     MandatoryField,
     NoGeom_10fields,
     NoGeom_100fields,
     Point_2056_10fields,
+    Point_2056_Empty,
     Polygon_2056,
     SecretLayer,
 )
 
-ogc_api = OAPIF()
+ogc_api = OAPIF(auth=[BasicAuth(), DjangoAuth()])
 
 ogc_api.register(
     Point_2056_10fields,
@@ -62,7 +65,6 @@ ogc_api.register(
     properties_fields=["name"],
 )
 
-
 ogc_api.register(
     SecretLayer,
     title="secret",
@@ -80,4 +82,20 @@ ogc_api.register(
     properties_fields=[
         "text_mandatory_field",
     ],
+)
+
+ogc_api.register(
+    Point_2056_10fields,
+    id="tests.point_2056_10fields_autofill",
+    title="point_2056",
+)
+
+ogc_api.register(
+    Geometry_2056,
+    title="geometry_2056",
+)
+
+ogc_api.register(
+    Point_2056_Empty,
+    title="point_2056_empty",
 )

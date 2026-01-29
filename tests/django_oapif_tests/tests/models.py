@@ -145,3 +145,11 @@ class MandatoryField(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     text_mandatory_field = models.CharField(max_length=255, verbose_name=_("Mandatory Field"), null=False, blank=False)
     geom = models.PointField(srid=2056, verbose_name=_("Geometry"))
+
+
+class Geometry_2056(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    geom = models.GeometryField(srid=2056, verbose_name=_("Geometry"))
+
+
+class Point_2056_Empty(Point_2056_10fields): ...
