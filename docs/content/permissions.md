@@ -31,7 +31,7 @@ ogc_api = OAPIF()
 ogc_api.register(MyModel, handler=DjangoModelPermissionsOrAnonReadOnly)
 ```
 
-It is also possible to write your own handler to implement custom permission or queryset logic. All `QueryHandler` functions have the same signature as django's `ModelAdmin`, meaning that logic can be shared between the two easily with a mixin class:
+It is also possible to write your own handler to implement custom permission or queryset logic. All `OapifCollection` functions have the same signature as django's `ModelAdmin`, meaning that logic can be shared between the two easily with a mixin class:
 
 ```python
 # permissions.py
@@ -72,7 +72,7 @@ from .permissions import MyModelPermissionsMixin
 
 ogc_api = OAPIF()
 
-class MyModelHandler(QueryHandler, MyModelPermissionsMixin):
+class MyModelHandler(OapifCollection, MyModelPermissionsMixin):
   ...
 
 ogc_api.register(MyModel, handler=MyModelHandler)

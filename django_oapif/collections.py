@@ -1,37 +1,17 @@
-import math
-from typing import Any, NamedTuple, Union, cast, get_args, get_origin
-
-from django.contrib.gis.db.models import Extent, GeometryField
-from django.contrib.gis.db.models.functions import AsGeoJSON, Transform
+from django.contrib.gis.db.models import Extent
 from django.contrib.gis.geos import GEOSGeometry
-from django.contrib.gis.geos import Polygon as GEOSPolygon
-from django.db.models import ForeignKey, GeneratedField, JSONField, ManyToManyRel, ManyToOneRel, Model, QuerySet
-from django.db.models.functions import Cast
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404
-from ninja import Header, ModelSchema, Query, Router, Schema
-from ninja.errors import AuthorizationError, HttpError
-from ninja.orm.fields import get_schema_field
-from ninja.schema import NinjaGenerateJsonSchema
-from pydantic import ConfigDict
+from ninja import Header, Query, Router
+from ninja.errors import AuthorizationError, HttpError, ValidationError
 
 from django_oapif.crs import CRS84_URI, get_srid_from_uri
 from django_oapif.geojson import (
-    Coordinate2D,
-    Coordinate3D,
     Feature,
-    FeatureCollection,
-    FeatureWithoutId,
-    Geometry,
-    GeometryCollection,
-    LineString,
-    MultiLineString,
-    MultiPoint,
-    MultiPolygon,
-    Point,
-    Polygon,
+    GenericFeature,
+    GenericFeatureCollection,
 )
-from django_oapif.handler import QueryHandler
+from django_oapif.handler import OapifCollection
 from django_oapif.schema import (
     OAPIFCollection,
     OAPIFCollections,
@@ -40,82 +20,6 @@ from django_oapif.schema import (
     OAPIFSpatialExtent,
 )
 from django_oapif.utils import replace_query_param
-
-
-class OAPIFCollectionEntry(NamedTuple):
-    model_class: type[Model]
-    id: str
-    title: str
-    description: str | None
-    geometry_field: str | None
-    properties_fields: list[str] | None
-    handler: QueryHandler
-
-    @property
-    def srid(self) -> int | None:
-        if not self.geometry_field:
-            return None
-        field = cast("GeometryField", self.model_class._meta.get_field(self.geometry_field))
-        return field.srid  # type: ignore[]
-
-    def query(
-        self,
-        request: HttpRequest,
-        crs: str,
-        bbox: str | None = None,
-        bbox_crs: str | None = None,
-    ) -> QuerySet:
-        output_srid = get_srid_from_uri(crs)
-        qs = self.handler.get_queryset(request)
-        qs = qs.only("pk", *self.properties_fields) if self.properties_fields else qs.all()
-        if geom_field := self.geometry_field:
-            geometry_query = geom_field if output_srid == self.srid else Transform(geom_field, output_srid)
-            qs = qs.annotate(_oapif_geometry=Cast(AsGeoJSON(geometry_query, bbox=True), JSONField()))
-            if bbox is not None:
-                assert bbox_crs is not None
-                try:
-                    minx, miny, maxx, maxy = map(float, bbox.split(","))
-                    bbox_geom: GEOSPolygon = GEOSPolygon.from_bbox((
-                        minx,
-                        miny,
-                        maxx,
-                        maxy,
-                    ))
-                    bbox_geom.srid = get_srid_from_uri(bbox_crs)
-                    bbox_expr = bbox_geom if bbox_geom.srid == self.srid else Transform(bbox_geom, self.srid)
-                    qs = qs.filter(**{f"{geom_field}__intersects": bbox_expr})
-                except ValueError as err:
-                    raise HttpError(
-                        400,
-                        "Invalid bbox parameter. Expected format: minx,miny,maxx,maxy",
-                    ) from err
-        return qs
-
-    def json_schema(self, geom_schema: type[Schema], properties_schema: type[Schema]) -> dict[str, Any]:
-        schema = properties_schema.model_json_schema(by_alias=False, schema_generator=NinjaGenerateJsonSchema)
-        required_fields = set(schema.get("required", []))
-        # Optional fields are represented as a AnyOf union of their actual type and None
-        # We patch this as it is unnecessary considering optional fields are already infered
-        # from the list of required ones
-        for field_name, field_props in schema["properties"].items():
-            if field_name not in required_fields:
-                if (t := field_props.get("anyOf")) and len(t) == 2 and t[1] == {"type": "null"}:
-                    for k, v in t[0].items():
-                        field_props[k] = v
-                    del field_props["anyOf"]
-
-        if geom_field := self.geometry_field:
-            geom_type = geom_schema.__name__.lower()
-            if geom_type == "geometry":
-                geom_type = "any"
-            schema["properties"][geom_field] = {
-                "title": "geometry",
-                "x-ogc-role": "primary-geometry",
-                "format": f"geometry-{geom_type}",
-            }
-        schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
-        schema["title"] = self.title
-        return schema
 
 
 def get_page_links(request: HttpRequest, limit: int, offset: int, total_count: int) -> list[OAPIFLink]:
@@ -148,7 +52,20 @@ def get_page_links(request: HttpRequest, limit: int, offset: int, total_count: i
     return links
 
 
-def get_collection_response(request: HttpRequest, collection: OAPIFCollectionEntry):
+def get_related_object_or_raise(field, value, related_model):
+    try:
+        return related_model.objects.get(pk=value)
+    except related_model.DoesNotExist:
+        raise ValidationError([
+            {
+                "loc": ["body", "feature", "properties", field],
+                "msg": "Foreign key not found",
+                "type": "value_error",
+            },
+        ])
+
+
+def get_collection_response(request: HttpRequest, collection: OapifCollection):
     uri_prefix = "collections/" if request.get_full_path().endswith("collections") else ""
     response = OAPIFCollection(
         id=collection.id,
@@ -181,14 +98,22 @@ def get_collection_response(request: HttpRequest, collection: OAPIFCollectionEnt
         crs_uri = f"http://www.opengis.net/def/crs/EPSG/0/{collection.srid}"
         response.storageCrs = crs_uri
         response.crs = [CRS84_URI, crs_uri]
-        if extent := collection.model_class.objects.aggregate(extent=Extent(geom))["extent"]:
+        if extent := collection.model.objects.aggregate(extent=Extent(geom))["extent"]:
             response.extent = OAPIFExtent(spatial=OAPIFSpatialExtent(bbox=[extent], crs=crs_uri))
 
     return response
 
 
-def create_collections_router(collections: dict[str, OAPIFCollectionEntry]):
+def create_collections_router(collections: dict[str, OapifCollection]):
     router = Router()
+
+    def get_collection_by_id(collection_id: str, request: HttpRequest):
+        collection = collections.get(collection_id)
+        if collection is None:
+            raise HttpError(404, "Collection not found")
+        if not collection.has_view_permission(request):
+            raise AuthorizationError()
+        return collection
 
     @router.get("", response=OAPIFCollections, operation_id="get_collections")
     def list_collections(request: HttpRequest):
@@ -204,150 +129,44 @@ def create_collections_router(collections: dict[str, OAPIFCollectionEntry]):
             collections=[
                 get_collection_response(request, collection)
                 for collection in collections.values()
-                if collection.handler.has_view_permission(request)
+                if collection.has_view_permission(request)
             ],
         )
 
-    return router
-
-
-def create_collection_router(collection: OAPIFCollectionEntry):
-    include_fields = (
-        set(collection.properties_fields)
-        if collection.properties_fields is not None
-        else {
-            f.name
-            for f in collection.model_class._meta.get_fields()
-            if not isinstance(f, (ManyToOneRel, ManyToManyRel)) and not f.name == collection.geometry_field
-        }
-    )
-
-    properties_model_config = ConfigDict(
-        extra="forbid",
-        from_attributes=True,
-        validate_by_name=True,
-        serialize_by_alias=False,
-        loc_by_alias=False,
-    )
-
-    readonly_fields = {f.name for f in collection.model_class._meta.get_fields() if isinstance(f, GeneratedField)}
-    if collection.geometry_field:
-        geom_field = cast("GeometryField", collection.model_class._meta.get_field(collection.geometry_field))
-
-        if geom_field.geom_type.endswith("Z") or geom_field.geom_type.endswith("ZM"):
-            Coordinate = Coordinate3D
-        else:
-            Coordinate = Coordinate2D
-
-        if geom_field.geom_type.startswith("POINT"):
-            GeometryType = Point
-        elif geom_field.geom_type.startswith("MULTIPOINT"):
-            GeometryType = MultiPoint
-        elif geom_field.geom_type.startswith("LINESTRING"):
-            GeometryType = LineString
-        elif geom_field.geom_type.startswith("MULTILINESTRING"):
-            GeometryType = MultiLineString
-        elif geom_field.geom_type.startswith("POLYGON"):
-            GeometryType = Polygon
-        elif geom_field.geom_type.startswith("MULTIPOLYGON"):
-            GeometryType = MultiPolygon
-        elif geom_field.geom_type.startswith("GEOMETRYCOLLECTION"):
-            GeometryType = GeometryCollection
-        else:
-            GeometryType = Geometry
-
-        if geom_field.null:
-            GeometrySchema = GeometryType[Coordinate] | None
-        else:
-            GeometrySchema = GeometryType[Coordinate]
-    else:
-        GeometryType = type(None)
-        GeometrySchema = type(None)
-
-    class PropertiesSchema(ModelSchema):
-        model_config = properties_model_config
-
-        class Meta:
-            model = collection.model_class
-            fields = include_fields
-
-    class CreatePropertiesSchema(ModelSchema):
-        model_config = properties_model_config
-
-        class Meta:
-            model = collection.model_class
-            fields = include_fields - readonly_fields
-
-    class PatchPropertiesSchema(ModelSchema):
-        model_config = properties_model_config
-
-        class Meta:
-            model = collection.model_class
-            fields = include_fields - readonly_fields
-            fields_optional = "__all__"
-
-    class FeatureSchema(Feature):
-        geometry: GeometrySchema
-        properties: PropertiesSchema
-
-    class CreateFeatureSchema(FeatureWithoutId):
-        geometry: GeometrySchema
-        properties: CreatePropertiesSchema
-
-    class PatchFeatureSchema(FeatureWithoutId):
-        geometry: GeometrySchema | None = None
-        properties: PatchPropertiesSchema
-
-    FeatureCollectionSchema = FeatureCollection[FeatureSchema]
-
-    PrimaryKeyType, _ = get_schema_field(collection.model_class._meta.pk)
-    # get_schema_field returns type as Union[int, None] if there is a default value
-    if get_origin(PrimaryKeyType) is Union:
-        PrimaryKeyType = get_args(PrimaryKeyType)[0]
-
-    foreign_key_fields = {
-        field.name: field.remote_field.model
-        for field in collection.model_class._meta.get_fields()
-        if isinstance(field, ForeignKey)
-    }
-    json_schema = collection.json_schema(GeometryType, PropertiesSchema)
-
-    router = Router()
-
     @router.get(
-        "",
+        "/{collection_id}",
         response=OAPIFCollection,
-        operation_id=f"get_{collection.id}",
+        operation_id="get_collection",
     )
-    def get_collection(request):
-        if not collection.handler.has_view_permission(request):
-            raise AuthorizationError()
+    def get_collection(request, collection_id: str):
+        collection = get_collection_by_id(collection_id, request)
         return get_collection_response(request, collection)
 
     @router.get(
-        "/schema",
-        operation_id=f"get_{collection.id}_schema",
+        "/{collection_id}/schema",
+        operation_id="get_collection_schema",
     )
-    def get_schema(request: HttpRequest):
-        if not collection.handler.has_view_permission(request):
-            raise AuthorizationError()
-        return {**json_schema, "$id": request.build_absolute_uri()}
+    def get_schema(request: HttpRequest, collection_id: str):
+        collection = get_collection_by_id(collection_id, request)
+        schema = collection.get_json_schema(request)
+        schema["$id"] = request.build_absolute_uri()
+        return schema
 
     @router.get(
-        "/items",
-        response=FeatureCollectionSchema,
-        operation_id=f"get_{collection.id}_items",
+        "/{collection_id}/items",
+        operation_id="get_collection_items",
+        response=GenericFeatureCollection,
     )
     def get_items(
         request: HttpRequest,
+        collection_id: str,
         limit: int = 100,
         offset: int = 0,
         crs: str = CRS84_URI,
         bbox_crs: str = Query(CRS84_URI, alias="bbox-crs"),
         bbox: str | None = Query(None, description="BBOX in the format: minx,miny,maxx,maxy"),
     ):
-        if not collection.handler.has_view_permission(request):
-            raise AuthorizationError()
+        collection = get_collection_by_id(collection_id, request)
 
         query = collection.query(request, crs, bbox, bbox_crs)
         paginated_query = query[offset : offset + limit]
@@ -355,21 +174,8 @@ def create_collection_router(collection: OAPIFCollectionEntry):
         total_count = query.count()
         result_count = len(paginated_query)
 
-        features = []
-        results_bbox = (math.inf, math.inf, -math.inf, -math.inf)
-        for obj in paginated_query:
-            feature = FeatureSchema.from_orm(obj)
-            features.append(feature)
-            if geometry := feature.geometry:
-                results_bbox = (
-                    min(results_bbox[0], geometry.bbox[0]),
-                    min(results_bbox[1], geometry.bbox[1]),
-                    max(results_bbox[2], geometry.bbox[2]),
-                    max(results_bbox[3], geometry.bbox[3]),
-                )
-        if results_bbox == (math.inf, math.inf, -math.inf, -math.inf):
-            results_bbox = None
-
+        features, results_bbox = collection.queryset_to_features(request, paginated_query)
+        FeatureCollectionSchema = collection.get_feature_collection_schema(request)
         return FeatureCollectionSchema(
             type="FeatureCollection",
             features=features,
@@ -381,103 +187,114 @@ def create_collection_router(collection: OAPIFCollectionEntry):
 
     @router.api_operation(
         ["OPTIONS"],
-        "/items",
-        operation_id=f"get_{collection.id}_items_rights",
+        "/{collection_id}/items",
+        operation_id="get_collection_items_rights",
     )
     def options_items(
         request: HttpRequest,
+        collection_id: str,
         response: HttpResponse,
     ):
+        collection = get_collection_by_id(collection_id, request)
         allowed = ["OPTIONS"]
-        if collection.handler.has_view_permission(request):
-            allowed.append("GET")
-        if collection.handler.has_add_permission(request):
+        allowed.append("GET")
+        if collection.has_add_permission(request):
             allowed.append("POST")
-        response.headers["Allow"] = ", ".join(allowed)
+        response.headers["Allow"] = ", ".join(allowed)  # type: ignore
 
     @router.get(
-        "/items/{item_id}",
-        response=FeatureSchema,
-        operation_id=f"get_{collection.id}_item",
+        "/{collection_id}/items/{item_id}",
+        operation_id="get_collection_item",
+        response=GenericFeature,
     )
     def get_item(
         request: HttpRequest,
-        item_id: PrimaryKeyType,
+        collection_id: str,
+        item_id: str,
         crs: str = CRS84_URI,
     ):
+        collection = get_collection_by_id(collection_id, request)
         query = collection.query(request, crs)
         item = get_object_or_404(query, pk=item_id)
-        if not collection.handler.has_view_permission(request, item):
+        if not collection.has_view_permission(request, item):
             raise AuthorizationError()
-        return FeatureSchema.from_orm(item)
+        return collection.model_to_feature(request, item)
 
     @router.post(
-        "/items",
-        response={201: FeatureSchema},
-        operation_id=f"create_{collection.id}_item",
+        "/{collection_id}/items",
+        response={201: GenericFeature},
+        operation_id="create_collection_item",
     )
     def create_item(
         request: HttpRequest,
         response: HttpResponse,
-        feature: CreateFeatureSchema,
+        collection_id: str,
+        feature: GenericFeature,
         crs: str = Header(alias="Content-Crs", default=CRS84_URI),
     ):
+        collection = get_collection_by_id(collection_id, request)
+        feature = collection.validate_feature_input_or_raise(request, feature)
         item_properties = feature.properties.model_dump() or {}
         if (geom_field := collection.geometry_field) and feature.geometry:
             geometry = GEOSGeometry(feature.geometry.model_dump_json())
             geometry.srid = get_srid_from_uri(crs)
             item_properties[geom_field] = geometry
-        for field, value in item_properties.items():
-            if value is not None and (related_model := foreign_key_fields.get(field)):
-                item_properties[field] = related_model.objects.get(pk=value)
-        item = collection.model_class.objects.create(**item_properties)
-        if not collection.handler.has_add_permission(request, item):
+        for field, value in feature.properties.model_dump().items():
+            if value is not None and (related_model := collection.foreign_key_fields.get(field)):
+                item_properties[field] = get_related_object_or_raise(field, value, related_model)
+
+        item = collection.model(**item_properties)
+        if not collection.has_add_permission(request, item):
             raise AuthorizationError()
-        collection.handler.save_model(request, item, False)
+        collection.save_model(request, item, False)
         item = collection.query(request, CRS84_URI).get(pk=item.pk)
         response.headers["Location"] = request.build_absolute_uri(f"items/{item.pk}")  # type: ignore
-        return 201, FeatureSchema.from_orm(item)
+        return 201, collection.model_to_feature(request, item)
 
     @router.api_operation(
         ["OPTIONS"],
-        "/items/{item_id}",
-        operation_id=f"create_{collection.id}_item_rights",
+        "/{collection_id}/items/{item_id}",
+        operation_id="create_collection_item_rights",
     )
     def options_item(
         request: HttpRequest,
         response: HttpResponse,
-        item_id: PrimaryKeyType,
+        collection_id: str,
+        item_id: str,
     ):
-        query = collection.handler.get_queryset(request)
+        collection = get_collection_by_id(collection_id, request)
+        query = collection.get_queryset(request)
         item = get_object_or_404(query, pk=item_id)
         allowed = ["OPTIONS"]
-        if collection.handler.has_view_permission(request, item):
+        if collection.has_view_permission(request, item):
             allowed.append("GET")
-        if collection.handler.has_change_permission(request, item):
+        if collection.has_change_permission(request, item):
             allowed.append("PUT")
             allowed.append("PATCH")
-        if collection.handler.has_delete_permission(request, item):
+        if collection.has_delete_permission(request, item):
             allowed.append("DELETE")
         response.headers["Allow"] = ", ".join(allowed)  # type: ignore
 
     @router.put(
-        "/items/{item_id}",
-        response=FeatureSchema,
-        operation_id=f"replace_{collection.id}_item",
+        "/{collection_id}/items/{item_id}",
+        operation_id="replace_collection_item",
     )
     def replace_item(
         request: HttpRequest,
-        item_id: PrimaryKeyType,
-        feature: CreateFeatureSchema,
+        collection_id: str,
+        item_id: str,
+        feature: Feature,
         crs: str = Header(alias="Content-Crs", default=CRS84_URI),
     ):
-        query = collection.handler.get_queryset(request)
+        collection = get_collection_by_id(collection_id, request)
+        query = collection.get_queryset(request)
         item = get_object_or_404(query, pk=item_id)
-        if not collection.handler.has_change_permission(request, item):
+        if not collection.has_change_permission(request, item):
             raise AuthorizationError()
+        feature = collection.validate_feature_input_or_raise(request, feature)
         for field, value in feature.properties.model_dump().items():
-            if value is not None and (related_model := foreign_key_fields.get(field)):
-                value = related_model.objects.get(pk=value)
+            if value is not None and (related_model := collection.foreign_key_fields.get(field)):
+                value = get_related_object_or_raise(field, value, related_model)
             setattr(item, field, value)
         if geom_field := collection.geometry_field:
             if feature.geometry:
@@ -486,28 +303,30 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             else:
                 geometry = None
             setattr(item, geom_field, geometry)
-        collection.handler.save_model(request, item, True)
+        collection.save_model(request, item, True)
         item = collection.query(request, CRS84_URI).get(pk=item_id)
-        return FeatureSchema.from_orm(item)
+        return collection.model_to_feature(request, item)
 
     @router.patch(
-        "/items/{item_id}",
-        response=FeatureSchema,
-        operation_id=f"update_{collection.id}_item",
+        "/{collection_id}/items/{item_id}",
+        operation_id="update_collection_item",
     )
     def update_item(
         request: HttpRequest,
-        item_id: PrimaryKeyType,
-        feature: PatchFeatureSchema,
+        collection_id: str,
+        item_id: str,
+        feature: Feature,
         crs: str = Header(alias="Content-Crs", default=CRS84_URI),
     ):
-        query = collection.handler.get_queryset(request)
+        collection = get_collection_by_id(collection_id, request)
+        query = collection.get_queryset(request)
         item = get_object_or_404(query, pk=item_id)
-        if not collection.handler.has_change_permission(request, item):
+        if not collection.has_change_permission(request, item):
             raise AuthorizationError()
-        for field, value in feature.properties.model_dump(exclude_unset=True).items():
-            if value is not None and (related_model := foreign_key_fields.get(field)):
-                value = related_model.objects.get(pk=value)
+        feature = collection.validate_feature_input_or_raise(request, feature)
+        for field, value in feature.properties.model_dump().items():
+            if value is not None and (related_model := collection.foreign_key_fields.get(field)):
+                value = get_related_object_or_raise(field, value, related_model)
             setattr(item, field, value)
         if (geom_field := collection.geometry_field) and "geometry" in feature.model_fields_set:
             if feature.geometry:
@@ -516,19 +335,21 @@ def create_collection_router(collection: OAPIFCollectionEntry):
             else:
                 geometry = None
             setattr(item, geom_field, geometry)
-        collection.handler.save_model(request, item, True)
+        collection.save_model(request, item, True)
         item = collection.query(request, CRS84_URI).get(pk=item_id)
-        return FeatureSchema.from_orm(item)
+        return collection.model_to_feature(request, item)
 
-    @router.delete("/items/{item_id}", operation_id=f"delete_{collection.id}_item")
+    @router.delete("/{collection_id}/items/{item_id}", operation_id="delete_collection_item")
     def delete_item(
         request: HttpRequest,
-        item_id: PrimaryKeyType,
+        collection_id: str,
+        item_id: str,
     ):
-        query = collection.handler.get_queryset(request)
+        collection = get_collection_by_id(collection_id, request)
+        query = collection.get_queryset(request)
         item = get_object_or_404(query, pk=item_id)
-        if not collection.handler.has_view_permission(request, item):
+        if not collection.has_view_permission(request, item):
             raise AuthorizationError()
-        collection.handler.delete_model(request, item)
+        collection.delete_model(request, item)
 
     return router

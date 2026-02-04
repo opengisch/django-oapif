@@ -8,7 +8,7 @@
 ::: django_oapif.handler
     options:
         members:
-            - QueryHandler
+            - OapifCollection
             - AllowAny
             - IsAuthenticated
             - IsAuthenticatedOrReadOnly

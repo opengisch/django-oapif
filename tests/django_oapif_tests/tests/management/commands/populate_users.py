@@ -24,6 +24,7 @@ class Command(BaseCommand):
             "mandatoryfield",
             "geometry_2056",
             "point_2056_empty",
+            "layerwithforeignkey",
         ):
             adding.append(Permission.objects.get(codename=f"add_{model}"))
             modifying.append(Permission.objects.get(codename=f"change_{model}"))

@@ -34,6 +34,7 @@ class TestBasicAuth(TestCase):
 
     def test_anonymous_items_options(self):
         # Anonymous user
+        self.maxDiff = None
         expected = {"GET", "OPTIONS"}
         url = f"{collections_url}/tests.point_2056_10fields/items"
         response = self.client.options(url)
@@ -111,13 +112,12 @@ class TestSchema(TestCase):
         self.client.logout()
 
     def test_schema_and_fields_recognition(self):
-        url = f"{collections_url}/tests.point_2056_10fields_autofill/schema"
+        url = f"{collections_url}/tests.point_2056_10fields/schema"
 
         expected_schema = {
             "additionalProperties": False,
             "properties": {
                 "id": {"title": "Id", "format": "uuid", "type": "string"},
-                "geom": {"title": "geometry", "x-ogc-role": "primary-geometry", "format": "geometry-point"},
                 "field_int": {"title": "Field Int", "type": "integer"},
                 "field_bool": {"default": True, "title": "Field Bool", "type": "boolean"},
                 "field_str_0": {"title": "Field 0", "maxLength": 255, "type": "string"},
@@ -130,11 +130,33 @@ class TestSchema(TestCase):
                 "field_str_7": {"title": "Field 7", "maxLength": 255, "type": "string"},
                 "field_str_8": {"title": "Field 8", "maxLength": 255, "type": "string"},
                 "field_str_9": {"title": "Field 9", "maxLength": 255, "type": "string"},
+                "geom": {"title": "geometry", "x-ogc-role": "primary-geometry", "format": "geometry-point"},
             },
-            "title": "point_2056",
+            "title": "tests.Point_2056_10fields",
             "type": "object",
             "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "$id": "http://testserver/oapif/collections/tests.point_2056_10fields_autofill/schema",
+            "$id": "http://testserver/oapif/collections/tests.point_2056_10fields/schema",
+        }
+
+        schema_response = self.client.get(url, headers=headers, content_type="application/json")
+        self.assertEqual(schema_response.status_code, 200)
+        self.assertEqual(schema_response.json(), expected_schema)
+
+    def test_schema_subset_recognition(self):
+        self.maxDiff = None
+        url = f"{collections_url}/tests.point_2056_10fields_subset/schema"
+
+        expected_schema = {
+            "additionalProperties": False,
+            "properties": {
+                "field_int": {"title": "Field Int", "type": "integer"},
+                "field_str_0": {"title": "Field 0", "maxLength": 255, "type": "string"},
+                "geom": {"title": "geometry", "x-ogc-role": "primary-geometry", "format": "geometry-point"},
+            },
+            "title": "tests.Point_2056_10fields",
+            "type": "object",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "http://testserver/oapif/collections/tests.point_2056_10fields_subset/schema",
         }
 
         schema_response = self.client.get(url, headers=headers, content_type="application/json")
@@ -147,11 +169,12 @@ class TestSchema(TestCase):
         expected_schema = {
             "additionalProperties": False,
             "properties": {
+                "id": {"format": "uuid", "title": "Id", "type": "string"},
                 "text_mandatory_field": {"maxLength": 255, "title": "Mandatory Field", "type": "string"},
                 "geom": {"title": "geometry", "x-ogc-role": "primary-geometry", "format": "geometry-point"},
             },
             "required": ["text_mandatory_field"],
-            "title": "mandatory_field",
+            "title": "tests.MandatoryField",
             "type": "object",
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "$id": "http://testserver/oapif/collections/tests.mandatoryfield/schema",
