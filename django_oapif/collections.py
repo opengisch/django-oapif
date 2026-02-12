@@ -1,5 +1,8 @@
+from typing import Any
+
 from django.contrib.gis.db.models import Extent
 from django.contrib.gis.geos import GEOSGeometry
+from django.db.models import Model
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404
 from ninja import Header, Query, Router
@@ -52,7 +55,7 @@ def get_page_links(request: HttpRequest, limit: int, offset: int, total_count: i
     return links
 
 
-def get_related_object_or_raise(field, value, related_model):
+def get_related_object_or_raise(field: str, value: Any, related_model: type[Model]):
     try:
         return related_model.objects.get(pk=value)
     except related_model.DoesNotExist:

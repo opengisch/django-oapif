@@ -4,6 +4,7 @@ import re
 from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.test.testcases import TestCase
+from django_oapif_tests.tests.models import Point_2056_10fields
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +100,52 @@ class TestBasicAuth(TestCase):
         fid = post_to_items.json()["id"]
         delete_from_items = self.client.delete(f"{url}/{fid}")
         self.assertIn(delete_from_items.status_code, (200, 204), f"{url}/{fid}")
+
+    def test_post_model_with_foreignkey(self):
+        self.client.force_login(user=self.demo_editor)
+        first_point = Point_2056_10fields.objects.first()
+        assert first_point is not None
+        data = {
+            "type": "Feature",
+            "geometry": None,
+            "properties": {"point": str(first_point.pk)},
+        }
+
+        url = f"{collections_url}/tests.layerwithforeignkey/items"
+        post_to_items = self.client.post(url, data, headers=headers, content_type="application/json")
+        self.assertEqual(post_to_items.status_code, 201, (url, data, post_to_items))
+        response = post_to_items.json()
+        expected_response = {
+            "type": "Feature",
+            "geometry": None,
+            "id": response["id"],
+            "properties": {
+                "point": str(first_point.pk),
+                "id": response["id"],
+            },
+        }
+        self.assertEqual(post_to_items.json(), expected_response)
+
+    def test_post_model_with_invalid_foreignkey(self):
+        self.client.force_login(user=self.demo_editor)
+        data = {
+            "type": "Feature",
+            "geometry": None,
+            "properties": {"point": "7038f63b-1a77-4489-b5bf-f09586aeb5a4"},
+        }
+        url = f"{collections_url}/tests.layerwithforeignkey/items"
+        post_to_items = self.client.post(url, data, headers=headers, content_type="application/json")
+        self.assertEqual(post_to_items.status_code, 422, (url, data, post_to_items))
+        expected_error = {
+            "detail": [
+                {
+                    "loc": ["body", "feature", "properties", "point"],
+                    "msg": "Foreign key not found",
+                    "type": "value_error",
+                }
+            ]
+        }
+        self.assertEqual(post_to_items.json(), expected_error)
 
 
 class TestSchema(TestCase):
