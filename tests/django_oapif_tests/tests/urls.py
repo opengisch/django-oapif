@@ -1,10 +1,10 @@
 from django.contrib import admin
 from django.urls import include, path
 
-from .ogc import ogc_api
+from .oapif import oapif
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("oapif/", ogc_api.urls),
+    path("oapif/", oapif.urls),
     path("__debug__/", include("debug_toolbar.urls")),
 ]
