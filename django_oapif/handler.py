@@ -65,15 +65,21 @@ class OapifCollection[M: Model]:
         self.srid = None
         self.geometry_field = None
         if not hasattr(cls, "geometry_field"):
-            for field in model_fields:
-                if isinstance(field, GeometryField):
-                    self.srid = field.srid
-                    self.geometry_field = field.name
-                    break
+            geometry_fields = [field for field in model_fields if isinstance(field, GeometryField)]
+            if len(geometry_fields) == 1:
+                self.srid = geometry_fields[0].srid
+                self.geometry_field = geometry_fields[0].name
+            elif len(geometry_fields) > 1:
+                raise Exception(
+                    f"Model {model} has more than one geometry field. Please use the `geometry_field` parameter to configure one."
+                )
         elif geometry_field := getattr(cls, "geometry_field", None):
             field = self.model._meta.get_field(geometry_field)
-            self.srid = field.srid
-            self.geometry_field = field.name
+            if isinstance(field, GeometryField):
+                self.srid = field.srid
+                self.geometry_field = field.name
+            else:
+                raise Exception(f"Field {field} of model {model} is not a GeometryField.")
 
         self.fields = getattr(
             cls,
