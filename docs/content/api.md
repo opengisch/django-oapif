@@ -1,16 +1,12 @@
 # API documentation
 
-::: django_oapif.api.OAPIF
-    options:
-        members: [register]
 
-
-::: django_oapif.handler
+::: django_oapif
     options:
         members:
+            - OAPIF
             - OapifCollection
-            - AllowAny
-            - IsAuthenticated
-            - IsAuthenticatedOrReadOnly
-            - DjangoModelPermissions
-            - DjangoModelPermissionsOrAnonReadOnly
+            - AllowAnyCollection
+            - AuthenticatedCollection
+            - AuthenticatedOrReadOnlyCollection
+            - AnonReadOnlyCollection

@@ -1,4 +1,5 @@
 import math
+from functools import cache
 from typing import cast
 
 from django.contrib.auth import get_permission_codename
@@ -41,18 +42,38 @@ model_config = ConfigDict(
 
 
 class OapifCollection[M: Model]:
+    """
+    Base class used to customize authorization and model operations.
+
+    Attributes:
+        id:
+            The collection identifier when calling the API, eg: `https://example.com/oapif/collections/<id>/items`.
+            If not defined, will be set to `model_class._meta.label_lower`.
+        title:
+            The collection title. If not defined, will be set to `model_class._meta.label`.
+        description:
+            The collection description.
+        geometry_field:
+            The collection geometry field. If not defined, the geometry field will be infered from the model.
+        fields:
+            The list of fields that will be exposed as feature properties. If not defined, all fields will be used.
+        readonly_fields:
+            The list of fields that will be included in the feature properties, but won't be accepted in Create/Update operations.
+        exclude:
+            The list of fields to be excluded from the feature properties.exclude:
+        ordering:
+            The field used to sort the queryset.
+    """
+
     id: str
     title: str
     description: str | None = None
 
     geometry_field: str | None
     fields: tuple[str, ...]
-    exclude: tuple[str, ...] = ()
     readonly_fields: tuple[str, ...] = ()
-
+    exclude: tuple[str, ...] = ()
     ordering = ()
-
-    """Base class used to customize authorization and model operations."""
 
     def __init__(self, model: type[M]) -> None:
         cls = type(self)
@@ -60,6 +81,7 @@ class OapifCollection[M: Model]:
         self.opts = model._meta
         self.id = getattr(cls, "id", model._meta.label_lower)
         self.title = getattr(cls, "title", model._meta.label)
+
         model_fields = model._meta.get_fields()
 
         self.srid = None
@@ -67,7 +89,7 @@ class OapifCollection[M: Model]:
         if not hasattr(cls, "geometry_field"):
             geometry_fields = [field for field in model_fields if isinstance(field, GeometryField)]
             if len(geometry_fields) == 1:
-                self.srid = geometry_fields[0].srid
+                self.srid = geometry_fields[0].srid  # type: ignore
                 self.geometry_field = geometry_fields[0].name
             elif len(geometry_fields) > 1:
                 raise Exception(
@@ -90,6 +112,7 @@ class OapifCollection[M: Model]:
                 if not isinstance(field, (ManyToOneRel, ManyToManyRel)) and not field.name == self.geometry_field
             ),
         )
+
         self.foreign_key_fields = {
             field.name: field.remote_field.model for field in model_fields if isinstance(field, ForeignKey)
         }
@@ -199,13 +222,14 @@ class OapifCollection[M: Model]:
         codename = get_permission_codename("delete", self.opts)
         return request.user.has_perm(f"{self.opts.app_label}.{codename}")
 
+    @cache
     def get_geometry_schema(self) -> type[Geometry] | None:
         if self.geometry_field is None:
             return None
 
         geom_field = cast("GeometryField", self.model._meta.get_field(self.geometry_field))
         is_3d = geom_field.geom_type.endswith("Z") or geom_field.geom_type.endswith("ZM")
-        type CoordType = Coordinate3D if is_3d else Coordinate2D  # type: ignore
+        CoordType = Coordinate3D if is_3d else Coordinate2D
 
         if geom_field.geom_type.startswith("POINT"):
             GeometryType = Point[CoordType]

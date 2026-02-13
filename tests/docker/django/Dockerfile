@@ -21,6 +21,6 @@ RUN pip install -r requirements.txt
 
 COPY . /usr/src/
 
-RUN pip install /usr/src/.[dev]
+RUN pip install --editable /usr/src/.[dev]
 
 WORKDIR /usr/src/tests

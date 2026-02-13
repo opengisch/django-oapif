@@ -1,4 +1,4 @@
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from functools import cached_property
 from importlib.metadata import version
 from typing import (
@@ -78,17 +78,24 @@ class OAPIF:
         self.api.add_router("/", create_root_router(title=title, description=description))
         self.api.add_router("/conformance", create_conformance_router())
 
-    def register(self, model: type[Model], oapif_class: type[OapifCollection] = OapifCollection) -> None:
+    def register_collection(
+        self,
+        models: type[Model] | Iterable[type[Model]],
+        oapif_class: type[OapifCollection] = OapifCollection,
+    ) -> None:
         """Register a model to expose as an OGC API Features collection."""
-        collection = oapif_class(model)
-        self.collections[collection.id] = collection
 
-    def register_decorator[T: OapifCollection](self, model: type[Model]) -> Callable[[type[T]], type[T]]:
+        for model in models if isinstance(models, Iterable) else [models]:
+            collection = oapif_class(model)
+            self.collections[collection.id] = collection
+
+    def register[T: OapifCollection](self, *models: type[Model]) -> Callable[[type[T]], type[T]]:
         """Register a model to expose as an OGC API Features collection."""
 
         def wrapper(oapif_class: type[T]) -> type[T]:
-            collection = oapif_class(model)
-            self.collections[collection.id] = collection
+            for model in models:
+                collection = oapif_class(model)
+                self.collections[collection.id] = collection
             return oapif_class
 
         return wrapper
