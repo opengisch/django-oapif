@@ -1,6 +1,6 @@
 import math
 from functools import cache
-from typing import cast
+from typing import Literal, cast
 
 from django.contrib.auth import get_permission_codename
 from django.contrib.gis.db.models import GeometryField
@@ -10,8 +10,7 @@ from django.db.models import ForeignKey, GeneratedField, JSONField, ManyToManyRe
 from django.db.models.functions import Cast
 from django.http import HttpRequest
 from ninja import ModelSchema, Schema
-from ninja.errors import HttpError
-from ninja.errors import ValidationError as NinjaValidationError
+from ninja.errors import HttpError, ValidationError
 from ninja.schema import NinjaGenerateJsonSchema
 from pydantic import ConfigDict
 from pydantic import ValidationError as PydanticValidationError
@@ -22,6 +21,7 @@ from django_oapif.geojson import (
     Coordinate3D,
     Feature,
     FeatureCollection,
+    FeaturePatch,
     Geometry,
     GeometryCollection,
     LineString,
@@ -31,6 +31,7 @@ from django_oapif.geojson import (
     Point,
     Polygon,
 )
+from django_oapif.utils import PatchSchema
 
 model_config = ConfigDict(
     extra="forbid",
@@ -123,7 +124,7 @@ class OapifCollection[M: Model]:
         crs: str,
         bbox: str | None = None,
         bbox_crs: str | None = None,
-    ) -> QuerySet:
+    ) -> QuerySet[M]:
         output_srid = get_srid_from_uri(crs)
         qs = self.get_queryset(request)
         qs = qs.only("pk", *self.get_fields(request))
@@ -253,13 +254,18 @@ class OapifCollection[M: Model]:
         else:
             return GeometryType
 
-    def get_properties_schema(self, properties_fields: tuple[str, ...]) -> type[Schema]:
+    def get_properties_schema(
+        self,
+        properties_fields: tuple[str, ...] | Literal["__all__"],
+        optional_fields: tuple[str, ...] | Literal["__all__"] = (),
+    ) -> type[Schema]:
         class Properties(ModelSchema):
             model_config = model_config
 
             class Meta:
                 model = self.model
                 fields = properties_fields
+                fields_optional = optional_fields
 
         return Properties
 
@@ -268,6 +274,12 @@ class OapifCollection[M: Model]:
         PropertiesSchema = self.get_properties_schema(fields)
         GeometrySchema = self.get_geometry_schema()
         return Feature[GeometrySchema, PropertiesSchema]
+
+    def get_feature_patch_schema(self, request: HttpRequest) -> type[Feature]:
+        fields = tuple(set(self.get_fields(request)) - set(self.get_readonly_fields(request)))
+        PropertiesSchema = self.get_properties_schema(fields)
+        GeometrySchema = self.get_geometry_schema()
+        return Feature[GeometrySchema, PatchSchema[PropertiesSchema]]
 
     def get_feature_output_schema(self, request: HttpRequest) -> type[Feature]:
         PropertiesSchema = self.get_properties_schema(self.get_fields(request))
@@ -314,14 +326,13 @@ class OapifCollection[M: Model]:
         schema["title"] = self.title
         return schema
 
-    def queryset_to_features(
-        self, request: HttpRequest, qs: QuerySet
-    ) -> tuple[list[Feature], tuple[float, float, float, float] | None]:
+    def queryset_to_featurecollection(self, request: HttpRequest, qs: QuerySet) -> FeatureCollection:
         features: list[Feature] = []
         bbox = (math.inf, math.inf, -math.inf, -math.inf)
-        feature_schema = self.get_feature_output_schema(request)
+        FeatureSchema = self.get_feature_output_schema(request)
+        FeatureCollectionSchema = FeatureCollection[FeatureSchema]
         for obj in qs:
-            feature = self._model_to_feature(request, feature_schema, obj)
+            feature = self._model_to_feature(request, FeatureSchema, obj)
             features.append(feature)
             if geometry := feature.geometry:
                 bbox = (
@@ -332,7 +343,14 @@ class OapifCollection[M: Model]:
                 )
         if bbox == (math.inf, math.inf, -math.inf, -math.inf):
             bbox = None
-        return features, bbox
+        return FeatureCollectionSchema(
+            type="FeatureCollection",
+            features=features,
+            bbox=bbox,
+            numberMatched=len(features),
+            numberReturned=len(features),
+            links=[],
+        )
 
     def model_to_feature(self, request: HttpRequest, obj: M) -> Feature:
         schema = self.get_feature_output_schema(request)
@@ -347,11 +365,22 @@ class OapifCollection[M: Model]:
         )
 
     def validate_feature_input_or_raise(self, request: HttpRequest, feature: Feature) -> Feature:
+        schema = self.get_feature_input_schema(request)
+        return self.validate_feature_or_raise(request, schema, feature)
+
+    def validate_feature_patch_or_raise(self, request: HttpRequest, feature: FeaturePatch) -> FeaturePatch:
+        schema = self.get_feature_patch_schema(request)
+        return self.validate_feature_or_raise(request, schema, feature)
+
+    def validate_feature_or_raise[T: Feature | FeaturePatch](
+        self, request: HttpRequest, schema: type[T], feature: T
+    ) -> T:
         try:
-            FeatureSchema = self.get_feature_input_schema(request)
-            return FeatureSchema.model_validate(feature)
+            validated = schema.model_validate(feature)
+            validated.__pydantic_fields_set__ = feature.__pydantic_fields_set__.copy()
+            return validated
         except PydanticValidationError as e:
-            raise NinjaValidationError(e.errors())  # type: ignore
+            raise ValidationError(e.errors())  # type: ignore
 
 
 class AllowAnyCollection[M: Model](OapifCollection):

@@ -10,9 +10,9 @@ from ninja.errors import AuthorizationError, HttpError, ValidationError
 
 from django_oapif.crs import CRS84_URI, get_srid_from_uri
 from django_oapif.geojson import (
-    Feature,
     GenericFeature,
     GenericFeatureCollection,
+    GenericFeaturePatch,
 )
 from django_oapif.handler import OapifCollection
 from django_oapif.schema import (
@@ -175,18 +175,11 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         paginated_query = query[offset : offset + limit]
 
         total_count = query.count()
-        result_count = len(paginated_query)
 
-        features, results_bbox = collection.queryset_to_features(request, paginated_query)
-        FeatureCollectionSchema = collection.get_feature_collection_schema(request)
-        return FeatureCollectionSchema(
-            type="FeatureCollection",
-            features=features,
-            bbox=results_bbox,
-            numberMatched=total_count,
-            numberReturned=result_count,
-            links=get_page_links(request, limit, offset, total_count),
-        )
+        feature_collection = collection.queryset_to_featurecollection(request, paginated_query)
+        feature_collection.numberMatched = total_count
+        feature_collection.links = get_page_links(request, limit, offset, total_count)
+        return feature_collection
 
     @router.api_operation(
         ["OPTIONS"],
@@ -281,12 +274,13 @@ def create_collections_router(collections: dict[str, OapifCollection]):
     @router.put(
         "/{collection_id}/items/{item_id}",
         operation_id="replace_collection_item",
+        response=GenericFeature,
     )
     def replace_item(
         request: HttpRequest,
         collection_id: str,
         item_id: str,
-        feature: Feature,
+        feature: GenericFeature,
         crs: str = Header(alias="Content-Crs", default=CRS84_URI),
     ):
         collection = get_collection_by_id(collection_id, request)
@@ -313,12 +307,13 @@ def create_collections_router(collections: dict[str, OapifCollection]):
     @router.patch(
         "/{collection_id}/items/{item_id}",
         operation_id="update_collection_item",
+        response=GenericFeature,
     )
     def update_item(
         request: HttpRequest,
         collection_id: str,
         item_id: str,
-        feature: Feature,
+        feature: GenericFeaturePatch,
         crs: str = Header(alias="Content-Crs", default=CRS84_URI),
     ):
         collection = get_collection_by_id(collection_id, request)
@@ -326,8 +321,8 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         item = get_object_or_404(query, pk=item_id)
         if not collection.has_change_permission(request, item):
             raise AuthorizationError()
-        feature = collection.validate_feature_input_or_raise(request, feature)
-        for field, value in feature.properties.model_dump().items():
+        feature = collection.validate_feature_patch_or_raise(request, feature)
+        for field, value in feature.properties.model_dump(exclude_unset=True).items():
             if value is not None and (related_model := collection.foreign_key_fields.get(field)):
                 value = get_related_object_or_raise(field, value, related_model)
             setattr(item, field, value)
