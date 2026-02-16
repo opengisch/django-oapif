@@ -275,11 +275,11 @@ class OapifCollection[M: Model]:
         GeometrySchema = self.get_geometry_schema()
         return Feature[GeometrySchema, PropertiesSchema]
 
-    def get_feature_patch_schema(self, request: HttpRequest) -> type[Feature]:
+    def get_feature_patch_schema(self, request: HttpRequest) -> type[FeaturePatch]:
         fields = tuple(set(self.get_fields(request)) - set(self.get_readonly_fields(request)))
         PropertiesSchema = self.get_properties_schema(fields)
         GeometrySchema = self.get_geometry_schema()
-        return Feature[GeometrySchema, PatchSchema[PropertiesSchema]]
+        return FeaturePatch[GeometrySchema, PatchSchema[PropertiesSchema]]
 
     def get_feature_output_schema(self, request: HttpRequest) -> type[Feature]:
         PropertiesSchema = self.get_properties_schema(self.get_fields(request))

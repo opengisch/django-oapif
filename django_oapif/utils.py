@@ -23,7 +23,7 @@ def replace_query_param(request: HttpRequest, **kwargs: Any) -> str:
     return urlunparse(parsed._replace(query=new_query))
 
 
-class PatchSchema[T: Schema]:
+class PatchSchema[T: Schema](Schema):
     """Make all fields in a schema optional by settings their default to None"""
 
     def __class_getitem__(cls, model: type[T]) -> type[T]:
@@ -34,7 +34,7 @@ class PatchSchema[T: Schema]:
             return new.annotation, new
 
         return create_model(
-            f"Partial{model.__name__}",
+            f"Patch{model.__name__}",
             __base__=model,
             __module__=model.__module__,
             **{field_name: make_field_optional(field_info) for field_name, field_info in model.model_fields.items()},  # type: ignore
