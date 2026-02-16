@@ -78,10 +78,10 @@ class Feature[G: Geometry | None, P: Schema](BaseSchema):
 
 
 class FeaturePatch[G: Geometry | None, P: Schema](BaseSchema):
-    type: Literal["Feature"]
+    type: Literal["Feature"] = "Feature"
     id: int | str | None = None
     geometry: G | None = None
-    properties: P
+    properties: P | None = None
 
 
 class FeatureCollection[F: Feature](BaseSchema):

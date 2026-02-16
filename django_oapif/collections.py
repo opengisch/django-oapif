@@ -322,10 +322,11 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         if not collection.has_change_permission(request, item):
             raise AuthorizationError()
         feature = collection.validate_feature_patch_or_raise(request, feature)
-        for field, value in feature.properties.model_dump(exclude_unset=True).items():
-            if value is not None and (related_model := collection.foreign_key_fields.get(field)):
-                value = get_related_object_or_raise(field, value, related_model)
-            setattr(item, field, value)
+        if feature.properties is not None:
+            for field, value in feature.properties.model_dump(exclude_unset=True).items():
+                if value is not None and (related_model := collection.foreign_key_fields.get(field)):
+                    value = get_related_object_or_raise(field, value, related_model)
+                setattr(item, field, value)
         if (geom_field := collection.geometry_field) and "geometry" in feature.model_fields_set:
             if feature.geometry:
                 geometry = GEOSGeometry(feature.geometry.model_dump_json())
