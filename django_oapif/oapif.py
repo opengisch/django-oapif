@@ -1,5 +1,4 @@
 from collections.abc import Callable, Iterable, Sequence
-from functools import cached_property
 from importlib.metadata import version
 from typing import (
     Any,
@@ -77,6 +76,7 @@ class OAPIF:
         self.collections: dict[str, OapifCollection] = {}
         self.api.add_router("/", create_root_router(title=title, description=description))
         self.api.add_router("/conformance", create_conformance_router())
+        self.api.add_router("/collections", create_collections_router(self.collections))
 
     def register_collection(
         self,
@@ -100,7 +100,6 @@ class OAPIF:
 
         return wrapper
 
-    @cached_property
+    @property
     def urls(self) -> tuple[list[URLResolver | URLPattern], str, str]:
-        self.api.add_router("/collections", create_collections_router(self.collections))
         return self.api.urls
