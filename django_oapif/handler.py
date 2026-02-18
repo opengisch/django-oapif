@@ -1,6 +1,6 @@
 import math
 from functools import cache
-from typing import Literal, cast
+from typing import Literal, cast, overload
 
 from django.contrib.auth import get_permission_codename
 from django.contrib.gis.db.models import GeometryField
@@ -10,12 +10,12 @@ from django.db.models import ForeignKey, GeneratedField, JSONField, ManyToManyRe
 from django.db.models.functions import Cast
 from django.http import HttpRequest
 from ninja import ModelSchema, Schema
-from ninja.errors import HttpError, ValidationError
+from ninja.errors import ValidationError
 from ninja.schema import NinjaGenerateJsonSchema
 from pydantic import ConfigDict
 from pydantic import ValidationError as PydanticValidationError
 
-from django_oapif.crs import get_srid_from_uri
+from django_oapif.crs import CRS, BBox
 from django_oapif.geojson import (
     Coordinate2D,
     Coordinate3D,
@@ -118,37 +118,26 @@ class OapifCollection[M: Model]:
             field.name: field.remote_field.model for field in model_fields if isinstance(field, ForeignKey)
         }
 
+    @overload
+    def query(self, request: HttpRequest, crs: CRS): ...
+
+    @overload
+    def query(self, request: HttpRequest, crs: CRS, bbox: BBox, bbox_crs: CRS): ...
+
     def query(
-        self,
-        request: HttpRequest,
-        crs: str,
-        bbox: str | None = None,
-        bbox_crs: str | None = None,
+        self, request: HttpRequest, crs: CRS, bbox: BBox | None = None, bbox_crs: CRS | None = None
     ) -> QuerySet[M]:
-        output_srid = get_srid_from_uri(crs)
         qs = self.get_queryset(request)
         qs = qs.only("pk", *self.get_fields(request))
         if geom_field := self.geometry_field:
-            geometry_query = geom_field if output_srid == self.srid else Transform(geom_field, output_srid)
+            geometry_query = geom_field if crs.srid == self.srid else Transform(geom_field, crs.srid)
             qs = qs.annotate(_oapif_geometry=Cast(AsGeoJSON(geometry_query, bbox=True), JSONField()))
             if bbox is not None:
                 assert bbox_crs is not None
-                try:
-                    minx, miny, maxx, maxy = map(float, bbox.split(","))
-                    bbox_geom: GEOSPolygon = GEOSPolygon.from_bbox((
-                        minx,
-                        miny,
-                        maxx,
-                        maxy,
-                    ))
-                    bbox_geom.srid = get_srid_from_uri(bbox_crs)
-                    bbox_expr = bbox_geom if bbox_geom.srid == self.srid else Transform(bbox_geom, self.srid)
-                    qs = qs.filter(**{f"{geom_field}__intersects": bbox_expr})
-                except ValueError as err:
-                    raise HttpError(
-                        400,
-                        "Invalid bbox parameter. Expected format: minx,miny,maxx,maxy",
-                    ) from err
+                bbox_geom = GEOSPolygon.from_bbox((bbox.xmin, bbox.ymin, bbox.xmax, bbox.ymax))
+                bbox_geom.srid = bbox_crs.srid
+                bbox_expr = bbox_geom if bbox_geom.srid == self.srid else Transform(bbox_geom, self.srid)
+                qs = qs.filter(**{f"{geom_field}__intersects": bbox_expr})
         return qs
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[M]:

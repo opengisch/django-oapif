@@ -8,7 +8,7 @@ from django.shortcuts import get_object_or_404
 from ninja import Header, Query, Router
 from ninja.errors import AuthorizationError, HttpError, ValidationError
 
-from django_oapif.crs import CRS84_URI, get_srid_from_uri
+from django_oapif.crs import CRS, CRS84_SRID, CRS84_URI, BBox
 from django_oapif.geojson import (
     GenericFeature,
     GenericFeatureCollection,
@@ -165,9 +165,9 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         collection_id: str,
         limit: int = 100,
         offset: int = 0,
-        crs: str = CRS84_URI,
-        bbox_crs: str = Query(CRS84_URI, alias="bbox-crs"),
-        bbox: str | None = Query(None, description="BBOX in the format: minx,miny,maxx,maxy"),
+        crs: CRS = CRS("OGC", CRS84_SRID),
+        bbox_crs: CRS = Query(CRS("OGC", CRS84_SRID), alias="bbox-crs"),
+        bbox: BBox | None = Query(None, alias="bbox", description="BBOX in the format: minx,miny,maxx,maxy"),
     ):
         collection = get_collection_by_id(collection_id, request)
 
@@ -207,7 +207,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         request: HttpRequest,
         collection_id: str,
         item_id: str,
-        crs: str = CRS84_URI,
+        crs: CRS = CRS("OGC", CRS84_SRID),
     ):
         collection = get_collection_by_id(collection_id, request)
         query = collection.query(request, crs)
@@ -226,14 +226,14 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         response: HttpResponse,
         collection_id: str,
         feature: GenericFeature,
-        crs: str = Header(alias="Content-Crs", default=CRS84_URI),
+        crs: CRS = Header(CRS("OGC", CRS84_SRID), alias="Content-Crs"),
     ):
         collection = get_collection_by_id(collection_id, request)
         feature = collection.validate_feature_input_or_raise(request, feature)
         item_properties = feature.properties.model_dump() or {}
         if (geom_field := collection.geometry_field) and feature.geometry:
             geometry = GEOSGeometry(feature.geometry.model_dump_json())
-            geometry.srid = get_srid_from_uri(crs)
+            geometry.srid = crs.srid
             item_properties[geom_field] = geometry
         for field, value in feature.properties.model_dump().items():
             if value is not None and (related_model := collection.foreign_key_fields.get(field)):
@@ -243,7 +243,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         if not collection.has_add_permission(request, item):
             raise AuthorizationError()
         collection.save_model(request, item, False)
-        item = collection.query(request, CRS84_URI).get(pk=item.pk)
+        item = collection.query(request, CRS("OGC", CRS84_SRID)).get(pk=item.pk)
         response.headers["Location"] = request.build_absolute_uri(f"items/{item.pk}")  # type: ignore
         return 201, collection.model_to_feature(request, item)
 
@@ -281,7 +281,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         collection_id: str,
         item_id: str,
         feature: GenericFeature,
-        crs: str = Header(alias="Content-Crs", default=CRS84_URI),
+        crs: CRS = Header(CRS("OGC", CRS84_SRID), alias="Content-Crs"),
     ):
         collection = get_collection_by_id(collection_id, request)
         query = collection.get_queryset(request)
@@ -296,12 +296,12 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         if geom_field := collection.geometry_field:
             if feature.geometry:
                 geometry = GEOSGeometry(feature.geometry.model_dump_json())
-                geometry.srid = get_srid_from_uri(crs)
+                geometry.srid = crs.srid
             else:
                 geometry = None
             setattr(item, geom_field, geometry)
         collection.save_model(request, item, True)
-        item = collection.query(request, CRS84_URI).get(pk=item_id)
+        item = collection.query(request, CRS("OGC", CRS84_SRID)).get(pk=item_id)
         return collection.model_to_feature(request, item)
 
     @router.patch(
@@ -314,7 +314,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         collection_id: str,
         item_id: str,
         feature: GenericFeaturePatch,
-        crs: str = Header(alias="Content-Crs", default=CRS84_URI),
+        crs: CRS = Header(CRS("OGC", CRS84_SRID), alias="Content-Crs"),
     ):
         collection = get_collection_by_id(collection_id, request)
         query = collection.get_queryset(request)
@@ -330,12 +330,12 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         if (geom_field := collection.geometry_field) and "geometry" in feature.model_fields_set:
             if feature.geometry:
                 geometry = GEOSGeometry(feature.geometry.model_dump_json())
-                geometry.srid = get_srid_from_uri(crs)
+                geometry.srid = crs.srid
             else:
                 geometry = None
             setattr(item, geom_field, geometry)
         collection.save_model(request, item, True)
-        item = collection.query(request, CRS84_URI).get(pk=item_id)
+        item = collection.query(request, CRS("OGC", CRS84_SRID)).get(pk=item_id)
         return collection.model_to_feature(request, item)
 
     @router.delete("/{collection_id}/items/{item_id}", operation_id="delete_collection_item")
