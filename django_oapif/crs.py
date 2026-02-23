@@ -22,7 +22,6 @@ class CRS:
     def __get_pydantic_core_schema__(cls, _source: Any, _handler: GetCoreSchemaHandler):
 
         def validate_crs(uri: str):
-            print(uri)
             if result := CRS_URI_PATTERN.match(uri):
                 auth, code = result.groups()
                 if auth == "OGC" and code in ("CRS84", "CRS84h"):
