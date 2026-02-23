@@ -2,8 +2,8 @@ FROM python:3.12-bookworm
 
 
 # set environment variables
-ENV PYTHONUNBUFFERED 1
-ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
 
 # install dependencies
 RUN apt-get update && \
