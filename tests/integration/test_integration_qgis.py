@@ -124,7 +124,7 @@ class TestStack(unittest.TestCase):
 
         self.assertEqual(
             str(ctx.exception),
-            """[\'ERROR: 1 feature(s) not added.\', \'\\n  Provider errors:\', \'    Feature creation failed: Create Feature request failed: Error transferring http://django:8000/oapif/collections/tests.mandatoryfield/items - server replied: Unprocessable Entity\\n    Server response: {"detail": [{"type": "string_type", "loc": ["properties", "text_mandatory_field"], "msg": "Input should be a valid string", "input": null, "url": "https://errors.pydantic.dev/2.12/v/string_type"}]}\']""",
+            """[\'ERROR: 1 feature(s) not added.\', \'\\n  Provider errors:\', \'    Feature creation failed: Create Feature request failed: Error transferring http://django:8000/oapif/collections/tests.mandatoryfield/items - server replied: Unprocessable Entity\\n    Server response: {"detail": [{"type": "string_type", "loc": ["body", "feature", "properties", "text_mandatory_field"], "msg": "Input should be a valid string", "input": null, "url": "https://errors.pydantic.dev/2.12/v/string_type"}]}\']""",
         )
 
         f = next(layer.getFeatures())

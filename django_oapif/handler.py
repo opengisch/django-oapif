@@ -374,7 +374,10 @@ class OapifCollection[M: Model]:
             validated.__pydantic_fields_set__ = feature.__pydantic_fields_set__.copy()
             return validated
         except PydanticValidationError as e:
-            raise ValidationError(e.errors())  # type: ignore
+            errors = e.errors()
+            for error in errors:
+                error["loc"] = ("body", "feature", *error["loc"])
+            raise ValidationError(errors)  # type: ignore
 
 
 class AllowAnyCollection[M: Model](OapifCollection):
