@@ -54,7 +54,7 @@ class BBox:
             try:
                 xmin, ymin, xmax, ymax = map(float, value.split(","))
                 return cls(xmin=xmin, ymin=ymin, xmax=xmax, ymax=ymax)
-            except Exception:
+            except (ValueError, TypeError):
                 raise PydanticCustomError("bbox_format", "Invalid BBOX. Expected format: xmin,ymin,xmax,ymax")
 
         return core_schema.with_info_after_validator_function(
