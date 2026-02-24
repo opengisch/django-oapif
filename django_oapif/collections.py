@@ -235,14 +235,13 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         collection = get_collection_by_id(collection_id, request)
         feature = collection.validate_feature_input_or_raise(request, feature)
         item_properties = feature.properties.model_dump() or {}
+        for field, value in item_properties.items():
+            if value is not None and (related_model := collection.foreign_key_fields.get(field)):
+                item_properties[field] = get_related_object_or_raise(field, value, related_model)
         if (geom_field := collection.geometry_field) and feature.geometry:
             geometry = GEOSGeometry(feature.geometry.model_dump_json())
             geometry.srid = crs.srid
             item_properties[geom_field] = geometry
-        for field, value in feature.properties.model_dump().items():
-            if value is not None and (related_model := collection.foreign_key_fields.get(field)):
-                item_properties[field] = get_related_object_or_raise(field, value, related_model)
-
         item = collection.model(**item_properties)
         if not collection.has_add_permission(request, item):
             raise AuthorizationError()
