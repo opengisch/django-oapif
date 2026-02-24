@@ -154,24 +154,24 @@ class OapifCollection[M: Model]:
         """
         return self.ordering
 
-    def get_fields(self, request, obj=None):
+    def get_fields(self, request, obj=None) -> tuple[str, ...]:
         """
         Hook for specifying fields.
         """
         return self.fields
 
-    def get_exclude(self, request, obj=None):
+    def get_exclude(self, request, obj=None) -> tuple[str, ...]:
         """
         Hook for specifying fields.
         """
         return self.exclude
 
-    def get_readonly_fields(self, request, obj=None):
+    def get_readonly_fields(self, request, obj=None) -> tuple[str, ...]:
         """
         Hook for specifying custom readonly fields.
         """
         generated_fields = {f.name for f in self.model._meta.get_fields() if isinstance(f, GeneratedField)}
-        return set(*self.readonly_fields, *generated_fields)
+        return tuple(set(self.readonly_fields) | generated_fields)
 
     def save_model(self, _request: HttpRequest, obj: M, _change: bool) -> None:
         """Given a model instance save it to the database."""
