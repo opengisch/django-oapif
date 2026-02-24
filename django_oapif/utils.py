@@ -24,7 +24,7 @@ def replace_query_param(request: HttpRequest, **kwargs: Any) -> str:
 
 
 class PatchSchema[T: Schema](Schema):
-    """Make all fields in a schema optional by settings their default to None"""
+    """Make all fields in a schema optional by setting their default to None"""
 
     def __class_getitem__(cls, model: type[T]) -> type[T]:
         def make_field_optional(field: FieldInfo) -> tuple[Any, FieldInfo]:
