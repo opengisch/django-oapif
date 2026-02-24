@@ -9,12 +9,7 @@ type Coordinate3D = tuple[float, float, float]
 type Coordinate = Coordinate2D | Coordinate3D
 
 
-class BaseSchema(Schema):
-    class Config:
-        extra = "forbid"
-
-
-class GeometryBase(BaseSchema):
+class GeometryBase(Schema):
     bbox: tuple[float, float, float, float] | None = None
 
 
@@ -70,21 +65,21 @@ type Geometry[C: Coordinate] = Annotated[
 GeometryCollection.model_rebuild()
 
 
-class Feature[G: Geometry | None, P: Schema](BaseSchema):
+class Feature[G: Geometry | None, P: Schema](Schema):
     type: Literal["Feature"]
     id: int | str | None = None
     geometry: G
     properties: P
 
 
-class FeaturePatch[G: Geometry | None, P: Schema](BaseSchema):
+class FeaturePatch[G: Geometry | None, P: Schema](Schema):
     type: Literal["Feature"] = "Feature"
     id: int | str | None = None
     geometry: G | None = None
     properties: P | None = None
 
 
-class FeatureCollection[F: Feature](BaseSchema):
+class FeatureCollection[F: Feature](Schema):
     type: Literal["FeatureCollection"]
     features: list[F]
     bbox: tuple[float, float, float, float] | None
