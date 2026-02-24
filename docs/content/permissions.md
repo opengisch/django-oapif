@@ -65,8 +65,7 @@ class MyModelAdmin(admin.ModelAdmin, MyModelPermissionsMixin):
 # oapif.py
 
 from .models import MyModel
-from django_oapif import OAPIF
-from django_oapif.handler import DjangoModelPermissionsOrAnonReadOnly
+from django_oapif import OAPIF, OapifCollection
 from .permissions import MyModelPermissionsMixin
 
 oapif = OAPIF()
