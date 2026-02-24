@@ -50,7 +50,8 @@ nav = [
   {"Demo" = "demo.md"},
   {"API" = "api.md"},
   {"Permissions" = "permissions.md"},
-  {"Test and conformance" = "tests.md"}
+  {"Foreign Keys" = "foreign_keys.md"},
+  {"Test and conformance" = "tests.md"},
 ]
 
 [project.extra]
