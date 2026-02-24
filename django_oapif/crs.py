@@ -2,7 +2,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from pydantic import GetCoreSchemaHandler, ValidationInfo
+from pydantic import GetCoreSchemaHandler
 from pydantic_core import PydanticCustomError, core_schema
 
 CRS84_SRID = 4326
@@ -49,14 +49,14 @@ class BBox:
     @classmethod
     def __get_pydantic_core_schema__(cls, _source: Any, _handler: GetCoreSchemaHandler):
 
-        def validate_bbox(value: str, info: ValidationInfo):
+        def validate_bbox(value: str):
             try:
                 xmin, ymin, xmax, ymax = map(float, value.split(","))
                 return cls(xmin=xmin, ymin=ymin, xmax=xmax, ymax=ymax)
             except (ValueError, TypeError):
                 raise PydanticCustomError("bbox_format", "Invalid BBOX. Expected format: xmin,ymin,xmax,ymax")
 
-        return core_schema.with_info_after_validator_function(
+        return core_schema.no_info_after_validator_function(
             validate_bbox,
             core_schema.str_schema(),
         )
