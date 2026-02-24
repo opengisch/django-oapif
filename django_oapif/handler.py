@@ -337,7 +337,7 @@ class OapifCollection[M: Model]:
                 )
         if bbox == (math.inf, math.inf, -math.inf, -math.inf):
             bbox = None
-        return FeatureCollectionSchema(
+        return FeatureCollectionSchema.model_construct(
             type="FeatureCollection",
             features=features,
             bbox=bbox,
