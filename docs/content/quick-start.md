@@ -44,15 +44,15 @@ class OtherTestModel(models.Model):
 ## Instantiate `OAPIF` and register your models:
 
 ```python
-# ogc.py
+# oapif.py
 
 from .models import TestModel
 from django_oapif import OAPIF
 
-ogc_api = OAPIF()
+oapif = OAPIF()
 
-@ogc_api.register(TestModel)
-@ogc_api.register(OtherTestModel)
+oapif.register_collection(TestModel)
+oapif.register_collection(OtherTestModel)
 ```
 
 
@@ -62,7 +62,7 @@ ogc_api = OAPIF()
 
 urlpatterns += [
     ...,
-    path("oapif/", include(django_oapif.urls)),
+    path("oapif/", include(oapif.urls)),
     ...,
 ]
 ```

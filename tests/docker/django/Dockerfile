@@ -2,8 +2,8 @@ FROM python:3.12-bookworm
 
 
 # set environment variables
-ENV PYTHONUNBUFFERED 1
-ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
 
 # install dependencies
 RUN apt-get update && \
@@ -21,6 +21,6 @@ RUN pip install -r requirements.txt
 
 COPY . /usr/src/
 
-RUN pip install /usr/src/.[dev]
+RUN pip install --editable /usr/src/.[dev]
 
 WORKDIR /usr/src/tests

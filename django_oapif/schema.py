@@ -30,7 +30,7 @@ class OAPIFExtent(OAPIFBaseSchema):
 
 class OAPIFCollection(OAPIFBaseSchema):
     id: str
-    title: str | None = None
+    title: str
     description: str | None = None
     links: list[OAPIFLink]
     crs: list[str] | None = None

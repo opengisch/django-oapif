@@ -1,4 +1,11 @@
-from .api import OAPIF
+from .handler import (
+    AllowAnyCollection,
+    AnonReadOnlyCollection,
+    AuthenticatedCollection,
+    AuthenticatedOrReadOnlyCollection,
+    OapifCollection,
+)
+from .oapif import OAPIF
 
 try:
     from .__version__ import __version__, __version_tuple__
@@ -8,6 +15,11 @@ except ImportError:
 
 __all__ = [
     "OAPIF",
+    "OapifCollection",
+    "AllowAnyCollection",
+    "AnonReadOnlyCollection",
+    "AuthenticatedCollection",
+    "AuthenticatedOrReadOnlyCollection",
     "__version__",
     "__version_tuple__",
 ]

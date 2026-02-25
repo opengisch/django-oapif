@@ -65,26 +65,18 @@ type Geometry[C: Coordinate] = Annotated[
 GeometryCollection.model_rebuild()
 
 
-class FeatureWithoutId[G: Geometry | None, P: Schema](Schema):
-    type: Literal["Feature"]
-    properties: P
-    geometry: G
-
-
 class Feature[G: Geometry | None, P: Schema](Schema):
     type: Literal["Feature"]
-    id: int | str
-    properties: P
+    id: int | str | None = None
     geometry: G
+    properties: P
 
-    @classmethod
-    def from_orm(cls, obj: Any):
-        return cls(
-            type="Feature",
-            id=str(obj.pk),
-            geometry=getattr(obj, "_oapif_geometry", None),  # type: ignore
-            properties=obj,
-        )
+
+class FeaturePatch[G: Geometry | None, P: Schema](Schema):
+    type: Literal["Feature"] = "Feature"
+    id: int | str | None = None
+    geometry: G | None = None
+    properties: P | None = None
 
 
 class FeatureCollection[F: Feature](Schema):
@@ -94,3 +86,9 @@ class FeatureCollection[F: Feature](Schema):
     links: list[OAPIFLink]
     numberReturned: int
     numberMatched: int
+
+
+GenericGeometry = Geometry[Coordinate] | None
+GenericFeature = Feature[GenericGeometry, Any]
+GenericFeaturePatch = FeaturePatch[GenericGeometry, Any]
+GenericFeatureCollection = FeatureCollection[GenericFeature]

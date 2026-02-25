@@ -8,6 +8,7 @@ from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django_oapif_tests.tests.models import (
+    LayerWithForeignKey,
     Line_2056_10fields,
     NoGeom_10fields,
     NoGeom_100fields,
@@ -81,6 +82,7 @@ class Command(BaseCommand):
         NoGeom_10fields.objects.bulk_create(no_geoms, batch_size=10000)
         NoGeom_100fields.objects.bulk_create(no_geoms_100fields, batch_size=10000)
         Line_2056_10fields.objects.bulk_create(lines, batch_size=10000)
+        LayerWithForeignKey.objects.create(point=Point_2056_10fields.objects.first())
 
         # Call 'update_data' to update computed properties
         call_command("updatedata")
