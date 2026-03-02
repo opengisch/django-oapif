@@ -7,10 +7,15 @@ on:
 
 jobs:
   publish:
+    name: "🐍 Release on PyPI"
     runs-on: ubuntu-latest
     environment:
       name: pypi
       url: https://pypi.org/p/${{ github.event.repository.name }}
+    permissions:
+      id-token: write
+      contents: write
+
     steps:
       - uses: actions/checkout@v6
 
@@ -22,13 +27,15 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install build twine
+          pip install build
 
       - name: Build
         run: python -m build
 
-      - name: Publish
+      - name: upload release asset
         env:
-          TWINE_USERNAME: "__token__"
-          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
-        run: twine upload ./dist/* --verbose
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload --repo ${{ github.repository_owner }}/${{ github.event.repository.name }} ${{ github.ref_name }} "dist/${{ github.event.repository.name }}-${{ github.ref_name }}.tar.gz"
+
+      - name: Deploy to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
