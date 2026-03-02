@@ -31,4 +31,4 @@ jobs:
         env:
           TWINE_USERNAME: "__token__"
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
-        run: twine upload ./django_oapif/dist/* --verbose
+        run: twine upload ./dist/* --verbose
