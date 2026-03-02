@@ -14,8 +14,6 @@ on:
       - .github/workflows/docs.yml
       - django_oapif/**/*.py
       - docs/**/*
-    tags:
-      - "*"
 
   pull_request:
     branches:
