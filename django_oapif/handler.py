@@ -6,7 +6,16 @@ from django.contrib.auth import get_permission_codename
 from django.contrib.gis.db.models import GeometryField
 from django.contrib.gis.db.models.functions import AsGeoJSON, Transform
 from django.contrib.gis.geos import Polygon as GEOSPolygon
-from django.db.models import ForeignKey, GeneratedField, JSONField, ManyToManyRel, ManyToOneRel, Model, QuerySet
+from django.db.models import (
+    FileField,
+    ForeignKey,
+    GeneratedField,
+    JSONField,
+    ManyToManyRel,
+    ManyToOneRel,
+    Model,
+    QuerySet,
+)
 from django.db.models.functions import Cast
 from django.http import HttpRequest
 from ninja import ModelSchema, Schema
@@ -14,6 +23,7 @@ from ninja.errors import ValidationError
 from ninja.schema import NinjaGenerateJsonSchema
 from pydantic import ConfigDict
 from pydantic import ValidationError as PydanticValidationError
+from pydantic.config import ExtraValues
 
 from django_oapif.crs import CRS, BBox
 from django_oapif.geojson import (
@@ -33,13 +43,12 @@ from django_oapif.geojson import (
 )
 from django_oapif.utils import PatchSchema
 
-model_config = ConfigDict(
-    extra="forbid",
-    from_attributes=True,
-    validate_by_name=True,
-    serialize_by_alias=False,
-    loc_by_alias=False,
-)
+model_config = {
+    "from_attributes": True,
+    "validate_by_name": True,
+    "serialize_by_alias": False,
+    "loc_by_alias": False,
+}
 
 
 class OapifCollection[M: Model]:
@@ -170,8 +179,9 @@ class OapifCollection[M: Model]:
         """
         Hook for specifying custom readonly fields.
         """
-        generated_fields = {f.name for f in self.model._meta.get_fields() if isinstance(f, GeneratedField)}
-        return tuple(set(self.readonly_fields) | generated_fields)
+        readonly_types = (GeneratedField, FileField)
+        readonly_fields = {f.name for f in self.model._meta.get_fields() if isinstance(f, readonly_types)}
+        return tuple(set(self.readonly_fields) | readonly_fields)
 
     def save_model(self, _request: HttpRequest, obj: M, _change: bool) -> None:
         """Given a model instance save it to the database."""
@@ -247,9 +257,11 @@ class OapifCollection[M: Model]:
         self,
         properties_fields: tuple[str, ...] | Literal["__all__"],
         optional_fields: tuple[str, ...] | Literal["__all__"] = (),
+        *,
+        extra: ExtraValues = "forbid",
     ) -> type[Schema]:
         class Properties(ModelSchema):
-            model_config = model_config
+            model_config = ConfigDict(**model_config, extra=extra)
 
             class Meta:
                 model = self.model
@@ -276,13 +288,10 @@ class OapifCollection[M: Model]:
 
     def get_feature_output_schema(self, request: HttpRequest) -> type[Feature]:
         fields = tuple(set(self.get_fields(request)) - set(self.get_exclude(request)))
-        PropertiesSchema = self.get_properties_schema(fields)
+        # extra="ignore" is required for the serialization to go through ninja DjangoGetter
+        PropertiesSchema = self.get_properties_schema(fields, extra="ignore")
         GeometrySchema = self.get_geometry_schema()
         return Feature[GeometrySchema, PropertiesSchema]
-
-    def get_feature_collection_schema(self, request: HttpRequest) -> type[FeatureCollection]:
-        FeatureSchema = self.get_feature_output_schema(request)
-        return FeatureCollection[FeatureSchema]
 
     def get_json_schema(self, request: HttpRequest) -> dict:
         properties_schema = self.get_properties_schema(self.get_fields(request))

@@ -1,6 +1,7 @@
 from typing import Annotated, Any, Literal
 
 from ninja import Field, Schema
+from pydantic import ConfigDict
 
 from django_oapif.schema import OAPIFLink
 
@@ -10,6 +11,9 @@ type Coordinate = Coordinate2D | Coordinate3D
 
 
 class GeometryBase(Schema):
+    # validate_assignment is required to skip passing values through DjangoGetter
+    # which causes a bug on null geometries
+    model_config = ConfigDict(from_attributes=True, validate_assignment=True)
     bbox: tuple[float, float, float, float] | None = None
 
 

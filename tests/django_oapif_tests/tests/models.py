@@ -158,3 +158,8 @@ class Point_2056_Empty(Point_2056_10fields): ...
 class LayerWithForeignKey(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     point = models.ForeignKey(Point_2056_10fields, on_delete=models.CASCADE)
+
+
+class LayerWithFile(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    file = models.FileField(upload_to="foo/")

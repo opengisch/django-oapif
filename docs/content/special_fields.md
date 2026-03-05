@@ -35,3 +35,27 @@ A GeoJSON feature for a collection mapped to the Child model would look like thi
 ```
 
 This behavior is shared for all `GET`, `POST`, `PUT`, `PATCH` operations.
+
+# Files
+
+Django `FileFields` are returned using their `url` property. `FileFields` properties updates are currently not possible, they are therefore marked as readonly by default.
+
+Given a model:
+
+```py
+class File(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    file = models.FileField(upload_to="/file_data")
+```
+
+A GeoJSON feature for a collection mapped to the File model would look like this:
+
+```json
+{
+  "type": "Feature",
+  "geometry": null,
+  "properties": {
+    "file": "/media/file_data/item.txt"
+  }
+}
+```
