@@ -4,7 +4,7 @@ import re
 from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.test.testcases import TestCase
-from django_oapif_tests.tests.models import Point_2056_10fields
+from django_oapif_tests.tests.models import LayerWithFile, Point_2056_10fields
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +146,25 @@ class TestBasicAuth(TestCase):
             ]
         }
         self.assertEqual(post_to_items.json(), expected_error)
+
+    def test_file_field(self):
+        obj = LayerWithFile.objects.create(file="foo/bar.txt")
+        obj.refresh_from_db()
+        url = f"{collections_url}/tests.layerwithfile/items/{obj.id}"
+        response = self.client.get(url, headers=headers, content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "id": str(obj.id),
+                "type": "Feature",
+                "geometry": None,
+                "properties": {
+                    "file": "/media/foo/bar.txt",
+                    "id": str(obj.id),
+                },
+            },
+        )
 
 
 class TestSchema(TestCase):

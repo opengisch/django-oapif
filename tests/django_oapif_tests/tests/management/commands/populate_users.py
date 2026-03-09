@@ -25,6 +25,7 @@ class Command(BaseCommand):
             "geometry_2056",
             "point_2056_empty",
             "layerwithforeignkey",
+            "layerwithfile",
         ):
             adding.append(Permission.objects.get(codename=f"add_{model}"))
             modifying.append(Permission.objects.get(codename=f"change_{model}"))
