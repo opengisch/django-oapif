@@ -108,7 +108,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: 💬 Create comment
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: marocchino/sticky-pull-request-comment@v3
         if: ${{ github.event_name == 'pull_request' && steps.baseline.outputs.EXIT_CODE != '0' }}
         with:
           message: ${{ steps.prepare_comment.outputs.comment }}
