@@ -86,7 +86,7 @@ jobs:
 
       - name: Commit baseline if changed >> commit
         if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.baseline.outputs.EXIT_CODE != '0' }}
-        uses: EndBug/add-and-commit@v9
+        uses: EndBug/add-and-commit@v10
         with:
           add: tests/conformance/conformance-baseline.json
           cwd: ./baseline_repo
