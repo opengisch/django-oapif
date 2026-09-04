@@ -9,7 +9,7 @@ CRS84_SRID = 4326
 CRS84_URI = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
 
 # taken from https://github.com/geopython/pygeoapi/blob/953b6fa74d2ce292d8f566c4f4d3bcb4161d6e95/pygeoapi/util.py#L90
-CRS_URI_PATTERN = re.compile(r"^http://www.opengis\.net/def/crs/(?P<auth>EPSG|OGC)/[\d|\.]+?/(?P<code>\w+?)$")
+CRS_URI_PATTERN = re.compile(r"^https?://www.opengis\.net/def/crs/(?P<auth>EPSG|OGC)/[\d|\.]+?/(?P<code>\w+?)$")
 
 
 @dataclass
