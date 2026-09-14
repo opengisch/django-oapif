@@ -354,7 +354,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         collection = get_collection_by_id(collection_id, request)
         query = collection.get_queryset(request)
         item = get_object_or_404(query, pk=item_id)
-        if not collection.has_view_permission(request, item):
+        if not collection.has_delete_permission(request, item):
             raise AuthorizationError()
         collection.delete_model(request, item)
 
