@@ -1,5 +1,6 @@
 from typing import Any
 
+import pyarrow as pa
 from django.contrib.gis.db.models import Extent
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
@@ -25,6 +26,15 @@ from django_oapif.schema import (
 )
 from django_oapif.utils import replace_query_param
 
+ARROW_STREAM_MEDIA_TYPE = "application/vnd.apache.arrow.stream"
+GEOJSON_MEDIA_TYPE = "application/geo+json"
+JSON_MEDIA_TYPE = "application/json"
+
+ACCEPTED_TYPES = [
+    JSON_MEDIA_TYPE,
+    GEOJSON_MEDIA_TYPE,
+    ARROW_STREAM_MEDIA_TYPE,
+]
 
 DEFAULT_CRS = CRS("OGC", CRS84_SRID)
 
@@ -57,6 +67,17 @@ def get_page_links(request: HttpRequest, limit: int, offset: int, total_count: i
             )
         )
     return links
+
+
+def prefers_geoarrow(request: HttpRequest) -> bool:
+    return request.get_preferred_type(ACCEPTED_TYPES) == ARROW_STREAM_MEDIA_TYPE
+
+
+def arrow_table_response(table: pa.Table) -> HttpResponse:
+    sink = pa.BufferOutputStream()
+    with pa.ipc.new_stream(sink, table.schema) as writer:
+        writer.write_table(table)
+    return HttpResponse(sink.getvalue().to_pybytes(), content_type=ARROW_STREAM_MEDIA_TYPE)
 
 
 def get_related_object_or_raise(field: str, value: Any, related_model: type[Model]):
@@ -186,6 +207,12 @@ def create_collections_router(collections: dict[str, OapifCollection]):
 
         total_count = query.count()
 
+        if prefers_geoarrow(request):
+            table = collection.queryset_to_arrow(request, paginated_query)
+            arrow_response = arrow_table_response(table)
+            arrow_response["Content-Crs"] = crs.uri_header()
+            return arrow_response
+
         feature_collection = collection.queryset_to_featurecollection(request, paginated_query)
         feature_collection.numberMatched = total_count
         if geom_field := collection.geometry_field:
@@ -229,6 +256,11 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         item = get_object_or_404(query, pk=item_id)
         if not collection.has_view_permission(request, item):
             raise AuthorizationError()
+        if prefers_geoarrow(request):
+            table = collection.queryset_to_arrow(request, query.filter(pk=item_id))
+            arrow_response = arrow_table_response(table)
+            arrow_response["Content-Crs"] = crs.uri_header()
+            return arrow_response
         response["Content-Crs"] = crs.uri_header()
         return collection.model_to_feature(request, item)
 
