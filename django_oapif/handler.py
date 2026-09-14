@@ -83,7 +83,7 @@ class OapifCollection[M: Model]:
     fields: tuple[str, ...]
     readonly_fields: tuple[str, ...] = ()
     exclude: tuple[str, ...] = ()
-    ordering = ()
+    ordering = ("pk",)
 
     def __init__(self, model: type[M]) -> None:
         cls = type(self)
