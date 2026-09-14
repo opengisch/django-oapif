@@ -26,6 +26,9 @@ from django_oapif.schema import (
 from django_oapif.utils import replace_query_param
 
 
+DEFAULT_CRS = CRS("OGC", CRS84_SRID)
+
+
 def get_page_links(request: HttpRequest, limit: int, offset: int, total_count: int) -> list[OAPIFLink]:
     links = [
         OAPIFLink(
@@ -168,11 +171,12 @@ def create_collections_router(collections: dict[str, OapifCollection]):
     )
     def get_items(
         request: HttpRequest,
+        response: HttpResponse,
         collection_id: str,
         limit: int = 100,
         offset: int = 0,
-        crs: CRS = CRS("OGC", CRS84_SRID),
-        bbox_crs: CRS = Query(CRS("OGC", CRS84_SRID), alias="bbox-crs"),
+        crs: CRS = DEFAULT_CRS,
+        bbox_crs: CRS = Query(DEFAULT_CRS, alias="bbox-crs"),
         bbox: BBox | None = Query(None, alias="bbox", description="BBOX in the format: minx,miny,maxx,maxy"),
     ):
         collection = get_collection_by_id(collection_id, request)
@@ -188,6 +192,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
             geom_field = geom_field if crs.srid == collection.srid else Transform(geom_field, crs.srid)
             feature_collection.bbox = paginated_query.aggregate(bbox=Extent(geom_field))["bbox"]
         feature_collection.links = get_page_links(request, limit, offset, total_count)
+        response["Content-Crs"] = crs.uri_header()
         return feature_collection
 
     @router.api_operation(
@@ -214,15 +219,17 @@ def create_collections_router(collections: dict[str, OapifCollection]):
     )
     def get_item(
         request: HttpRequest,
+        response: HttpResponse,
         collection_id: str,
         item_id: str,
-        crs: CRS = CRS("OGC", CRS84_SRID),
+        crs: CRS = DEFAULT_CRS,
     ):
         collection = get_collection_by_id(collection_id, request)
         query = collection.query(request, crs)
         item = get_object_or_404(query, pk=item_id)
         if not collection.has_view_permission(request, item):
             raise AuthorizationError()
+        response["Content-Crs"] = crs.uri_header()
         return collection.model_to_feature(request, item)
 
     @router.post(
@@ -235,7 +242,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         response: HttpResponse,
         collection_id: str,
         feature: GenericFeature,
-        crs: CRS = Header(CRS("OGC", CRS84_SRID), alias="Content-Crs"),
+        crs: CRS = Header(DEFAULT_CRS, alias="Content-Crs"),
     ):
         collection = get_collection_by_id(collection_id, request)
         feature = collection.validate_feature_input_or_raise(request, feature)
@@ -251,8 +258,9 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         if not collection.has_add_permission(request, item):
             raise AuthorizationError()
         collection.save_model(request, item, False)
-        item = collection.query(request, CRS("OGC", CRS84_SRID)).get(pk=item.pk)
+        item = collection.query(request, DEFAULT_CRS).get(pk=item.pk)
         response.headers["Location"] = request.build_absolute_uri(f"items/{item.pk}")  # type: ignore
+        response["Content-Crs"] = DEFAULT_CRS.uri_header()
         return 201, collection.model_to_feature(request, item)
 
     @router.api_operation(
@@ -286,10 +294,11 @@ def create_collections_router(collections: dict[str, OapifCollection]):
     )
     def replace_item(
         request: HttpRequest,
+        response: HttpResponse,
         collection_id: str,
         item_id: str,
         feature: GenericFeature,
-        crs: CRS = Header(CRS("OGC", CRS84_SRID), alias="Content-Crs"),
+        crs: CRS = Header(DEFAULT_CRS, alias="Content-Crs"),
     ):
         collection = get_collection_by_id(collection_id, request)
         query = collection.get_queryset(request)
@@ -309,7 +318,8 @@ def create_collections_router(collections: dict[str, OapifCollection]):
                 geometry = None
             setattr(item, geom_field, geometry)
         collection.save_model(request, item, True)
-        item = collection.query(request, CRS("OGC", CRS84_SRID)).get(pk=item_id)
+        item = collection.query(request, DEFAULT_CRS).get(pk=item_id)
+        response["Content-Crs"] = DEFAULT_CRS.uri_header()
         return collection.model_to_feature(request, item)
 
     @router.patch(
@@ -319,10 +329,11 @@ def create_collections_router(collections: dict[str, OapifCollection]):
     )
     def update_item(
         request: HttpRequest,
+        response: HttpResponse,
         collection_id: str,
         item_id: str,
         feature: GenericFeaturePatch,
-        crs: CRS = Header(CRS("OGC", CRS84_SRID), alias="Content-Crs"),
+        crs: CRS = Header(DEFAULT_CRS, alias="Content-Crs"),
     ):
         collection = get_collection_by_id(collection_id, request)
         query = collection.get_queryset(request)
@@ -343,7 +354,8 @@ def create_collections_router(collections: dict[str, OapifCollection]):
                 geometry = None
             setattr(item, geom_field, geometry)
         collection.save_model(request, item, True)
-        item = collection.query(request, CRS("OGC", CRS84_SRID)).get(pk=item_id)
+        item = collection.query(request, DEFAULT_CRS).get(pk=item_id)
+        response["Content-Crs"] = DEFAULT_CRS.uri_header()
         return collection.model_to_feature(request, item)
 
     @router.delete("/{collection_id}/items/{item_id}", operation_id="delete_collection_item")

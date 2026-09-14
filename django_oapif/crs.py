@@ -38,6 +38,14 @@ class CRS:
             core_schema.str_schema(),
         )
 
+    def uri(self) -> str:
+        if self.srid == CRS84_SRID:
+            return CRS84_URI
+        return f"http://www.opengis.net/def/crs/EPSG/0/{self.srid}"
+
+    def uri_header(self) -> str:
+        return f"<{self.uri()}>"
+
 
 @dataclass
 class BBox:
