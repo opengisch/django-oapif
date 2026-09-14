@@ -106,8 +106,9 @@ def get_collection_response(request: HttpRequest, collection: OapifCollection):
             crs_uri = f"http://www.opengis.net/def/crs/EPSG/0/{collection.srid}"
             response.storageCrs = crs_uri
             response.crs = [CRS84_URI, crs_uri]
-        if extent := collection.model.objects.aggregate(extent=Extent(geom))["extent"]:
-            response.extent = OAPIFExtent(spatial=OAPIFSpatialExtent(bbox=[extent], crs=response.storageCrs))
+        geom_query = geom if collection.srid == CRS84_SRID else Transform(geom, CRS84_SRID)
+        if extent := collection.model.objects.aggregate(extent=Extent(geom_query))["extent"]:
+            response.extent = OAPIFExtent(spatial=OAPIFSpatialExtent(bbox=[extent], crs=CRS84_URI))
 
     return response
 
