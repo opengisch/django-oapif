@@ -4,4 +4,6 @@ psycopg2-binary
 inflection
 pyyaml
 uritemplate
+geoarrow-pyarrow
+pyarrow
 polars-st

@@ -1,8 +1,11 @@
 from functools import cache
 from typing import Literal, cast, overload
+from uuid import UUID
 
+import geoarrow.pyarrow as ga
 import polars as pl
 import polars_st  # noqa: F401
+import pyarrow as pa
 from django.contrib.auth import get_permission_codename
 from django.contrib.gis.db.models import GeometryField
 from django.contrib.gis.db.models.functions import Transform
@@ -340,6 +343,25 @@ class OapifCollection[M: Model]:
             numberMatched=0,  # Will be updated in the caller
             links=[],  # Will be updated in the caller,
         )
+
+    def queryset_to_arrow(self, request: HttpRequest, qs: QuerySet) -> pa.Table:
+        """Convert a queryset (as produced by `query()`) to a pyarrow Table with a GeoArrow-WKB geometry column."""
+
+        fields = tuple(set(self.get_fields(request)) - set(self.get_exclude(request)))
+        PropertiesSchema = self.get_properties_schema(fields, extra="ignore")
+        table = pa.Table.from_pylist([
+            {
+                **{
+                    name: str(value) if isinstance(value, UUID) else value
+                    for name, value in PropertiesSchema.from_orm(row).dict().items()
+                },
+                "geometry": bytes(wkb) if (wkb := getattr(row, "_oapif_geometry", None)) else None,
+            }
+            for row in qs
+        ])
+        if not self.geometry_field:
+            return table.drop_columns("geometry")
+        return table.set_column(table.schema.get_field_index("geometry"), "geometry", ga.as_wkb(table["geometry"]))
 
     def model_to_feature(self, request: HttpRequest, obj: M) -> Feature:
         schema = self.get_feature_output_schema(request)
