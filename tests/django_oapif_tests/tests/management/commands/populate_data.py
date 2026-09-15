@@ -1,3 +1,4 @@
+import datetime
 import math
 import random
 import string
@@ -8,6 +9,7 @@ from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django_oapif_tests.tests.models import (
+    LayerWithDate,
     LayerWithForeignKey,
     Line_2056_10fields,
     NoGeom_10fields,
@@ -83,7 +85,7 @@ class Command(BaseCommand):
         NoGeom_100fields.objects.bulk_create(no_geoms_100fields, batch_size=10000)
         Line_2056_10fields.objects.bulk_create(lines, batch_size=10000)
         LayerWithForeignKey.objects.create(point=Point_2056_10fields.objects.first())
-
+        LayerWithDate.objects.create(date=datetime.date.today(), time=datetime.datetime.now())
         # Call 'update_data' to update computed properties
         call_command("updatedata")
         print("🤖 testdata added!")
