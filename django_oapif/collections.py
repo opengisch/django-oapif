@@ -1,6 +1,7 @@
 from typing import Any
 
 from django.contrib.gis.db.models import Extent
+from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
 from django.db.models import Model
 from django.http import HttpRequest, HttpResponse
@@ -182,6 +183,9 @@ def create_collections_router(collections: dict[str, OapifCollection]):
 
         feature_collection = collection.queryset_to_featurecollection(request, paginated_query)
         feature_collection.numberMatched = total_count
+        if geom_field := collection.geometry_field:
+            geom_field = geom_field if crs.srid == collection.srid else Transform(geom_field, crs.srid)
+            feature_collection.bbox = paginated_query.aggregate(bbox=Extent(geom_field))["bbox"]
         feature_collection.links = get_page_links(request, limit, offset, total_count)
         return feature_collection
 

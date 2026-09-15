@@ -1,16 +1,17 @@
-import math
 from functools import cache
 from typing import Literal, cast, overload
 
+import polars as pl
+import polars_st  # noqa: F401
 from django.contrib.auth import get_permission_codename
 from django.contrib.gis.db.models import GeometryField
-from django.contrib.gis.db.models.functions import AsGeoJSON, Transform
+from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import Polygon as GEOSPolygon
 from django.db.models import (
+    BinaryField,
     FileField,
     ForeignKey,
     GeneratedField,
-    JSONField,
     ManyToManyRel,
     ManyToOneRel,
     Model,
@@ -119,7 +120,7 @@ class OapifCollection[M: Model]:
             tuple(
                 field.name
                 for field in model_fields
-                if not isinstance(field, (ManyToOneRel, ManyToManyRel)) and not field.name == self.geometry_field
+                if not isinstance(field, (ManyToOneRel, ManyToManyRel)) and field.name != self.geometry_field
             ),
         )
 
@@ -140,7 +141,7 @@ class OapifCollection[M: Model]:
         qs = qs.only("pk", *self.get_fields(request))
         if geom_field := self.geometry_field:
             geometry_query = geom_field if crs.srid == self.srid else Transform(geom_field, crs.srid)
-            qs = qs.annotate(_oapif_geometry=Cast(AsGeoJSON(geometry_query, bbox=True), JSONField()))
+            qs = qs.annotate(_oapif_geometry=Cast(geometry_query, output_field=BinaryField()))
             if bbox is not None:
                 assert bbox_crs is not None
                 bbox_geom = GEOSPolygon.from_bbox((bbox.xmin, bbox.ymin, bbox.xmax, bbox.ymax))
@@ -314,10 +315,8 @@ class OapifCollection[M: Model]:
         if geom_field := self.geometry_field:
             geom_field = cast("GeometryField", self.model._meta.get_field(self.geometry_field))
             geom_type = geom_field.geom_type.lower()
-            if geom_type.endswith("m"):
-                geom_type = geom_type[:-1]
-            if geom_type.endswith("z"):
-                geom_type = geom_type[:-1]
+            geom_type = geom_type.removesuffix("m")
+            geom_type = geom_type.removesuffix("z")
             if geom_type == "geometry":
                 geom_type = "any"
             schema["properties"][geom_field.name] = {
@@ -330,40 +329,28 @@ class OapifCollection[M: Model]:
         return schema
 
     def queryset_to_featurecollection(self, request: HttpRequest, qs: QuerySet) -> FeatureCollection:
-        features: list[Feature] = []
-        bbox = (math.inf, math.inf, -math.inf, -math.inf)
         FeatureSchema = self.get_feature_output_schema(request)
         FeatureCollectionSchema = FeatureCollection[FeatureSchema]
-        for obj in qs:
-            feature = self._model_to_feature(request, FeatureSchema, obj)
-            features.append(feature)
-            if geometry := feature.geometry:
-                bbox = (
-                    min(bbox[0], geometry.bbox[0]),
-                    min(bbox[1], geometry.bbox[1]),
-                    max(bbox[2], geometry.bbox[2]),
-                    max(bbox[3], geometry.bbox[3]),
-                )
-        if bbox == (math.inf, math.inf, -math.inf, -math.inf):
-            bbox = None
+        features = [self._model_to_feature(FeatureSchema, obj) for obj in qs]
         return FeatureCollectionSchema.model_construct(
             type="FeatureCollection",
             features=features,
-            bbox=bbox,
-            numberMatched=len(features),
+            bbox=None,  # Will be updated in the caller,
             numberReturned=len(features),
-            links=[],
+            numberMatched=0,  # Will be updated in the caller
+            links=[],  # Will be updated in the caller,
         )
 
     def model_to_feature(self, request: HttpRequest, obj: M) -> Feature:
         schema = self.get_feature_output_schema(request)
-        return self._model_to_feature(request, schema, obj)
+        return self._model_to_feature(schema, obj)
 
-    def _model_to_feature(self, request: HttpRequest, schema: type[Feature], obj: M) -> Feature:
+    def _model_to_feature(self, schema: type[Feature], obj: M) -> Feature:
+        geometry_wkb = getattr(obj, "_oapif_geometry", None)
         return schema(
             type="Feature",
             id=str(obj.pk),
-            geometry=getattr(obj, "_oapif_geometry", None),
+            geometry=pl.Series([bytes(geometry_wkb)], dtype=pl.Binary()).st.to_dict().item() if geometry_wkb else None,
             properties=obj,
         )
 
