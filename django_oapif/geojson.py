@@ -14,7 +14,6 @@ class GeometryBase(Schema):
     # validate_assignment is required to skip passing values through DjangoGetter
     # which causes a bug on null geometries
     model_config = ConfigDict(from_attributes=True, validate_assignment=True)
-    bbox: tuple[float, float, float, float] | None = None
 
 
 class Point[C: Coordinate](GeometryBase):
@@ -50,6 +49,38 @@ class MultiPolygon[C: Coordinate](GeometryBase):
     coordinates: list[list[Annotated[list[C], Field(min_length=4)]]]
 
 
+class CircularString[C: Coordinate](GeometryBase):
+    type: Literal["CircularString"]
+    coordinates: (
+        Annotated[list[C], Field(min_length=0, max_length=0)]
+        | Annotated[list[C], Field(min_length=3, max_length=3)]
+        | Annotated[list[C], Field(min_length=5, max_length=5)]
+        | Annotated[list[C], Field(min_length=7, max_length=7)]
+        | Annotated[list[C], Field(min_length=9, max_length=9)]
+        | Annotated[list[C], Field(min_length=11, max_length=11)]
+    )
+
+
+class CompoundCurve[C: Coordinate](GeometryBase):
+    type: Literal["CompoundCurve"]
+    geometries: list[LineString[C] | CircularString[C]]
+
+
+class CurvePolygon[C: Coordinate](GeometryBase):
+    type: Literal["CurvePolygon"]
+    geometries: list[LineString[C] | CircularString[C] | CompoundCurve[C]]
+
+
+class MultiCurve[C: Coordinate](GeometryBase):
+    type: Literal["MultiCurve"]
+    geometries: list[LineString[C] | CircularString[C] | CompoundCurve[C]]
+
+
+class MultiSurface[C: Coordinate](GeometryBase):
+    type: Literal["MultiSurface"]
+    geometries: list[Polygon[C] | CurvePolygon[C]]
+
+
 class GeometryCollection[C: Coordinate](GeometryBase):
     type: Literal["GeometryCollection"]
     geometries: list["Geometry[C]"]
@@ -62,6 +93,11 @@ type Geometry[C: Coordinate] = Annotated[
     | MultiLineString[C]
     | Polygon[C]
     | MultiPolygon[C]
+    | CircularString[C]
+    | CompoundCurve[C]
+    | CurvePolygon[C]
+    | MultiCurve[C]
+    | MultiSurface[C]
     | GeometryCollection[C],
     Field(discriminator="type"),
 ]
