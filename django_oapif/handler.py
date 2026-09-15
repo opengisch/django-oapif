@@ -2,10 +2,8 @@ from functools import cache
 from typing import Literal, cast, overload
 from uuid import UUID
 
-import geoarrow.pyarrow as ga
 import polars as pl
 import polars_st  # noqa: F401
-import pyarrow as pa
 from django.contrib.auth import get_permission_codename
 from django.contrib.gis.db.models import GeometryField
 from django.contrib.gis.db.models.functions import Transform
@@ -344,8 +342,11 @@ class OapifCollection[M: Model]:
             links=[],  # Will be updated in the caller,
         )
 
-    def queryset_to_arrow(self, request: HttpRequest, qs: QuerySet) -> pa.Table:
+    def queryset_to_arrow(self, request: HttpRequest, qs: QuerySet):
         """Convert a queryset (as produced by `query()`) to a pyarrow Table with a GeoArrow-WKB geometry column."""
+
+        import geoarrow.pyarrow as ga
+        import pyarrow as pa
 
         fields = tuple(set(self.get_fields(request)) - set(self.get_exclude(request)))
         PropertiesSchema = self.get_properties_schema(fields, extra="ignore")

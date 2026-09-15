@@ -13,11 +13,13 @@ RUN apt-get update && \
     gettext \
     graphviz
 
-COPY requirements-dev.txt .
 COPY requirements.txt .
+COPY requirements-dev.txt .
+COPY requirements-arrow.txt .
 
-RUN pip install -r requirements-dev.txt
 RUN pip install -r requirements.txt
+RUN pip install -r requirements-dev.txt
+RUN pip install -r requirements-arrow.txt
 
 COPY . /usr/src/
 
