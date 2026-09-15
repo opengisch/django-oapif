@@ -4,6 +4,7 @@ from django_oapif.handler import AnonReadOnlyCollection, OapifCollection
 
 from .models import (
     Geometry_2056,
+    LayerWithDate,
     LayerWithFile,
     LayerWithForeignKey,
     Line_2056_10fields,
@@ -29,6 +30,7 @@ oapif.register_collection(Geometry_2056, AnonReadOnlyCollection)
 oapif.register_collection(Point_2056_Empty, AnonReadOnlyCollection)
 oapif.register_collection(LayerWithForeignKey, AnonReadOnlyCollection)
 oapif.register_collection(LayerWithFile, AnonReadOnlyCollection)
+oapif.register_collection(LayerWithDate, AnonReadOnlyCollection)
 
 
 @oapif.register(Point_2056_10fields)
