@@ -12,7 +12,6 @@ def create_conformance_router():
         return OAPIFConformance(
             conformsTo=[
                 "http://www.opengis.net/spec/ogcapi-common-1/1.0/conf/core",
-                "http://www.opengis.net/spec/ogcapi-common-1/1.0/conf/html",
                 "http://www.opengis.net/spec/ogcapi-common-1/1.0/conf/json",
                 "http://www.opengis.net/spec/ogcapi-common-1/1.0/conf/landing-page",
                 "http://www.opengis.net/spec/ogcapi-common-1/1.0/conf/oas30",

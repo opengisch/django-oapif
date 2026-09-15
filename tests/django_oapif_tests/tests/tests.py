@@ -1,10 +1,11 @@
+import datetime
 import logging
 import re
 
 from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.test.testcases import TestCase
-from django_oapif_tests.tests.models import LayerWithFile, Point_2056_10fields
+from django_oapif_tests.tests.models import LayerWithDate, LayerWithFile, Point_2056_10fields
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +162,28 @@ class TestBasicAuth(TestCase):
                 "geometry": None,
                 "properties": {
                     "file": "/media/foo/bar.txt",
+                    "id": str(obj.id),
+                },
+            },
+        )
+
+    def test_date_field(self):
+        today = datetime.date.today()
+        now = datetime.datetime.now()
+        obj = LayerWithDate.objects.create(date=today, time=now)
+        obj.refresh_from_db()
+        url = f"{collections_url}/tests.layerwithdate/items/{obj.id}"
+        response = self.client.get(url, headers=headers, content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "id": str(obj.id),
+                "type": "Feature",
+                "geometry": None,
+                "properties": {
+                    "date": str(today),
+                    "time": now.isoformat(timespec="milliseconds") + "Z",
                     "id": str(obj.id),
                 },
             },
