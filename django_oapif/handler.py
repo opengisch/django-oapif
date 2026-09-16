@@ -45,6 +45,15 @@ from django_oapif.geojson import (
 )
 from django_oapif.utils import PatchSchema
 
+try:
+    import geoarrow.pyarrow as ga
+    import pyarrow as pa
+
+    ARROW_AVAILABLE = True
+except ImportError:
+    ARROW_AVAILABLE = False
+
+
 model_config = {
     "from_attributes": True,
     "validate_by_name": True,
@@ -342,11 +351,8 @@ class OapifCollection[M: Model]:
             links=[],  # Will be updated in the caller,
         )
 
-    def queryset_to_arrow(self, request: HttpRequest, qs: QuerySet):
+    def queryset_to_arrow_stream(self, request: HttpRequest, qs: QuerySet):
         """Convert a queryset (as produced by `query()`) to a pyarrow Table with a GeoArrow-WKB geometry column."""
-
-        import geoarrow.pyarrow as ga
-        import pyarrow as pa
 
         fields = tuple(set(self.get_fields(request)) - set(self.get_exclude(request)))
         PropertiesSchema = self.get_properties_schema(fields, extra="ignore")
@@ -361,8 +367,14 @@ class OapifCollection[M: Model]:
             for row in qs
         ])
         if not self.geometry_field:
-            return table.drop_columns("geometry")
-        return table.set_column(table.schema.get_field_index("geometry"), "geometry", ga.as_wkb(table["geometry"]))
+            table = table.drop_columns("geometry")
+        else:
+            table = table.set_column(table.schema.get_field_index("geometry"), "geometry", ga.as_wkb(table["geometry"]))
+
+        stream = pa.BufferOutputStream()
+        with pa.ipc.new_stream(stream, table.schema) as writer:
+            writer.write_table(table)
+        return stream
 
     def model_to_feature(self, request: HttpRequest, obj: M) -> Feature:
         schema = self.get_feature_output_schema(request)
