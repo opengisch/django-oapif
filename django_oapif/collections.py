@@ -216,6 +216,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
             feature_collection.bbox = paginated_query.aggregate(bbox=Extent(geom_field))["bbox"]
         feature_collection.links = get_page_links(request, limit, offset, total_count)
         response["Content-Crs"] = crs.uri_header()
+        response["Content-Type"] = GEOJSON_MEDIA_TYPE
         return feature_collection
 
     @router.api_operation(
@@ -258,6 +259,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
             arrow_response["Content-Crs"] = crs.uri_header()
             return arrow_response
         response["Content-Crs"] = crs.uri_header()
+        response["Content-Type"] = GEOJSON_MEDIA_TYPE
         return collection.model_to_feature(request, item)
 
     @router.post(
@@ -289,6 +291,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         item = collection.query(request, DEFAULT_CRS).get(pk=item.pk)
         response.headers["Location"] = request.build_absolute_uri(f"items/{item.pk}")  # type: ignore
         response["Content-Crs"] = DEFAULT_CRS.uri_header()
+        response["Content-Type"] = GEOJSON_MEDIA_TYPE
         return 201, collection.model_to_feature(request, item)
 
     @router.api_operation(
@@ -348,6 +351,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         collection.save_model(request, item, True)
         item = collection.query(request, DEFAULT_CRS).get(pk=item_id)
         response["Content-Crs"] = DEFAULT_CRS.uri_header()
+        response["Content-Type"] = GEOJSON_MEDIA_TYPE
         return collection.model_to_feature(request, item)
 
     @router.patch(
@@ -384,6 +388,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         collection.save_model(request, item, True)
         item = collection.query(request, DEFAULT_CRS).get(pk=item_id)
         response["Content-Crs"] = DEFAULT_CRS.uri_header()
+        response["Content-Type"] = GEOJSON_MEDIA_TYPE
         return collection.model_to_feature(request, item)
 
     @router.delete("/{collection_id}/items/{item_id}", operation_id="delete_collection_item")
