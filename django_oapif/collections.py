@@ -1,6 +1,5 @@
 from typing import Any
 
-import pyarrow as pa
 from django.contrib.gis.db.models import Extent
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
@@ -16,7 +15,7 @@ from django_oapif.geojson import (
     GenericFeatureCollection,
     GenericFeaturePatch,
 )
-from django_oapif.handler import OapifCollection
+from django_oapif.handler import ARROW_AVAILABLE, OapifCollection
 from django_oapif.schema import (
     OAPIFCollection,
     OAPIFCollections,
@@ -69,15 +68,12 @@ def get_page_links(request: HttpRequest, limit: int, offset: int, total_count: i
     return links
 
 
-def prefers_geoarrow(request: HttpRequest) -> bool:
-    return request.get_preferred_type(ACCEPTED_TYPES) == ARROW_STREAM_MEDIA_TYPE
-
-
-def arrow_table_response(table: pa.Table) -> HttpResponse:
-    sink = pa.BufferOutputStream()
-    with pa.ipc.new_stream(sink, table.schema) as writer:
-        writer.write_table(table)
-    return HttpResponse(sink.getvalue().to_pybytes(), content_type=ARROW_STREAM_MEDIA_TYPE)
+def accepts_geoarrow(request: HttpRequest) -> bool:
+    if request.get_preferred_type(ACCEPTED_TYPES) == ARROW_STREAM_MEDIA_TYPE:
+        if ARROW_AVAILABLE:
+            return True
+        raise HttpError(406, "Arrow content type not supported")
+    return False
 
 
 def get_related_object_or_raise(field: str, value: Any, related_model: type[Model]):
@@ -207,9 +203,9 @@ def create_collections_router(collections: dict[str, OapifCollection]):
 
         total_count = query.count()
 
-        if prefers_geoarrow(request):
-            table = collection.queryset_to_arrow(request, paginated_query)
-            arrow_response = arrow_table_response(table)
+        if accepts_geoarrow(request):
+            stream = collection.queryset_to_arrow_stream(request, paginated_query)
+            arrow_response = HttpResponse(stream.getvalue().to_pybytes(), content_type=ARROW_STREAM_MEDIA_TYPE)
             arrow_response["Content-Crs"] = crs.uri_header()
             return arrow_response
 
@@ -256,9 +252,9 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         item = get_object_or_404(query, pk=item_id)
         if not collection.has_view_permission(request, item):
             raise AuthorizationError()
-        if prefers_geoarrow(request):
-            table = collection.queryset_to_arrow(request, query.filter(pk=item_id))
-            arrow_response = arrow_table_response(table)
+        if accepts_geoarrow(request):
+            stream = collection.queryset_to_arrow_stream(request, query.filter(pk=item_id))
+            arrow_response = HttpResponse(stream.getvalue().to_pybytes(), content_type=ARROW_STREAM_MEDIA_TYPE)
             arrow_response["Content-Crs"] = crs.uri_header()
             return arrow_response
         response["Content-Crs"] = crs.uri_header()
