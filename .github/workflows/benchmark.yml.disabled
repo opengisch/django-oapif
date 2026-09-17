@@ -69,9 +69,7 @@ jobs:
 
     - uses: actions/upload-artifact@v5
       with:
-        path: |
-          tests/benchmark/output/benchmark.dat
-          tests/benchmark/output/*.png
+        path: tests/benchmark/output/*
         if-no-files-found: error
 
     - name: Failure logs
