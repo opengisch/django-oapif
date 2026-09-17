@@ -2,8 +2,6 @@ from functools import cache
 from typing import Literal, cast, overload
 from uuid import UUID
 
-import polars as pl
-import polars_st  # noqa: F401
 from django.contrib.auth import get_permission_codename
 from django.contrib.gis.db.models import GeometryField
 from django.contrib.gis.db.models.functions import Transform
@@ -27,6 +25,7 @@ from pydantic import ConfigDict
 from pydantic import ValidationError as PydanticValidationError
 from pydantic.config import ExtraValues
 
+from django_oapif import jsonfg
 from django_oapif.crs import CRS, BBox
 from django_oapif.geojson import (
     Coordinate2D,
@@ -389,7 +388,7 @@ class OapifCollection[M: Model]:
         return schema(
             type="Feature",
             id=str(obj.pk),
-            geometry=pl.Series([bytes(geometry_wkb)], dtype=pl.Binary()).st.to_dict().item() if geometry_wkb else None,
+            geometry=jsonfg.loads(bytes(geometry_wkb)) if geometry_wkb else None,
             properties=obj,
         )
 
