@@ -2,10 +2,13 @@ import datetime
 import logging
 import re
 
+import pyarrow as pa
 from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.test.testcases import TestCase
 from django_oapif_tests.tests.models import LayerWithDate, LayerWithFile, Point_2056_10fields
+from geoarrow.pyarrow import WkbType
+from geoarrow.types.crs import StringCrs
 
 logger = logging.getLogger(__name__)
 
@@ -312,3 +315,53 @@ class TestSchema(TestCase):
             schema_response.json()["properties"]["geom"],
             {"title": "geometry", "x-ogc-role": "primary-geometry", "format": "geometry-any"},
         )
+
+
+class TestOutputFormat(TestCase):
+    COLLECTIONS = {
+        "tests.nogeom_10fields": None,
+        "tests.point_2056_10fields": "Point",
+        "tests.line_2056_10fields": "LineString",
+        "tests.arc_2056_10fields": "CircularString",
+    }
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("populate_data", "-s 100")
+        call_command("populate_users")
+
+    def test_geojson_geometry_types(self):
+        for collection, geometry_type in self.COLLECTIONS.items():
+            with self.subTest(collection=collection):
+                response = self.client.get(
+                    f"{collections_url}/{collection}/items?limit=1",
+                    headers={"Accept": "application/geo+json"},
+                )
+
+                self.assertEqual(response.status_code, 200)
+                feature = response.json()["features"][0]
+                if geometry_type:
+                    self.assertEqual(feature["geometry"]["type"], geometry_type)
+                else:
+                    self.assertEqual(feature["geometry"], None)
+
+    def test_arrow_geometry_types(self):
+        for collection, geometry_type in self.COLLECTIONS.items():
+            with self.subTest(collection=collection):
+                response = self.client.get(
+                    f"{collections_url}/{collection}/items?limit=1",
+                    headers={"Accept": "application/vnd.apache.arrow.stream"},
+                )
+
+                self.assertEqual(response.status_code, 200)
+                table = pa.ipc.open_stream(response.content).read_all()
+                if geometry_type is not None:
+                    self.assertIn("geometry", table.schema.names)
+                    geometry_field = table.schema.field("geometry")
+                    self.assertIsNotNone(geometry_field)
+                    self.assertIsInstance(geometry_field.type, WkbType)
+                    self.assertEqual(geometry_field.type.crs, StringCrs("EPSG:2056"))
+                    self.assertEqual(geometry_field.type.extension_name, "geoarrow.wkb")
+                    self.assertEqual(table.num_rows, 1)
+                else:
+                    self.assertNotIn("geometry", table.schema.names)

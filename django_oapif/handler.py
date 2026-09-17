@@ -369,7 +369,11 @@ class OapifCollection[M: Model]:
         if not self.geometry_field:
             table = table.drop_columns("geometry")
         else:
-            table = table.set_column(table.schema.get_field_index("geometry"), "geometry", ga.as_wkb(table["geometry"]))
+            table = table.set_column(
+                table.schema.get_field_index("geometry"),
+                "geometry",
+                ga.with_crs(ga.as_wkb(table["geometry"]), f"EPSG:{self.srid}"),
+            )
 
         stream = pa.BufferOutputStream()
         with pa.ipc.new_stream(stream, table.schema) as writer:
