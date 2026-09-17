@@ -35,6 +35,8 @@ starting_version = "0.0.0.dev"
 readme = {file = ["README.md"], content-type = "text/markdown"}
 dependencies = {file = ["requirements.txt"]}
 optional-dependencies.dev = {file = ["requirements-dev.txt"]}
+optional-dependencies.arrow = {file = ["requirements-arrow.txt"]}
+optional-dependencies.bench = {file = ["requirements-bench.txt"]}
 
 [tool.pyright]
 typeCheckingMode = "basic"

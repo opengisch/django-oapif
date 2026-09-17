@@ -1,13 +1,17 @@
+import datetime
 import math
 import random
 import string
+import uuid
 from copy import deepcopy
 from typing import Any
 
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
-from django.db import transaction
+from django.db import connection, transaction
 from django_oapif_tests.tests.models import (
+    Arc_2056_10fields,
+    LayerWithDate,
     LayerWithForeignKey,
     Line_2056_10fields,
     NoGeom_10fields,
@@ -36,6 +40,7 @@ class Command(BaseCommand):
         points = []
         secret_points = []
         lines = []
+        arcs = []
         no_geoms = []
         no_geoms_100fields = []
 
@@ -49,7 +54,13 @@ class Command(BaseCommand):
                 geom_line_wkt = (
                     f"LineString("
                     f"{x:4f} {y:4f}, "
+                    f"{x + random.randint(10, 50):4f} {y + random.randint(10, 50):4f},"
                     f"{x + random.randint(10, 50):4f} {y + random.randint(10, 50):4f})"
+                )
+                circularstring_wkt = (
+                    f"CircularString("
+                    f"{x:4f} {y:4f}, "
+                    f"{x + random.randint(10, 50):4f} {y + random.randint(10, 50):4f},"
                     f"{x + random.randint(10, 50):4f} {y + random.randint(10, 50):4f})"
                 )
 
@@ -76,14 +87,23 @@ class Command(BaseCommand):
                 line = Line_2056_10fields(**fields)
                 lines.append(line)
 
+                arcs.append((uuid.uuid4(), circularstring_wkt))
+
         # Create objects in batches
+        # The GEOS version used by geodjango does not support curves
+        arc_table_name = connection.ops.quote_name(Arc_2056_10fields._meta.db_table)
+        with connection.cursor() as cursor:
+            cursor.executemany(
+                f"INSERT INTO {arc_table_name} (id, geom) VALUES (%s, ST_GeomFromText(%s, 2056))",
+                [(arc_id, wkt) for arc_id, wkt in arcs],
+            )
         Point_2056_10fields.objects.bulk_create(points, batch_size=10000)
         SecretLayer.objects.bulk_create(secret_points, batch_size=10000)
         NoGeom_10fields.objects.bulk_create(no_geoms, batch_size=10000)
         NoGeom_100fields.objects.bulk_create(no_geoms_100fields, batch_size=10000)
         Line_2056_10fields.objects.bulk_create(lines, batch_size=10000)
         LayerWithForeignKey.objects.create(point=Point_2056_10fields.objects.first())
-
+        LayerWithDate.objects.create(date=datetime.date.today(), time=datetime.datetime.now())
         # Call 'update_data' to update computed properties
         call_command("updatedata")
         print("🤖 testdata added!")

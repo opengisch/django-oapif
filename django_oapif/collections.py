@@ -1,6 +1,7 @@
 from typing import Any
 
 from django.contrib.gis.db.models import Extent
+from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
 from django.db.models import Model
 from django.http import HttpRequest, HttpResponse
@@ -14,7 +15,7 @@ from django_oapif.geojson import (
     GenericFeatureCollection,
     GenericFeaturePatch,
 )
-from django_oapif.handler import OapifCollection
+from django_oapif.handler import ARROW_AVAILABLE, OapifCollection
 from django_oapif.schema import (
     OAPIFCollection,
     OAPIFCollections,
@@ -23,6 +24,18 @@ from django_oapif.schema import (
     OAPIFSpatialExtent,
 )
 from django_oapif.utils import replace_query_param
+
+ARROW_STREAM_MEDIA_TYPE = "application/vnd.apache.arrow.stream"
+GEOJSON_MEDIA_TYPE = "application/geo+json"
+JSON_MEDIA_TYPE = "application/json"
+
+ACCEPTED_TYPES = [
+    JSON_MEDIA_TYPE,
+    GEOJSON_MEDIA_TYPE,
+    ARROW_STREAM_MEDIA_TYPE,
+]
+
+DEFAULT_CRS = CRS("OGC", CRS84_SRID)
 
 
 def get_page_links(request: HttpRequest, limit: int, offset: int, total_count: int) -> list[OAPIFLink]:
@@ -53,6 +66,14 @@ def get_page_links(request: HttpRequest, limit: int, offset: int, total_count: i
             )
         )
     return links
+
+
+def accepts_geoarrow(request: HttpRequest) -> bool:
+    if request.get_preferred_type(ACCEPTED_TYPES) == ARROW_STREAM_MEDIA_TYPE:
+        if ARROW_AVAILABLE:
+            return True
+        raise HttpError(406, "Arrow content type not supported")
+    return False
 
 
 def get_related_object_or_raise(field: str, value: Any, related_model: type[Model]):
@@ -105,8 +126,9 @@ def get_collection_response(request: HttpRequest, collection: OapifCollection):
             crs_uri = f"http://www.opengis.net/def/crs/EPSG/0/{collection.srid}"
             response.storageCrs = crs_uri
             response.crs = [CRS84_URI, crs_uri]
-        if extent := collection.model.objects.aggregate(extent=Extent(geom))["extent"]:
-            response.extent = OAPIFExtent(spatial=OAPIFSpatialExtent(bbox=[extent], crs=response.storageCrs))
+        geom_query = geom if collection.srid == CRS84_SRID else Transform(geom, CRS84_SRID)
+        if extent := collection.model.objects.aggregate(extent=Extent(geom_query))["extent"]:
+            response.extent = OAPIFExtent(spatial=OAPIFSpatialExtent(bbox=[extent], crs=CRS84_URI))
 
     return response
 
@@ -166,11 +188,12 @@ def create_collections_router(collections: dict[str, OapifCollection]):
     )
     def get_items(
         request: HttpRequest,
+        response: HttpResponse,
         collection_id: str,
         limit: int = 100,
         offset: int = 0,
-        crs: CRS = CRS("OGC", CRS84_SRID),
-        bbox_crs: CRS = Query(CRS("OGC", CRS84_SRID), alias="bbox-crs"),
+        crs: CRS = DEFAULT_CRS,
+        bbox_crs: CRS = Query(DEFAULT_CRS, alias="bbox-crs"),
         bbox: BBox | None = Query(None, alias="bbox", description="BBOX in the format: minx,miny,maxx,maxy"),
     ):
         collection = get_collection_by_id(collection_id, request)
@@ -180,9 +203,20 @@ def create_collections_router(collections: dict[str, OapifCollection]):
 
         total_count = query.count()
 
+        if accepts_geoarrow(request):
+            stream = collection.queryset_to_arrow_stream(request, paginated_query)
+            arrow_response = HttpResponse(stream.getvalue().to_pybytes(), content_type=ARROW_STREAM_MEDIA_TYPE)
+            arrow_response["Content-Crs"] = crs.uri_header()
+            return arrow_response
+
         feature_collection = collection.queryset_to_featurecollection(request, paginated_query)
         feature_collection.numberMatched = total_count
+        if geom_field := collection.geometry_field:
+            geom_field = geom_field if crs.srid == collection.srid else Transform(geom_field, crs.srid)
+            feature_collection.bbox = paginated_query.aggregate(bbox=Extent(geom_field))["bbox"]
         feature_collection.links = get_page_links(request, limit, offset, total_count)
+        response["Content-Crs"] = crs.uri_header()
+        response["Content-Type"] = GEOJSON_MEDIA_TYPE
         return feature_collection
 
     @router.api_operation(
@@ -209,15 +243,23 @@ def create_collections_router(collections: dict[str, OapifCollection]):
     )
     def get_item(
         request: HttpRequest,
+        response: HttpResponse,
         collection_id: str,
         item_id: str,
-        crs: CRS = CRS("OGC", CRS84_SRID),
+        crs: CRS = DEFAULT_CRS,
     ):
         collection = get_collection_by_id(collection_id, request)
         query = collection.query(request, crs)
         item = get_object_or_404(query, pk=item_id)
         if not collection.has_view_permission(request, item):
             raise AuthorizationError()
+        if accepts_geoarrow(request):
+            stream = collection.queryset_to_arrow_stream(request, query.filter(pk=item_id))
+            arrow_response = HttpResponse(stream.getvalue().to_pybytes(), content_type=ARROW_STREAM_MEDIA_TYPE)
+            arrow_response["Content-Crs"] = crs.uri_header()
+            return arrow_response
+        response["Content-Crs"] = crs.uri_header()
+        response["Content-Type"] = GEOJSON_MEDIA_TYPE
         return collection.model_to_feature(request, item)
 
     @router.post(
@@ -230,7 +272,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         response: HttpResponse,
         collection_id: str,
         feature: GenericFeature,
-        crs: CRS = Header(CRS("OGC", CRS84_SRID), alias="Content-Crs"),
+        crs: CRS = Header(DEFAULT_CRS, alias="Content-Crs"),
     ):
         collection = get_collection_by_id(collection_id, request)
         feature = collection.validate_feature_input_or_raise(request, feature)
@@ -246,8 +288,10 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         if not collection.has_add_permission(request, item):
             raise AuthorizationError()
         collection.save_model(request, item, False)
-        item = collection.query(request, CRS("OGC", CRS84_SRID)).get(pk=item.pk)
+        item = collection.query(request, DEFAULT_CRS).get(pk=item.pk)
         response.headers["Location"] = request.build_absolute_uri(f"items/{item.pk}")  # type: ignore
+        response["Content-Crs"] = DEFAULT_CRS.uri_header()
+        response["Content-Type"] = GEOJSON_MEDIA_TYPE
         return 201, collection.model_to_feature(request, item)
 
     @router.api_operation(
@@ -281,10 +325,11 @@ def create_collections_router(collections: dict[str, OapifCollection]):
     )
     def replace_item(
         request: HttpRequest,
+        response: HttpResponse,
         collection_id: str,
         item_id: str,
         feature: GenericFeature,
-        crs: CRS = Header(CRS("OGC", CRS84_SRID), alias="Content-Crs"),
+        crs: CRS = Header(DEFAULT_CRS, alias="Content-Crs"),
     ):
         collection = get_collection_by_id(collection_id, request)
         query = collection.get_queryset(request)
@@ -304,7 +349,9 @@ def create_collections_router(collections: dict[str, OapifCollection]):
                 geometry = None
             setattr(item, geom_field, geometry)
         collection.save_model(request, item, True)
-        item = collection.query(request, CRS("OGC", CRS84_SRID)).get(pk=item_id)
+        item = collection.query(request, DEFAULT_CRS).get(pk=item_id)
+        response["Content-Crs"] = DEFAULT_CRS.uri_header()
+        response["Content-Type"] = GEOJSON_MEDIA_TYPE
         return collection.model_to_feature(request, item)
 
     @router.patch(
@@ -314,10 +361,11 @@ def create_collections_router(collections: dict[str, OapifCollection]):
     )
     def update_item(
         request: HttpRequest,
+        response: HttpResponse,
         collection_id: str,
         item_id: str,
         feature: GenericFeaturePatch,
-        crs: CRS = Header(CRS("OGC", CRS84_SRID), alias="Content-Crs"),
+        crs: CRS = Header(DEFAULT_CRS, alias="Content-Crs"),
     ):
         collection = get_collection_by_id(collection_id, request)
         query = collection.get_queryset(request)
@@ -338,7 +386,9 @@ def create_collections_router(collections: dict[str, OapifCollection]):
                 geometry = None
             setattr(item, geom_field, geometry)
         collection.save_model(request, item, True)
-        item = collection.query(request, CRS("OGC", CRS84_SRID)).get(pk=item_id)
+        item = collection.query(request, DEFAULT_CRS).get(pk=item_id)
+        response["Content-Crs"] = DEFAULT_CRS.uri_header()
+        response["Content-Type"] = GEOJSON_MEDIA_TYPE
         return collection.model_to_feature(request, item)
 
     @router.delete("/{collection_id}/items/{item_id}", operation_id="delete_collection_item")
@@ -350,7 +400,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         collection = get_collection_by_id(collection_id, request)
         query = collection.get_queryset(request)
         item = get_object_or_404(query, pk=item_id)
-        if not collection.has_view_permission(request, item):
+        if not collection.has_delete_permission(request, item):
             raise AuthorizationError()
         collection.delete_model(request, item)
 
