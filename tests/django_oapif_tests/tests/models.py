@@ -152,6 +152,11 @@ class Geometry_2056(models.Model):
     geom = models.GeometryField(srid=2056, verbose_name=_("Geometry"))
 
 
+class GeometryZ_2056(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    geom = models.GeometryField(srid=2056, dim=3, verbose_name=_("Geometry"))
+
+
 class CircularStringField(models.GeometryField):
     geom_type = "CIRCULARSTRING"
 
