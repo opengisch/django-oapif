@@ -94,6 +94,27 @@ class TestBasicAuth(TestCase):
         post_to_items = self.client.post(url, data, headers=headers, content_type="application/json")
         self.assertIn(post_to_items.status_code, (200, 201), (url, data, post_to_items))
 
+    def test_line_must_have_the_dimension_of_its_collection(self):
+        # LineString used to take any dimension, and the insert then failed in the database with a 500
+        self.client.force_login(user=User.objects.get(username="admin"))
+        line_2d = [[2508500.0, 1152000.0], [2508600.0, 1152100.0]]
+        line_3d = [[2508500.0, 1152000.0, 1.0], [2508600.0, 1152100.0, 2.0]]
+        for collection, coordinates, status in (
+            ("tests.line_2056_10fields", line_2d, 201),
+            ("tests.line_2056_10fields", line_3d, 422),
+            ("tests.geometryz_2056", line_3d, 201),
+            ("tests.geometryz_2056", line_2d, 422),
+        ):
+            with self.subTest(collection=collection, dimension=len(coordinates[0])):
+                data = {
+                    "type": "Feature",
+                    "geometry": {"type": "LineString", "coordinates": coordinates},
+                    "properties": {},
+                }
+                url = f"{collections_url}/{collection}/items"
+                response = self.client.post(url, data, headers=headers, content_type="application/json")
+                self.assertEqual(response.status_code, status)
+
     def test_unknown_property_is_rejected_after_a_read(self):
         self.client.force_login(user=self.demo_editor)
         url = f"{collections_url}/tests.point_2056_10fields/items"

@@ -23,10 +23,7 @@ class Point[C: Coordinate](GeometryBase):
 
 class LineString[C: Coordinate](GeometryBase):
     type: Literal["LineString"]
-    coordinates: (
-        Annotated[list[Coordinate], Field(min_length=0, max_length=0)]
-        | Annotated[list[Coordinate], Field(min_length=2)]
-    )
+    coordinates: Annotated[list[C], Field(min_length=0, max_length=0)] | Annotated[list[C], Field(min_length=2)]
 
 
 class Polygon[C: Coordinate](GeometryBase):
