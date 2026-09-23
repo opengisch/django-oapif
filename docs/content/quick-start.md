@@ -13,6 +13,12 @@ Install with your favorite package manager
 pip install --user https://github.com/opengisch/django-oapif
 ```
 
+To serve [GeoArrow](geoarrow.md) as well, install the `arrow` extra:
+
+```bash
+pip install "django-oapif[arrow]"
+```
+
 ## Enable the app
 
 Edit settings.py
