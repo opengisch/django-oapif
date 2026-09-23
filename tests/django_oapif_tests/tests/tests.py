@@ -11,11 +11,14 @@ from django.test.testcases import TestCase
 from django_oapif import jsonfg
 from django_oapif.crs import CRS
 from django_oapif.geojson import CircularString, Coordinate2D
+from django_oapif.handler import AnonReadOnlyCollection
+from django_oapif_tests.tests.oapif import oapif
 from django_oapif_tests.tests.models import (
     Arc_2056_10fields,
     GeometryZ_2056,
     LayerWithDate,
     LayerWithFile,
+    LayerWithOrdering,
     Point_2056_10fields,
 )
 from geoarrow.pyarrow import WkbType
@@ -727,3 +730,38 @@ class TestCircularString(TestCase):
                         type="CircularString",
                         coordinates=[(float(i), 0.0) for i in range(count)],
                     )
+
+
+class TestOrdering(TestCase):
+    # inserted in reverse, so ordering by pk gives exactly the opposite of the model ordering
+    NAMES = ("delta", "charlie", "bravo", "alpha")
+
+    @classmethod
+    def setUpTestData(cls):
+        for name in cls.NAMES:
+            LayerWithOrdering.objects.create(name=name)
+
+    def test_model_ordering_is_kept(self):
+        response = self.client.get(f"{collections_url}/tests.layerwithordering/items")
+
+        self.assertEqual(response.status_code, 200)
+        names = [feature["properties"]["name"] for feature in response.json()["features"]]
+        self.assertEqual(names, sorted(self.NAMES))
+
+    def test_model_ordering_gets_the_pk_as_tie_breaker(self):
+        collection = oapif.collections["tests.layerwithordering"]
+
+        self.assertEqual(collection.get_ordering(None), ("name", "pk"))
+
+    def test_ordering_defaults_to_the_pk(self):
+        collection = oapif.collections["tests.point_2056_10fields"]
+
+        self.assertEqual(collection.get_ordering(None), ("pk",))
+
+    def test_collection_ordering_wins(self):
+        class ReversedCollection(AnonReadOnlyCollection):
+            ordering = ("-name",)
+
+        collection = ReversedCollection(LayerWithOrdering)
+
+        self.assertEqual(collection.get_ordering(None), ("-name",))
