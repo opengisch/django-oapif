@@ -20,6 +20,7 @@ from django_oapif_tests.tests.models import (
     LayerWithFile,
     LayerWithOrdering,
     Point_2056_10fields,
+    Point_2056_Empty,
 )
 from geoarrow.pyarrow import WkbType
 from pydantic import ValidationError as PydanticValidationError
@@ -392,6 +393,35 @@ class TestOutputFormat(TestCase):
         self.assertEqual(table.num_rows, 0)
         self.assertIn("geometry", table.schema.names)
         self.assertIsInstance(table.schema.field("geometry").type, WkbType)
+
+    def test_arrow_pages_share_one_schema(self):
+        # a column that is all null on one page used to be null-typed, and stop concatenating
+        Point_2056_Empty.objects.create(geom="POINT(2508500 1152000)", field_int=1)
+        Point_2056_Empty.objects.create(geom="POINT(2508600 1152100)", field_int=None)
+        pages = []
+        for offset in (0, 1):
+            response = self.client.get(
+                f"{collections_url}/tests.point_2056_empty/items?limit=1&offset={offset}",
+                headers={"Accept": "application/vnd.apache.arrow.stream"},
+            )
+
+            self.assertEqual(response.status_code, 200)
+            pages.append(pa.ipc.open_stream(response.content).read_all())
+
+        self.assertEqual(pages[0].schema, pages[1].schema)
+        self.assertEqual(pa.concat_tables(pages).num_rows, 2)
+
+    def test_arrow_reports_the_total_and_the_page_links(self):
+        # an Arrow stream cannot carry them in the payload, so they go to the headers
+        url = f"{collections_url}/tests.point_2056_10fields/items?limit=1&offset=1"
+        arrow = self.client.get(url, headers={"Accept": "application/vnd.apache.arrow.stream"})
+        geojson = self.client.get(url, headers={"Accept": "application/geo+json"}).json()
+
+        self.assertEqual(arrow.status_code, 200)
+        self.assertEqual(arrow.headers["OGC-NumberMatched"], str(geojson["numberMatched"]))
+        self.assertEqual({link["rel"] for link in geojson["links"]}, {"self", "prev", "next"})
+        for link in geojson["links"]:
+            self.assertIn(f'<{link["href"]}>; rel="{link["rel"]}"', arrow.headers["Link"])
 
     def test_arrow_crs_matches_coordinates(self):
         # the column crs must describe the coordinates that are in it, not the storage srid
