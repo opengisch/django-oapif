@@ -80,7 +80,8 @@ class OapifCollection[M: Model]:
         exclude:
             The list of fields to be excluded from the feature properties.exclude:
         ordering:
-            The field used to sort the queryset.
+            The fields used to sort the queryset. Defaults to the model ordering, completed by the
+            primary key so that pagination is stable.
     """
 
     id: str
@@ -91,7 +92,7 @@ class OapifCollection[M: Model]:
     fields: tuple[str, ...]
     readonly_fields: tuple[str, ...] = ()
     exclude: tuple[str, ...] = ()
-    ordering = ("pk",)
+    ordering: tuple = ()
 
     def __init__(self, model: type[M]) -> None:
         cls = type(self)
@@ -185,8 +186,11 @@ class OapifCollection[M: Model]:
     def get_ordering(self, request) -> tuple:
         """
         Hook for specifying field ordering.
+
+        The model ordering is kept, with the primary key appended as a tie breaker: without one,
+        rows that compare equal can move between pages and be returned twice or not at all.
         """
-        return self.ordering
+        return self.ordering or (*self.opts.ordering, "pk")
 
     def get_fields(self, request, obj=None) -> tuple[str, ...]:
         """

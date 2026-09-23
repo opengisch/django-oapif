@@ -179,6 +179,14 @@ class LayerWithFile(models.Model):
     file = models.FileField(upload_to="foo/")
 
 
+class LayerWithOrdering(models.Model):
+    # a sequential pk, so that inserting in reverse makes the pk order differ from the model ordering
+    class Meta:
+        ordering = ["name"]
+
+    name = models.CharField(max_length=255, verbose_name=_("Name"))
+
+
 class LayerWithDate(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     date = models.DateField()
