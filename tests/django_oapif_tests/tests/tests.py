@@ -350,6 +350,35 @@ class TestOutputFormat(TestCase):
                 else:
                     self.assertEqual(feature["geometry"], None)
 
+    def test_arrow_empty_page(self):
+        # an empty page used to come back as a table without a single column
+        for collection in ("tests.point_2056_10fields", "tests.nogeom_10fields"):
+            with self.subTest(collection=collection):
+                url = f"{collections_url}/{collection}/items?limit=1"
+                arrow_headers = {"Accept": "application/vnd.apache.arrow.stream"}
+                populated = self.client.get(url, headers=arrow_headers)
+                empty = self.client.get(f"{url}&offset=1000000", headers=arrow_headers)
+
+                self.assertEqual(populated.status_code, 200)
+                self.assertEqual(empty.status_code, 200)
+                populated_table = pa.ipc.open_stream(populated.content).read_all()
+                empty_table = pa.ipc.open_stream(empty.content).read_all()
+                self.assertEqual(populated_table.num_rows, 1)
+                self.assertEqual(empty_table.num_rows, 0)
+                self.assertEqual(empty_table.schema.names, populated_table.schema.names)
+
+    def test_arrow_empty_collection(self):
+        response = self.client.get(
+            f"{collections_url}/tests.point_2056_empty/items",
+            headers={"Accept": "application/vnd.apache.arrow.stream"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        table = pa.ipc.open_stream(response.content).read_all()
+        self.assertEqual(table.num_rows, 0)
+        self.assertIn("geometry", table.schema.names)
+        self.assertIsInstance(table.schema.field("geometry").type, WkbType)
+
     def test_arrow_geometry_types(self):
         for collection, geometry_type in self.COLLECTIONS.items():
             with self.subTest(collection=collection):
