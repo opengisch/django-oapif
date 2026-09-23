@@ -76,6 +76,17 @@ def accepts_geoarrow(request: HttpRequest) -> bool:
     return False
 
 
+def validate_crs_or_raise(collection: OapifCollection, crs: CRS, parameter: str) -> None:
+    """Reject a CRS the collection does not advertise, as the coordinates could not be trusted."""
+    supported = collection.supported_crs()
+    if not supported or crs in supported:
+        return
+    raise HttpError(
+        400,
+        f"Unsupported {parameter} '{crs.uri()}'. Supported: {', '.join(c.uri() for c in supported)}",
+    )
+
+
 def get_related_object_or_raise(field: str, value: Any, related_model: type[Model]):
     try:
         return related_model.objects.get(pk=value)
@@ -119,13 +130,9 @@ def get_collection_response(request: HttpRequest, collection: OapifCollection):
     )
 
     if geom := collection.geometry_field:
-        if collection.srid == CRS84_SRID:
-            response.storageCrs = CRS84_URI
-            response.crs = [CRS84_URI]
-        else:
-            crs_uri = f"http://www.opengis.net/def/crs/EPSG/0/{collection.srid}"
-            response.storageCrs = crs_uri
-            response.crs = [CRS84_URI, crs_uri]
+        response.crs = [crs.uri() for crs in collection.supported_crs()]
+        if storage_crs := collection.storage_crs():
+            response.storageCrs = storage_crs.uri()
         geom_query = geom if collection.srid == CRS84_SRID else Transform(geom, CRS84_SRID)
         if extent := collection.model.objects.aggregate(extent=Extent(geom_query))["extent"]:
             response.extent = OAPIFExtent(spatial=OAPIFSpatialExtent(bbox=[extent], crs=CRS84_URI))
@@ -197,6 +204,8 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         bbox: BBox | None = Query(None, alias="bbox", description="BBOX in the format: minx,miny,maxx,maxy"),
     ):
         collection = get_collection_by_id(collection_id, request)
+        validate_crs_or_raise(collection, crs, "crs")
+        validate_crs_or_raise(collection, bbox_crs, "bbox-crs")
 
         query = collection.query(request, crs, bbox, bbox_crs)
         paginated_query = query[offset : offset + limit]
@@ -249,6 +258,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         crs: CRS = DEFAULT_CRS,
     ):
         collection = get_collection_by_id(collection_id, request)
+        validate_crs_or_raise(collection, crs, "crs")
         query = collection.query(request, crs)
         item = get_object_or_404(query, pk=item_id)
         if not collection.has_view_permission(request, item):

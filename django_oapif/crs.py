@@ -39,7 +39,7 @@ class CRS:
         )
 
     def uri(self) -> str:
-        if self.srid == CRS84_SRID:
+        if self.auth == "OGC" and self.srid == CRS84_SRID:
             return CRS84_URI
         return f"http://www.opengis.net/def/crs/EPSG/0/{self.srid}"
 
