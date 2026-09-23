@@ -236,7 +236,8 @@ class OapifCollection[M: Model]:
             return None
 
         geom_field = cast("GeometryField", self.model._meta.get_field(self.geometry_field))
-        is_3d = geom_field.geom_type.endswith("Z") or geom_field.geom_type.endswith("ZM")
+        # dim covers the usual GeometryField(dim=3); the suffix covers custom geom_type subclasses
+        is_3d = geom_field.dim >= 3 or geom_field.geom_type.endswith(("Z", "ZM"))
         CoordType = Coordinate3D if is_3d else Coordinate2D
 
         if geom_field.geom_type.startswith("POINT"):
