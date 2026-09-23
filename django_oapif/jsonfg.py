@@ -19,6 +19,10 @@ _TYPES = {
     10: ("CurvePolygon", "geoms"),
     11: ("MultiCurve", "geoms"),
     12: ("MultiSurface", "geoms"),
+    # GeoJSON has no polyhedral types, so they are served as their closest equivalent, the way GDAL does
+    15: ("MultiPolygon", "geoms"),  # PolyhedralSurface, a collection of Polygons
+    16: ("MultiPolygon", "geoms"),  # TIN, a collection of Triangles
+    17: ("Polygon", "rings"),  # Triangle, laid out exactly like a Polygon
 }
 # GeoJSON puts homogeneous multi-parts under "coordinates", curves under "geometries"
 _FLATTEN = {"MultiPoint", "MultiLineString", "MultiPolygon"}
