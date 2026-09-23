@@ -4,10 +4,9 @@ from uuid import UUID
 
 from django.contrib.auth import get_permission_codename
 from django.contrib.gis.db.models import GeometryField
-from django.contrib.gis.db.models.functions import Transform
+from django.contrib.gis.db.models.functions import AsWKB, Transform
 from django.contrib.gis.geos import Polygon as GEOSPolygon
 from django.db.models import (
-    BinaryField,
     FileField,
     ForeignKey,
     GeneratedField,
@@ -16,7 +15,6 @@ from django.db.models import (
     Model,
     QuerySet,
 )
-from django.db.models.functions import Cast
 from django.http import HttpRequest
 from ninja import ModelSchema, Schema
 from ninja.errors import ValidationError
@@ -150,7 +148,7 @@ class OapifCollection[M: Model]:
         qs = qs.only("pk", *self.get_fields(request))
         if geom_field := self.geometry_field:
             geometry_query = geom_field if crs.srid == self.srid else Transform(geom_field, crs.srid)
-            qs = qs.annotate(_oapif_geometry=Cast(geometry_query, output_field=BinaryField()))
+            qs = qs.annotate(_oapif_geometry=AsWKB(geometry_query))
             if bbox is not None:
                 assert bbox_crs is not None
                 bbox_geom = GEOSPolygon.from_bbox((bbox.xmin, bbox.ymin, bbox.xmax, bbox.ymax))
