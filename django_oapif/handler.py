@@ -75,6 +75,16 @@ model_config = {
 }
 
 
+def without(fields: tuple[str, ...], *excluded: tuple[str, ...]) -> tuple[str, ...]:
+    """
+    The fields minus the excluded ones, in their declared order. A set difference would do, but its
+    order changes from one process to the next, and so would the columns of GeoArrow pages served by
+    different workers, which then no longer concatenate.
+    """
+    removed = set().union(*excluded)
+    return tuple(field for field in fields if field not in removed)
+
+
 class OapifCollection[M: Model]:
     """
     Base class used to customize authorization and model operations.
@@ -330,23 +340,19 @@ class OapifCollection[M: Model]:
         )
 
     def get_feature_input_schema(self, request: HttpRequest) -> type[Feature]:
-        fields = tuple(
-            set(self.get_fields(request)) - set(self.get_exclude(request)) - set(self.get_readonly_fields(request))
-        )
+        fields = without(self.get_fields(request), self.get_exclude(request), self.get_readonly_fields(request))
         PropertiesSchema = self.get_properties_schema(fields)
         GeometrySchema = self.get_geometry_schema()
         return Feature[GeometrySchema, PropertiesSchema]
 
     def get_feature_patch_schema(self, request: HttpRequest) -> type[FeaturePatch]:
-        fields = tuple(
-            set(self.get_fields(request)) - set(self.get_exclude(request)) - set(self.get_readonly_fields(request))
-        )
+        fields = without(self.get_fields(request), self.get_exclude(request), self.get_readonly_fields(request))
         PropertiesSchema = self.get_properties_schema(fields)
         GeometrySchema = self.get_geometry_schema()
         return FeaturePatch[GeometrySchema, PatchSchema[PropertiesSchema]]
 
     def get_feature_properties_schema(self, request: HttpRequest) -> type[Schema]:
-        fields = tuple(set(self.get_fields(request)) - set(self.get_exclude(request)))
+        fields = without(self.get_fields(request), self.get_exclude(request))
         # extra="ignore" is required for the serialization to go through ninja DjangoGetter
         return self.get_properties_schema(fields, extra="ignore")
 

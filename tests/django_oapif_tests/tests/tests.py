@@ -436,6 +436,29 @@ class TestOutputFormat(TestCase):
         self.assertEqual(pages[0].schema, pages[1].schema)
         self.assertEqual(pa.concat_tables(pages).num_rows, 2)
 
+    def test_arrow_columns_keep_the_declared_order(self):
+        # the order of a set changes from one process to the next, so pages served by different
+        # workers used to come back with their columns shuffled, and no longer concatenated
+        expected = {
+            "tests.point_2056_10fields": [
+                "id",
+                "field_bool",
+                "field_int",
+                *(f"field_str_{i}" for i in range(10)),
+                "geometry",
+            ],
+            "tests.point_2056_10fields_subset": ["field_int", "field_str_0", "geometry"],
+        }
+        for collection, columns in expected.items():
+            with self.subTest(collection=collection):
+                response = self.client.get(
+                    f"{collections_url}/{collection}/items?limit=1",
+                    headers={"Accept": "application/vnd.apache.arrow.stream"},
+                )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(pa.ipc.open_stream(response.content).schema.names, columns)
+
     def test_arrow_reports_the_total_and_the_page_links(self):
         # an Arrow stream cannot carry them in the payload, so they go to the headers
         url = f"{collections_url}/tests.point_2056_10fields/items?limit=1&offset=1"
