@@ -1,12 +1,15 @@
 import datetime
 import logging
 import re
+import uuid
 
 import pyarrow as pa
 from django.contrib.auth.models import User
 from django.core.management import call_command
+from django.db import connection
 from django.test.testcases import TestCase
-from django_oapif_tests.tests.models import LayerWithDate, LayerWithFile, Point_2056_10fields
+from django_oapif import jsonfg
+from django_oapif_tests.tests.models import GeometryZ_2056, LayerWithDate, LayerWithFile, Point_2056_10fields
 from geoarrow.pyarrow import WkbType
 from geoarrow.types.crs import StringCrs
 
@@ -14,7 +17,9 @@ logger = logging.getLogger(__name__)
 
 collections_url = "/oapif/collections"
 
-headers = {"Content-Crs": "http://www.opengis.net/def/crs/EPSG/0/2056"}
+crs_2056 = "http://www.opengis.net/def/crs/EPSG/0/2056"
+
+headers = {"Content-Crs": crs_2056}
 
 
 class TestBasicAuth(TestCase):
@@ -365,3 +370,140 @@ class TestOutputFormat(TestCase):
                     self.assertEqual(table.num_rows, 1)
                 else:
                     self.assertNotIn("geometry", table.schema.names)
+
+
+class TestGeometry3D(TestCase):
+    """Z ordinates must survive the WKB -> JSON-FG round trip, whatever the geometry type."""
+
+    # WKT to store -> geometry expected back, unprojected, in EPSG:2056
+    GEOMETRIES = {
+        "point": (
+            "POINT Z (2508500 1152000 555)",
+            {"type": "Point", "coordinates": [2508500.0, 1152000.0, 555.0]},
+        ),
+        "linestring": (
+            "LINESTRING Z (2508500 1152000 1, 2508600 1152100 2)",
+            {"type": "LineString", "coordinates": [[2508500.0, 1152000.0, 1.0], [2508600.0, 1152100.0, 2.0]]},
+        ),
+        "polygon": (
+            "POLYGON Z ((2508500 1152000 1, 2508600 1152000 2, 2508600 1152100 3, 2508500 1152000 1))",
+            {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [2508500.0, 1152000.0, 1.0],
+                        [2508600.0, 1152000.0, 2.0],
+                        [2508600.0, 1152100.0, 3.0],
+                        [2508500.0, 1152000.0, 1.0],
+                    ]
+                ],
+            },
+        ),
+        "multipoint": (
+            "MULTIPOINT Z ((2508500 1152000 1), (2508600 1152100 2))",
+            {"type": "MultiPoint", "coordinates": [[2508500.0, 1152000.0, 1.0], [2508600.0, 1152100.0, 2.0]]},
+        ),
+        "multilinestring": (
+            "MULTILINESTRING Z ((2508500 1152000 1, 2508600 1152100 2))",
+            {
+                "type": "MultiLineString",
+                "coordinates": [[[2508500.0, 1152000.0, 1.0], [2508600.0, 1152100.0, 2.0]]],
+            },
+        ),
+        "multipolygon": (
+            "MULTIPOLYGON Z (((2508500 1152000 1, 2508600 1152000 2, 2508600 1152100 3, 2508500 1152000 1)))",
+            {
+                "type": "MultiPolygon",
+                "coordinates": [
+                    [
+                        [
+                            [2508500.0, 1152000.0, 1.0],
+                            [2508600.0, 1152000.0, 2.0],
+                            [2508600.0, 1152100.0, 3.0],
+                            [2508500.0, 1152000.0, 1.0],
+                        ]
+                    ]
+                ],
+            },
+        ),
+        "geometrycollection": (
+            "GEOMETRYCOLLECTION Z (POINT Z (2508500 1152000 1), LINESTRING Z (2508500 1152000 1, 2508600 1152100 2))",
+            {
+                "type": "GeometryCollection",
+                "geometries": [
+                    {"type": "Point", "coordinates": [2508500.0, 1152000.0, 1.0]},
+                    {
+                        "type": "LineString",
+                        "coordinates": [[2508500.0, 1152000.0, 1.0], [2508600.0, 1152100.0, 2.0]],
+                    },
+                ],
+            },
+        ),
+        "circularstring": (
+            "CIRCULARSTRING Z (2508500 1152000 1, 2508550 1152050 2, 2508600 1152000 3)",
+            {
+                "type": "CircularString",
+                "coordinates": [
+                    [2508500.0, 1152000.0, 1.0],
+                    [2508550.0, 1152050.0, 2.0],
+                    [2508600.0, 1152000.0, 3.0],
+                ],
+            },
+        ),
+    }
+
+    @classmethod
+    def setUpTestData(cls):
+        # The GEOS version used by geodjango does not support curves, so insert the WKT as is
+        table_name = connection.ops.quote_name(GeometryZ_2056._meta.db_table)
+        cls.ids = {name: uuid.uuid4() for name in cls.GEOMETRIES}
+        with connection.cursor() as cursor:
+            cursor.executemany(
+                f"INSERT INTO {table_name} (id, geom) VALUES (%s, ST_GeomFromEWKT(%s))",
+                [(cls.ids[name], f"SRID=2056;{wkt}") for name, (wkt, _) in cls.GEOMETRIES.items()],
+            )
+
+    def test_item_keeps_z(self):
+        for name, (_, expected) in self.GEOMETRIES.items():
+            with self.subTest(geometry=name):
+                response = self.client.get(
+                    f"{collections_url}/tests.geometryz_2056/items/{self.ids[name]}?crs={crs_2056}",
+                    headers={"Accept": "application/geo+json"},
+                )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()["geometry"], expected)
+
+    def test_items_keep_z(self):
+        response = self.client.get(
+            f"{collections_url}/tests.geometryz_2056/items?crs={crs_2056}",
+            headers={"Accept": "application/geo+json"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        features = {feature["id"]: feature["geometry"] for feature in response.json()["features"]}
+        expected = {str(self.ids[name]): geometry for name, (_, geometry) in self.GEOMETRIES.items()}
+        self.assertEqual(features, expected)
+
+    def test_wkb_reader_accepts_iso_and_ewkb(self):
+        # query() asks for ISO WKB, but the reader must cope with the EWKB a bytea cast returns too
+        for name, (wkt, expected) in self.GEOMETRIES.items():
+            for flavour in ("ST_AsBinary", "ST_AsEWKB"):
+                with self.subTest(geometry=name, flavour=flavour):
+                    with connection.cursor() as cursor:
+                        cursor.execute(f"SELECT {flavour}(ST_GeomFromEWKT(%s))", [f"SRID=2056;{wkt}"])
+                        wkb = bytes(cursor.fetchone()[0])
+
+                    self.assertEqual(jsonfg.loads(wkb), expected)
+
+    def test_item_reprojected_keeps_z(self):
+        # Transform() must not drop the Z ordinate either
+        response = self.client.get(
+            f"{collections_url}/tests.geometryz_2056/items/{self.ids['point']}",
+            headers={"Accept": "application/geo+json"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        coordinates = response.json()["geometry"]["coordinates"]
+        self.assertEqual(len(coordinates), 3)
+        self.assertAlmostEqual(coordinates[2], 555.0, places=3)
