@@ -243,12 +243,13 @@ def create_collections_router(collections: dict[str, OapifCollection]):
             arrow_response["OGC-NumberMatched"] = str(total_count)
             return arrow_response
 
-        feature_collection = collection.queryset_to_featurecollection(request, paginated_query)
-        feature_collection.numberMatched = total_count
-        if geom_field := collection.geometry_field:
-            geom_field = geom_field if crs.srid == collection.srid else Transform(geom_field, crs.srid)
-            feature_collection.bbox = paginated_query.aggregate(bbox=Extent(geom_field))["bbox"]
-        feature_collection.links = get_page_links(request, limit, offset, total_count)
+        feature_collection = collection.queryset_to_featurecollection(
+            request,
+            paginated_query,
+            crs,
+            number_matched=total_count,
+            links=get_page_links(request, limit, offset, total_count),
+        )
         response["Content-Crs"] = crs.uri_header()
         response["Content-Type"] = GEOJSON_MEDIA_TYPE
         return feature_collection

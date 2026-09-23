@@ -5,9 +5,13 @@ import uuid
 
 import pyarrow as pa
 from django.contrib.auth.models import User
+from django.contrib.gis.db.models import Extent
+from django.contrib.gis.db.models.functions import Transform
 from django.core.management import call_command
 from django.db import connection
+from django.test import RequestFactory
 from django.test.testcases import TestCase
+from django.test.utils import CaptureQueriesContext
 from django_oapif import jsonfg
 from django_oapif.crs import CRS
 from django_oapif.geojson import CircularString, Coordinate2D
@@ -471,6 +475,33 @@ class TestOutputFormat(TestCase):
         for link in geojson["links"]:
             self.assertIn(f'<{link["href"]}>; rel="{link["rel"]}"', arrow.headers["Link"])
 
+    def test_geojson_bbox_is_the_extent_of_the_page(self):
+        for crs_uri, geometry in ((None, Transform("geom", 4326)), (crs_2056, "geom")):
+            with self.subTest(crs=crs_uri or crs84):
+                url = f"{collections_url}/tests.point_2056_10fields/items?limit=10&offset=20"
+                if crs_uri:
+                    url += f"&crs={crs_uri}"
+                with CaptureQueriesContext(connection) as queries:
+                    response = self.client.get(url, headers={"Accept": "application/geo+json"})
+
+                self.assertEqual(response.status_code, 200)
+                page = Point_2056_10fields.objects.order_by("pk")[20:30]
+                self.assertEqual(tuple(response.json()["bbox"]), page.aggregate(extent=Extent(geometry))["extent"])
+                # the boxes come along with the features, instead of from a query of their own
+                self.assertFalse(any("ST_Extent" in query["sql"] for query in queries.captured_queries))
+
+    def test_featurecollection_is_complete_on_its_own(self):
+        # it used to come back with numberMatched=0 and no bbox, for the endpoint to fill in
+        collection = oapif.collections["tests.point_2056_10fields"]
+        request = RequestFactory().get("/")
+        crs = CRS("OGC", 4326)
+
+        feature_collection = collection.queryset_to_featurecollection(request, collection.query(request, crs)[:5], crs)
+
+        self.assertEqual(feature_collection.numberReturned, 5)
+        self.assertEqual(feature_collection.numberMatched, 5)
+        self.assertIsNotNone(feature_collection.bbox)
+
     def test_arrow_crs_matches_coordinates(self):
         # the column crs must describe the coordinates that are in it, not the storage srid
         for crs_uri, expected_crs in ((None, "OGC:CRS84"), (crs_2056, "EPSG:2056")):
@@ -781,6 +812,22 @@ class TestCircularString(TestCase):
                 geometry = response.json()["geometry"]
                 self.assertEqual(geometry["type"], "CircularString")
                 self.assertEqual(len(geometry["coordinates"]), count)
+
+    def test_bbox_follows_the_arcs(self):
+        # an arc can reach beyond its control points: this one goes up to 1200100, its points to 1200060
+        table_name = connection.ops.quote_name(Arc_2056_10fields._meta.db_table)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"INSERT INTO {table_name} (id, geom) VALUES (%s, ST_GeomFromText(%s, 2056))",
+                [uuid.uuid4(), "CIRCULARSTRING(2600000 1200000, 2600020 1200060, 2600200 1200000)"],
+            )
+
+        response = self.client.get(f"{collections_url}/tests.arc_2056_10fields/items?crs={crs_2056}")
+
+        self.assertEqual(response.status_code, 200)
+        bbox = tuple(response.json()["bbox"])
+        self.assertEqual(bbox, Arc_2056_10fields.objects.aggregate(extent=Extent("geom"))["extent"])
+        self.assertGreater(bbox[3], 1200099)
 
     def test_arc_item_options(self):
         response = self.client.options(f"{collections_url}/tests.arc_2056_10fields/items/{self.ids[3]}")
