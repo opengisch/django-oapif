@@ -740,6 +740,29 @@ class TestCrs(TestCase):
         self.assertEqual(CRS("EPSG", 4326).uri(), "http://www.opengis.net/def/crs/EPSG/0/4326")
         self.assertEqual(CRS("EPSG", 2056).uri(), crs_2056)
 
+    def test_extent_takes_no_reprojection_of_every_geometry(self):
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get(f"{collections_url}/tests.point_2056_10fields")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(any("ST_Extent(ST_Transform(" in query["sql"] for query in queries.captured_queries))
+
+    def test_extent_covers_the_bulge_of_its_reprojected_edges(self):
+        # the top edge of a box across Switzerland bulges north by over a kilometre once reprojected, so a
+        # point in the middle of it would lie outside an extent made of the reprojected corners alone
+        for x, y in ((2485000, 1075000), (2834000, 1296000), (2659500, 1296000)):
+            Point_2056_Empty.objects.create(geom=f"SRID=2056;POINT({x} {y})")
+
+        response = self.client.get(f"{collections_url}/tests.point_2056_empty")
+
+        self.assertEqual(response.status_code, 200)
+        xmin, ymin, xmax, ymax = response.json()["extent"]["spatial"]["bbox"][0]
+        exact = Point_2056_Empty.objects.aggregate(extent=Extent(Transform("geom", 4326)))["extent"]
+        self.assertLessEqual(xmin, exact[0])
+        self.assertLessEqual(ymin, exact[1])
+        self.assertGreaterEqual(xmax, exact[2])
+        self.assertGreaterEqual(ymax, exact[3])
+
     def test_advertised_crs_are_accepted(self):
         collection_response = self.client.get(f"{collections_url}/tests.point_2056_10fields")
 
