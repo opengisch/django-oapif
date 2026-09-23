@@ -379,6 +379,25 @@ class TestOutputFormat(TestCase):
         self.assertIn("geometry", table.schema.names)
         self.assertIsInstance(table.schema.field("geometry").type, WkbType)
 
+    def test_arrow_crs_matches_coordinates(self):
+        # the column crs must describe the coordinates that are in it, not the storage srid
+        for crs_uri, expected_crs in ((None, "OGC:CRS84"), (crs_2056, "EPSG:2056")):
+            with self.subTest(crs=expected_crs):
+                url = f"{collections_url}/tests.point_2056_10fields/items?limit=1"
+                if crs_uri:
+                    url += f"&crs={crs_uri}"
+                arrow = self.client.get(url, headers={"Accept": "application/vnd.apache.arrow.stream"})
+                geojson = self.client.get(url, headers={"Accept": "application/geo+json"})
+
+                self.assertEqual(arrow.status_code, 200)
+                self.assertEqual(geojson.status_code, 200)
+                table = pa.ipc.open_stream(arrow.content).read_all()
+                self.assertEqual(table.schema.field("geometry").type.crs, StringCrs(expected_crs))
+                self.assertEqual(
+                    jsonfg.loads(table["geometry"][0].as_py()),
+                    geojson.json()["features"][0]["geometry"],
+                )
+
     def test_arrow_geometry_types(self):
         for collection, geometry_type in self.COLLECTIONS.items():
             with self.subTest(collection=collection):
@@ -394,7 +413,7 @@ class TestOutputFormat(TestCase):
                     geometry_field = table.schema.field("geometry")
                     self.assertIsNotNone(geometry_field)
                     self.assertIsInstance(geometry_field.type, WkbType)
-                    self.assertEqual(geometry_field.type.crs, StringCrs("EPSG:2056"))
+                    self.assertEqual(geometry_field.type.crs, StringCrs("OGC:CRS84"))
                     self.assertEqual(geometry_field.type.extension_name, "geoarrow.wkb")
                     self.assertEqual(table.num_rows, 1)
                 else:

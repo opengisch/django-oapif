@@ -46,6 +46,12 @@ class CRS:
     def uri_header(self) -> str:
         return f"<{self.uri()}>"
 
+    def auth_code(self) -> str:
+        """Authority code, as GeoArrow expects it in the CRS metadata of a geometry column."""
+        if self.auth == "OGC" and self.srid == CRS84_SRID:
+            return "OGC:CRS84"
+        return f"EPSG:{self.srid}"
+
 
 @dataclass
 class BBox:

@@ -204,7 +204,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         total_count = query.count()
 
         if accepts_geoarrow(request):
-            stream = collection.queryset_to_arrow_stream(request, paginated_query)
+            stream = collection.queryset_to_arrow_stream(request, paginated_query, crs)
             arrow_response = HttpResponse(stream.getvalue().to_pybytes(), content_type=ARROW_STREAM_MEDIA_TYPE)
             arrow_response["Content-Crs"] = crs.uri_header()
             return arrow_response
@@ -254,7 +254,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         if not collection.has_view_permission(request, item):
             raise AuthorizationError()
         if accepts_geoarrow(request):
-            stream = collection.queryset_to_arrow_stream(request, query.filter(pk=item_id))
+            stream = collection.queryset_to_arrow_stream(request, query.filter(pk=item_id), crs)
             arrow_response = HttpResponse(stream.getvalue().to_pybytes(), content_type=ARROW_STREAM_MEDIA_TYPE)
             arrow_response["Content-Crs"] = crs.uri_header()
             return arrow_response
