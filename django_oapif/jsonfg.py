@@ -1,4 +1,4 @@
-"""Minimal ISO WKB -> JSON-FG geometry dict reader. Stdlib only."""
+"""Minimal WKB (ISO and EWKB) -> JSON-FG geometry dict reader. Stdlib only."""
 
 from struct import unpack_from
 
@@ -33,11 +33,17 @@ def _geom(buf, off):
     e = "<" if buf[off] == 1 else ">"
     (code,) = unpack_from(e + "I", buf, off + 1)
     off += 5
-    if code & 0x20000000:  # EWKB SRID flag: skip the srid, keep the base type
+    if code & 0x20000000:  # EWKB SRID flag: only the outermost geometry carries it
         off += 4
-        code &= ~0xE0000000
-    name, kind = _TYPES[code % 1000]
-    dim = (2, 3, 3, 4)[code // 1000]  # ISO: +1000 Z, +2000 M, +3000 ZM
+    # EWKB flags Z/M in the high bits, ISO adds 1000/2000/3000 to the base code.
+    # A geometry uses one convention or the other, so the two never contribute at once.
+    dim = 2 + bool(code & 0x80000000) + bool(code & 0x40000000)
+    code &= ~0xE0000000
+    try:
+        dim += (0, 1, 1, 2)[code // 1000]
+        name, kind = _TYPES[code % 1000]
+    except (IndexError, KeyError):
+        raise ValueError(f"unsupported WKB geometry type {code}") from None
 
     if kind == "pt":
         pts, off = _coords(buf, off, 1, dim, e)
