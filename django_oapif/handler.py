@@ -5,7 +5,7 @@ from typing import Literal, cast, get_args, overload
 from uuid import UUID
 
 from django.contrib.auth import get_permission_codename
-from django.contrib.gis.db.models import GeometryField
+from django.contrib.gis.db.models import Extent, GeometryField
 from django.contrib.gis.db.models.functions import AsWKB, Transform
 from django.contrib.gis.geos import Polygon as GEOSPolygon
 from django.db.models import (
@@ -92,6 +92,28 @@ def parse_box2d(value: str) -> tuple[float, float, float, float]:
     """Read a PostGIS box, which comes as 'BOX(xmin ymin,xmax ymax)'."""
     xmin, ymin, xmax, ymax = map(float, value.removeprefix("BOX(").removesuffix(")").replace(",", " ").split())
     return xmin, ymin, xmax, ymax
+
+
+class ReprojectedExtent(Func):
+    """
+    The extent of a geometry column in another CRS, as a PostGIS box. Reprojecting every geometry to get it
+    would be slow, so the extent is computed where they are stored, and only its outline is reprojected:
+    densified first, as the edges of a box curve once reprojected, and its corners alone would miss the
+    bulge, over a kilometre across Switzerland.
+    """
+
+    output_field = TextField()
+
+    def __init__(self, geometry, source_srid: int, target_srid: int):
+        super().__init__(Extent(geometry))
+        self.source_srid = int(source_srid)
+        self.target_srid = int(target_srid)
+
+    def as_sql(self, compiler, connection, **extra_context):
+        extent, params = compiler.compile(self.source_expressions[0])
+        box = f"ST_SetSRID({extent}::geometry, {self.source_srid})"
+        sql = f"Box2D(ST_Transform(ST_Segmentize({box}, ST_Perimeter({box}) / 128), {self.target_srid}))"
+        return sql, (*params, *params)
 
 
 def without(fields: tuple[str, ...], *excluded: tuple[str, ...]) -> tuple[str, ...]:

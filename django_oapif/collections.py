@@ -1,7 +1,6 @@
 from typing import Any
 
 from django.contrib.gis.db.models import Extent
-from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
 from django.db.models import Model
 from django.http import HttpRequest, HttpResponse
@@ -15,7 +14,7 @@ from django_oapif.geojson import (
     GenericFeatureCollection,
     GenericFeaturePatch,
 )
-from django_oapif.handler import ARROW_AVAILABLE, OapifCollection
+from django_oapif.handler import ARROW_AVAILABLE, OapifCollection, ReprojectedExtent, parse_box2d
 from django_oapif.schema import (
     OAPIFCollection,
     OAPIFCollections,
@@ -152,8 +151,12 @@ def get_collection_response(request: HttpRequest, collection: OapifCollection):
         response.crs = [crs.uri() for crs in collection.supported_crs()]
         if storage_crs := collection.storage_crs():
             response.storageCrs = storage_crs.uri()
-        geom_query = geom if collection.srid == CRS84_SRID else Transform(geom, CRS84_SRID)
-        if extent := collection.model.objects.aggregate(extent=Extent(geom_query))["extent"]:
+        if collection.srid == CRS84_SRID:
+            extent = collection.model.objects.aggregate(extent=Extent(geom))["extent"]
+        else:
+            box = collection.model.objects.aggregate(extent=ReprojectedExtent(geom, collection.srid, CRS84_SRID))
+            extent = parse_box2d(box["extent"]) if box["extent"] else None
+        if extent:
             response.extent = OAPIFExtent(spatial=OAPIFSpatialExtent(bbox=[extent], crs=CRS84_URI))
 
     return response
