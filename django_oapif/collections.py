@@ -314,6 +314,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         crs: CRS = Header(DEFAULT_CRS, alias="Content-Crs"),
     ):
         collection = get_collection_by_id(collection_id, request)
+        validate_crs_or_raise(collection, crs, "Content-Crs")
         feature = collection.validate_feature_input_or_raise(request, feature)
         item_properties = feature.properties.model_dump() or {}
         for field, value in item_properties.items():
@@ -370,6 +371,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         crs: CRS = Header(DEFAULT_CRS, alias="Content-Crs"),
     ):
         collection = get_collection_by_id(collection_id, request)
+        validate_crs_or_raise(collection, crs, "Content-Crs")
         item = get_item_or_404(collection, request, item_id)
         if not collection.has_change_permission(request, item):
             raise AuthorizationError()
@@ -405,6 +407,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         crs: CRS = Header(DEFAULT_CRS, alias="Content-Crs"),
     ):
         collection = get_collection_by_id(collection_id, request)
+        validate_crs_or_raise(collection, crs, "Content-Crs")
         item = get_item_or_404(collection, request, item_id)
         if not collection.has_change_permission(request, item):
             raise AuthorizationError()
