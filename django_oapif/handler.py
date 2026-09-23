@@ -11,11 +11,13 @@ from django.contrib.gis.geos import Polygon as GEOSPolygon
 from django.db.models import (
     FileField,
     ForeignKey,
+    Func,
     GeneratedField,
     ManyToManyRel,
     ManyToOneRel,
     Model,
     QuerySet,
+    TextField,
 )
 from django.http import HttpRequest
 from ninja import ModelSchema, Schema
@@ -42,6 +44,7 @@ from django_oapif.geojson import (
     Point,
     Polygon,
 )
+from django_oapif.schema import OAPIFLink
 from django_oapif.utils import PatchSchema
 
 try:
@@ -73,6 +76,22 @@ model_config = {
     "serialize_by_alias": False,
     "loc_by_alias": False,
 }
+
+
+class Box2D(Func):
+    """
+    The 2D box of a geometry, as PostGIS computes it: only it knows where a curve goes between its
+    control points, and an arc can reach well beyond them.
+    """
+
+    function = "Box2D"
+    output_field = TextField()
+
+
+def parse_box2d(value: str) -> tuple[float, float, float, float]:
+    """Read a PostGIS box, which comes as 'BOX(xmin ymin,xmax ymax)'."""
+    xmin, ymin, xmax, ymax = map(float, value.removeprefix("BOX(").removesuffix(")").replace(",", " ").split())
+    return xmin, ymin, xmax, ymax
 
 
 def without(fields: tuple[str, ...], *excluded: tuple[str, ...]) -> tuple[str, ...]:
@@ -179,6 +198,10 @@ class OapifCollection[M: Model]:
             return (storage_crs,)
         return (CRS("OGC", CRS84_SRID), storage_crs)
 
+    def _geometry_in(self, crs: CRS):
+        """The geometry field, reprojected when the crs is not the storage one."""
+        return self.geometry_field if crs.srid == self.srid else Transform(self.geometry_field, crs.srid)
+
     @overload
     def query(self, request: HttpRequest, crs: CRS): ...
 
@@ -191,8 +214,7 @@ class OapifCollection[M: Model]:
         qs = self.get_queryset(request)
         qs = qs.only("pk", *self.get_fields(request))
         if geom_field := self.geometry_field:
-            geometry_query = geom_field if crs.srid == self.srid else Transform(geom_field, crs.srid)
-            qs = qs.annotate(_oapif_geometry=AsWKB(geometry_query))
+            qs = qs.annotate(_oapif_geometry=AsWKB(self._geometry_in(crs)))
             if bbox is not None:
                 assert bbox_crs is not None
                 bbox_geom = GEOSPolygon.from_bbox((bbox.xmin, bbox.ymin, bbox.xmax, bbox.ymax))
@@ -395,17 +417,41 @@ class OapifCollection[M: Model]:
         schema["title"] = self.title
         return schema
 
-    def queryset_to_featurecollection(self, request: HttpRequest, qs: QuerySet) -> FeatureCollection:
+    def queryset_to_featurecollection(
+        self,
+        request: HttpRequest,
+        qs: QuerySet,
+        crs: CRS,
+        *,
+        number_matched: int | None = None,
+        links: list[OAPIFLink] | None = None,
+    ) -> FeatureCollection:
+        """
+        Convert a queryset (as produced by `query()`) to a FeatureCollection. `number_matched` defaults
+        to the number of features returned, for a queryset that is not a page of a larger one.
+        """
         FeatureSchema = self.get_feature_output_schema(request)
         FeatureCollectionSchema = FeatureCollection[FeatureSchema]
-        features = [self._model_to_feature(FeatureSchema, obj) for obj in qs]
+        if self.geometry_field:
+            # the box of each geometry comes along with it, so that the collection one takes no extra query
+            qs = qs.annotate(_oapif_bbox=Box2D(self._geometry_in(crs)))
+        features = []
+        boxes = []
+        for obj in qs:
+            features.append(self._model_to_feature(FeatureSchema, obj))
+            if box := getattr(obj, "_oapif_bbox", None):
+                boxes.append(parse_box2d(box))
+        bbox = None
+        if boxes:
+            xmins, ymins, xmaxs, ymaxs = zip(*boxes)
+            bbox = (min(xmins), min(ymins), max(xmaxs), max(ymaxs))
         return FeatureCollectionSchema.model_construct(
             type="FeatureCollection",
             features=features,
-            bbox=None,  # Will be updated in the caller,
+            bbox=bbox,
             numberReturned=len(features),
-            numberMatched=0,  # Will be updated in the caller
-            links=[],  # Will be updated in the caller,
+            numberMatched=len(features) if number_matched is None else number_matched,
+            links=links or [],
         )
 
     def get_arrow_properties_schema(self, properties_schema: type[Schema], properties: list[dict]) -> "pa.Schema":
