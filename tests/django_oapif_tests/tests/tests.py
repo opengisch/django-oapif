@@ -652,6 +652,19 @@ class TestCircularString(TestCase):
                 self.assertEqual(geometry["type"], "CircularString")
                 self.assertEqual(len(geometry["coordinates"]), count)
 
+    def test_arc_item_options(self):
+        response = self.client.options(f"{collections_url}/tests.arc_2056_10fields/items/{self.ids[3]}")
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_arc_can_be_deleted(self):
+        # fetching an item to act on used to load the geometry through GEOS, which has no curve support
+        self.client.force_login(User.objects.create_superuser(username="arc_admin", email=None, password="123"))
+        url = f"{collections_url}/tests.arc_2056_10fields/items/{self.ids[3]}"
+
+        self.assertEqual(self.client.delete(url).status_code, 200)
+        self.assertEqual(self.client.get(url).status_code, 404)
+
     def test_empty_arc_is_accepted(self):
         arc = CircularString[Coordinate2D](type="CircularString", coordinates=[])
 
