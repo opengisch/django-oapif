@@ -24,7 +24,7 @@ from pydantic import ValidationError as PydanticValidationError
 from pydantic.config import ExtraValues
 
 from django_oapif import jsonfg
-from django_oapif.crs import CRS, BBox
+from django_oapif.crs import CRS, CRS84_SRID, BBox
 from django_oapif.geojson import (
     Coordinate2D,
     Coordinate3D,
@@ -134,6 +134,23 @@ class OapifCollection[M: Model]:
         self.foreign_key_fields = {
             field.name: field.remote_field.model for field in model_fields if isinstance(field, ForeignKey)
         }
+
+    def storage_crs(self) -> CRS | None:
+        """The CRS the geometries are stored in, or None for a collection without geometry."""
+        if self.srid is None:
+            return None
+        return CRS("OGC", CRS84_SRID) if self.srid == CRS84_SRID else CRS("EPSG", self.srid)
+
+    def supported_crs(self) -> tuple[CRS, ...]:
+        """
+        Hook for specifying which CRS the collection can be queried in.
+        """
+        storage_crs = self.storage_crs()
+        if storage_crs is None:
+            return ()
+        if storage_crs.srid == CRS84_SRID:
+            return (storage_crs,)
+        return (CRS("OGC", CRS84_SRID), storage_crs)
 
     @overload
     def query(self, request: HttpRequest, crs: CRS): ...

@@ -9,6 +9,7 @@ from django.core.management import call_command
 from django.db import connection
 from django.test.testcases import TestCase
 from django_oapif import jsonfg
+from django_oapif.crs import CRS
 from django_oapif_tests.tests.models import GeometryZ_2056, LayerWithDate, LayerWithFile, Point_2056_10fields
 from geoarrow.pyarrow import WkbType
 from geoarrow.types.crs import StringCrs
@@ -18,6 +19,8 @@ logger = logging.getLogger(__name__)
 collections_url = "/oapif/collections"
 
 crs_2056 = "http://www.opengis.net/def/crs/EPSG/0/2056"
+crs84 = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+crs_base = "http://www.opengis.net/def/crs"
 
 headers = {"Content-Crs": crs_2056}
 
@@ -555,3 +558,56 @@ class TestGeometry3D(TestCase):
         coordinates = response.json()["geometry"]["coordinates"]
         self.assertEqual(len(coordinates), 3)
         self.assertAlmostEqual(coordinates[2], 555.0, places=3)
+
+
+class TestCrs(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("populate_data", "-s 100")
+
+    def test_uri_keeps_the_requested_authority(self):
+        # EPSG:4326 is lat/lon and CRS84 is lon/lat, so the two must not be conflated
+        self.assertEqual(CRS("OGC", 4326).uri(), crs84)
+        self.assertEqual(CRS("EPSG", 4326).uri(), "http://www.opengis.net/def/crs/EPSG/0/4326")
+        self.assertEqual(CRS("EPSG", 2056).uri(), crs_2056)
+
+    def test_advertised_crs_are_accepted(self):
+        collection_response = self.client.get(f"{collections_url}/tests.point_2056_10fields")
+
+        self.assertEqual(collection_response.status_code, 200)
+        advertised = collection_response.json()["crs"]
+        self.assertEqual(advertised, [crs84, crs_2056])
+        self.assertEqual(collection_response.json()["storageCrs"], crs_2056)
+        for crs in advertised:
+            with self.subTest(crs=crs):
+                url = f"{collections_url}/tests.point_2056_10fields/items?limit=1&crs={crs}"
+                items_response = self.client.get(url)
+
+                self.assertEqual(items_response.status_code, 200)
+                self.assertEqual(items_response.headers["Content-Crs"], f"<{crs}>")
+
+    def test_unadvertised_crs_is_rejected(self):
+        # EPSG:4326 is not the same as CRS84 and the collection does not offer it
+        for crs in (f"{crs_base}/EPSG/0/4326", f"{crs_base}/EPSG/0/3857"):
+            with self.subTest(crs=crs):
+                items = self.client.get(f"{collections_url}/tests.point_2056_10fields/items?crs={crs}")
+                self.assertEqual(items.status_code, 400)
+
+                item_id = self.client.get(f"{collections_url}/tests.point_2056_10fields/items?limit=1").json()[
+                    "features"
+                ][0]["id"]
+                item = self.client.get(f"{collections_url}/tests.point_2056_10fields/items/{item_id}?crs={crs}")
+                self.assertEqual(item.status_code, 400)
+
+    def test_unadvertised_bbox_crs_is_rejected(self):
+        url = f"{collections_url}/tests.point_2056_10fields/items?bbox=0,0,1,1&bbox-crs={crs_base}/EPSG/0/3857"
+
+        self.assertEqual(self.client.get(url).status_code, 400)
+
+    def test_geometry_less_collection_ignores_crs(self):
+        collection_response = self.client.get(f"{collections_url}/tests.nogeom_10fields")
+
+        self.assertEqual(collection_response.status_code, 200)
+        self.assertIsNone(collection_response.json().get("crs"))
+        items = self.client.get(f"{collections_url}/tests.nogeom_10fields/items?limit=1&crs={crs_base}/EPSG/0/3857")
+        self.assertEqual(items.status_code, 200)
