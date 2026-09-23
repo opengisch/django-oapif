@@ -1,6 +1,6 @@
 from datetime import date, datetime, time
 from functools import cache
-from types import NoneType
+from types import NoneType, new_class
 from typing import Literal, cast, get_args, overload
 from uuid import UUID
 
@@ -306,15 +306,28 @@ class OapifCollection[M: Model]:
         *,
         extra: ExtraValues = "forbid",
     ) -> type[Schema]:
-        class Properties(ModelSchema):
-            model_config = ConfigDict(**model_config, extra=extra)
+        # ninja caches model schemas by model, name and fields, but not by config: were the name the
+        # same for every extra behaviour, the output schema built by a GET would be handed to the next
+        # POST, which would then silently drop unknown properties instead of rejecting them
+        name = f"Properties{extra.capitalize()}"
 
-            class Meta:
-                model = self.model
-                fields = properties_fields
-                fields_optional = optional_fields
+        class Meta:
+            model = self.model
+            fields = properties_fields
+            fields_optional = optional_fields
 
-        return Properties
+        # qualified as nested in the schema, so that pydantic does not take it for a field
+        Meta.__qualname__ = f"{name}.Meta"
+        return new_class(
+            name,
+            (ModelSchema,),
+            exec_body=lambda namespace: namespace.update(
+                __module__=__name__,
+                __qualname__=name,
+                model_config=ConfigDict(**model_config, extra=extra),
+                Meta=Meta,
+            ),
+        )
 
     def get_feature_input_schema(self, request: HttpRequest) -> type[Feature]:
         fields = tuple(

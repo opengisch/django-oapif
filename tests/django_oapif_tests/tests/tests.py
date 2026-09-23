@@ -90,6 +90,19 @@ class TestBasicAuth(TestCase):
         post_to_items = self.client.post(url, data, headers=headers, content_type="application/json")
         self.assertIn(post_to_items.status_code, (200, 201), (url, data, post_to_items))
 
+    def test_unknown_property_is_rejected_after_a_read(self):
+        self.client.force_login(user=self.demo_editor)
+        url = f"{collections_url}/tests.point_2056_10fields/items"
+        self.assertEqual(self.client.get(url).status_code, 200)
+        data = {
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [2508500.0, 1152000.0]},
+            "properties": {"field_str_0": "test123456", "not_a_field": 1},
+        }
+
+        post_to_items = self.client.post(url, data, headers=headers, content_type="application/json")
+        self.assertEqual(post_to_items.status_code, 422)
+
     def test_returned_id(self):
         self.client.force_login(user=self.demo_editor)
         data = {
@@ -253,6 +266,18 @@ class TestSchema(TestCase):
         schema_response = self.client.get(url, headers=headers, content_type="application/json")
         self.assertEqual(schema_response.status_code, 200)
         self.assertEqual(schema_response.json(), expected_schema)
+
+    def test_properties_schema_keeps_its_extra_behaviour(self):
+        # ninja caches schemas by name and fields but not by config: the output schema, built first by
+        # a read, used to be handed to writes too, which then silently dropped unknown properties
+        collection = oapif.collections["tests.point_2056_10fields"]
+        fields = ("field_str_9", "field_str_8")  # built nowhere else, so nothing is cached for it yet
+
+        ignoring = collection.get_properties_schema(fields, extra="ignore")
+        forbidding = collection.get_properties_schema(fields)
+
+        self.assertEqual(ignoring.model_config["extra"], "ignore")
+        self.assertEqual(forbidding.model_config["extra"], "forbid")
 
     def test_schema_subset_recognition(self):
         self.maxDiff = None
