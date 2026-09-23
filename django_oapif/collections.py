@@ -87,6 +87,14 @@ def validate_crs_or_raise(collection: OapifCollection, crs: CRS, parameter: str)
     )
 
 
+def get_item_or_404(collection: OapifCollection, request: HttpRequest, item_id: str):
+    """Fetch an item to act on, leaving the geometry in the database: GEOS cannot deserialize curves."""
+    query = collection.get_queryset(request)
+    if geom_field := collection.geometry_field:
+        query = query.defer(geom_field)
+    return get_object_or_404(query, pk=item_id)
+
+
 def get_related_object_or_raise(field: str, value: Any, related_model: type[Model]):
     try:
         return related_model.objects.get(pk=value)
@@ -316,8 +324,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         item_id: str,
     ):
         collection = get_collection_by_id(collection_id, request)
-        query = collection.get_queryset(request)
-        item = get_object_or_404(query, pk=item_id)
+        item = get_item_or_404(collection, request, item_id)
         allowed = ["OPTIONS"]
         if collection.has_view_permission(request, item):
             allowed.append("GET")
@@ -342,8 +349,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         crs: CRS = Header(DEFAULT_CRS, alias="Content-Crs"),
     ):
         collection = get_collection_by_id(collection_id, request)
-        query = collection.get_queryset(request)
-        item = get_object_or_404(query, pk=item_id)
+        item = get_item_or_404(collection, request, item_id)
         if not collection.has_change_permission(request, item):
             raise AuthorizationError()
         feature = collection.validate_feature_input_or_raise(request, feature)
@@ -378,8 +384,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         crs: CRS = Header(DEFAULT_CRS, alias="Content-Crs"),
     ):
         collection = get_collection_by_id(collection_id, request)
-        query = collection.get_queryset(request)
-        item = get_object_or_404(query, pk=item_id)
+        item = get_item_or_404(collection, request, item_id)
         if not collection.has_change_permission(request, item):
             raise AuthorizationError()
         feature = collection.validate_feature_patch_or_raise(request, feature)
@@ -408,8 +413,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         item_id: str,
     ):
         collection = get_collection_by_id(collection_id, request)
-        query = collection.get_queryset(request)
-        item = get_object_or_404(query, pk=item_id)
+        item = get_item_or_404(collection, request, item_id)
         if not collection.has_delete_permission(request, item):
             raise AuthorizationError()
         collection.delete_model(request, item)
