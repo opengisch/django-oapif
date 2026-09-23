@@ -354,23 +354,29 @@ class OapifCollection[M: Model]:
 
         fields = tuple(set(self.get_fields(request)) - set(self.get_exclude(request)))
         PropertiesSchema = self.get_properties_schema(fields, extra="ignore")
-        table = pa.Table.from_pylist([
+        rows = list(qs)
+        properties = [
             {
-                **{
-                    name: str(value) if isinstance(value, UUID) else value
-                    for name, value in PropertiesSchema.from_orm(row).dict().items()
-                },
-                "geometry": bytes(wkb) if (wkb := getattr(row, "_oapif_geometry", None)) else None,
+                name: str(value) if isinstance(value, UUID) else value
+                for name, value in PropertiesSchema.from_orm(row).dict().items()
             }
-            for row in qs
-        ])
-        if not self.geometry_field:
-            table = table.drop_columns("geometry")
+            for row in rows
+        ]
+        if properties:
+            table = pa.Table.from_pylist(properties)
         else:
-            table = table.set_column(
-                table.schema.get_field_index("geometry"),
+            # from_pylist() infers the schema from the values, so an empty page yields no column at all
+            table = pa.table({name: pa.nulls(0) for name in PropertiesSchema.model_fields})
+
+        if self.geometry_field:
+            # the type has to be spelled out: a page whose geometries are all null would infer as null
+            geometries = pa.array(
+                [bytes(wkb) if (wkb := getattr(row, "_oapif_geometry", None)) else None for row in rows],
+                type=pa.binary(),
+            )
+            table = table.append_column(
                 "geometry",
-                ga.with_crs(ga.as_wkb(table["geometry"]), f"EPSG:{self.srid}"),
+                ga.with_crs(ga.as_wkb(geometries), f"EPSG:{self.srid}"),
             )
 
         stream = pa.BufferOutputStream()
