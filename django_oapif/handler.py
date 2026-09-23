@@ -1,5 +1,7 @@
+from datetime import date, datetime, time
 from functools import cache
-from typing import Literal, cast, overload
+from types import NoneType
+from typing import Literal, cast, get_args, overload
 from uuid import UUID
 
 from django.contrib.auth import get_permission_codename
@@ -47,6 +49,20 @@ try:
     import pyarrow as pa
 
     ARROW_AVAILABLE = True
+
+    # A page carries its own schema, so it has to be derived from the property types rather than
+    # from the values: a column that happens to be all null on one page would otherwise come back
+    # null-typed and no longer concatenate with the other pages.
+    ARROW_TYPES = {
+        bool: pa.bool_(),
+        int: pa.int64(),
+        float: pa.float64(),
+        str: pa.string(),
+        UUID: pa.string(),  # serialized with str() below
+        date: pa.date32(),
+        datetime: pa.timestamp("us", tz="UTC"),
+        time: pa.time64("us"),
+    }
 except ImportError:
     ARROW_AVAILABLE = False
 
@@ -316,10 +332,13 @@ class OapifCollection[M: Model]:
         GeometrySchema = self.get_geometry_schema()
         return FeaturePatch[GeometrySchema, PatchSchema[PropertiesSchema]]
 
-    def get_feature_output_schema(self, request: HttpRequest) -> type[Feature]:
+    def get_feature_properties_schema(self, request: HttpRequest) -> type[Schema]:
         fields = tuple(set(self.get_fields(request)) - set(self.get_exclude(request)))
         # extra="ignore" is required for the serialization to go through ninja DjangoGetter
-        PropertiesSchema = self.get_properties_schema(fields, extra="ignore")
+        return self.get_properties_schema(fields, extra="ignore")
+
+    def get_feature_output_schema(self, request: HttpRequest) -> type[Feature]:
+        PropertiesSchema = self.get_feature_properties_schema(request)
         GeometrySchema = self.get_geometry_schema()
         return Feature[GeometrySchema, PropertiesSchema]
 
@@ -370,11 +389,24 @@ class OapifCollection[M: Model]:
             links=[],  # Will be updated in the caller,
         )
 
+    def get_arrow_properties_schema(self, properties_schema: type[Schema], properties: list[dict]) -> "pa.Schema":
+        """Arrow schema of the feature properties, so that every page of a collection shares one."""
+        fields = []
+        for name, field in properties_schema.model_fields.items():
+            annotation = field.annotation
+            if optional := [arg for arg in get_args(annotation) if arg is not NoneType]:
+                annotation = optional[0] if len(optional) == 1 else None
+            arrow_type = ARROW_TYPES.get(annotation)
+            if arrow_type is None:
+                # not a type we know: let pyarrow work it out from the values, as it did before
+                arrow_type = pa.array([row[name] for row in properties]).type if properties else pa.null()
+            fields.append(pa.field(name, arrow_type))
+        return pa.schema(fields)
+
     def queryset_to_arrow_stream(self, request: HttpRequest, qs: QuerySet, crs: CRS):
         """Convert a queryset (as produced by `query()`) to a pyarrow Table with a GeoArrow-WKB geometry column."""
 
-        fields = tuple(set(self.get_fields(request)) - set(self.get_exclude(request)))
-        PropertiesSchema = self.get_properties_schema(fields, extra="ignore")
+        PropertiesSchema = self.get_feature_properties_schema(request)
         rows = list(qs)
         properties = [
             {
@@ -383,11 +415,7 @@ class OapifCollection[M: Model]:
             }
             for row in rows
         ]
-        if properties:
-            table = pa.Table.from_pylist(properties)
-        else:
-            # from_pylist() infers the schema from the values, so an empty page yields no column at all
-            table = pa.table({name: pa.nulls(0) for name in PropertiesSchema.model_fields})
+        table = pa.Table.from_pylist(properties, schema=self.get_arrow_properties_schema(PropertiesSchema, properties))
 
         if self.geometry_field:
             # the type has to be spelled out: a page whose geometries are all null would infer as null

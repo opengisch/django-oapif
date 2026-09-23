@@ -38,12 +38,18 @@ ACCEPTED_TYPES = [
 DEFAULT_CRS = CRS("OGC", CRS84_SRID)
 
 
-def get_page_links(request: HttpRequest, limit: int, offset: int, total_count: int) -> list[OAPIFLink]:
+def get_page_links(
+    request: HttpRequest,
+    limit: int,
+    offset: int,
+    total_count: int,
+    media_type: str = GEOJSON_MEDIA_TYPE,
+) -> list[OAPIFLink]:
     links = [
         OAPIFLink(
             rel="self",
             title="items (self)",
-            type="application/geo+json",
+            type=media_type,
             href=request.build_absolute_uri(),
         )
     ]
@@ -52,7 +58,7 @@ def get_page_links(request: HttpRequest, limit: int, offset: int, total_count: i
             OAPIFLink(
                 rel="prev",
                 title="items (prev)",
-                type="application/geo+json",
+                type=media_type,
                 href=replace_query_param(request, offset=None if offset - limit <= 0 else offset - limit),
             )
         )
@@ -61,11 +67,16 @@ def get_page_links(request: HttpRequest, limit: int, offset: int, total_count: i
             OAPIFLink(
                 rel="next",
                 title="items (next)",
-                type="application/geo+json",
+                type=media_type,
                 href=replace_query_param(request, offset=offset + limit),
             )
         )
     return links
+
+
+def link_header(links: list[OAPIFLink]) -> str:
+    """Serialize links as a RFC 8288 Link header, for responses that cannot carry them in the payload."""
+    return ", ".join(f'<{link.href}>; rel="{link.rel}"; type="{link.type}"' for link in links)
 
 
 def accepts_geoarrow(request: HttpRequest) -> bool:
@@ -224,6 +235,12 @@ def create_collections_router(collections: dict[str, OapifCollection]):
             stream = collection.queryset_to_arrow_stream(request, paginated_query, crs)
             arrow_response = HttpResponse(stream.getvalue().to_pybytes(), content_type=ARROW_STREAM_MEDIA_TYPE)
             arrow_response["Content-Crs"] = crs.uri_header()
+            # an Arrow stream has nowhere to put them, and the row count is the only one a client
+            # cannot work out from the table itself
+            arrow_response["Link"] = link_header(
+                get_page_links(request, limit, offset, total_count, ARROW_STREAM_MEDIA_TYPE)
+            )
+            arrow_response["OGC-NumberMatched"] = str(total_count)
             return arrow_response
 
         feature_collection = collection.queryset_to_featurecollection(request, paginated_query)
