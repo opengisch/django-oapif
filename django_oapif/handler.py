@@ -349,7 +349,7 @@ class OapifCollection[M: Model]:
             links=[],  # Will be updated in the caller,
         )
 
-    def queryset_to_arrow_stream(self, request: HttpRequest, qs: QuerySet):
+    def queryset_to_arrow_stream(self, request: HttpRequest, qs: QuerySet, crs: CRS):
         """Convert a queryset (as produced by `query()`) to a pyarrow Table with a GeoArrow-WKB geometry column."""
 
         fields = tuple(set(self.get_fields(request)) - set(self.get_exclude(request)))
@@ -376,7 +376,8 @@ class OapifCollection[M: Model]:
             )
             table = table.append_column(
                 "geometry",
-                ga.with_crs(ga.as_wkb(geometries), f"EPSG:{self.srid}"),
+                # query() has already reprojected the geometries, so tag the crs that was asked for
+                ga.with_crs(ga.as_wkb(geometries), crs.auth_code()),
             )
 
         stream = pa.BufferOutputStream()
