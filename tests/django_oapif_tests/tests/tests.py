@@ -812,6 +812,32 @@ class TestCrs(TestCase):
                 item = self.client.get(f"{collections_url}/tests.point_2056_10fields/items/{item_id}?crs={crs}")
                 self.assertEqual(item.status_code, 400)
 
+    def test_writes_take_only_an_advertised_content_crs(self):
+        # coordinates are always read as x/y: a client sending EPSG:4326 latitude first would have its
+        # features stored with swapped coordinates, so a CRS the collection does not offer is refused
+        self.client.force_login(User.objects.create_superuser(username="crs_admin", email=None, password="123"))
+        url = f"{collections_url}/tests.point_2056_10fields/items"
+        item_url = f"{url}/{Point_2056_10fields.objects.first().pk}"
+        for crs, coordinates, status in (
+            (crs84, [7.44, 46.95], 201),
+            (crs_2056, [2600000.0, 1200000.0], 201),
+            (f"{crs_base}/EPSG/0/4326", [46.95, 7.44], 400),
+            (f"{crs_base}/EPSG/0/3857", [828000.0, 5933000.0], 400),
+        ):
+            with self.subTest(crs=crs):
+                feature = {
+                    "type": "Feature",
+                    "geometry": {"type": "Point", "coordinates": coordinates},
+                    "properties": {},
+                }
+                crs_header = {"Content-Crs": crs}
+                post = self.client.post(url, feature, content_type="application/json", headers=crs_header)
+                self.assertEqual(post.status_code, status)
+                if status == 400:
+                    for method in (self.client.put, self.client.patch):
+                        response = method(item_url, feature, content_type="application/json", headers=crs_header)
+                        self.assertEqual(response.status_code, 400)
+
     def test_unadvertised_bbox_crs_is_rejected(self):
         url = f"{collections_url}/tests.point_2056_10fields/items?bbox=0,0,1,1&bbox-crs={crs_base}/EPSG/0/3857"
 
