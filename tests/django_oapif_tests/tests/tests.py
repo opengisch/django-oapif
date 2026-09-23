@@ -10,8 +10,16 @@ from django.db import connection
 from django.test.testcases import TestCase
 from django_oapif import jsonfg
 from django_oapif.crs import CRS
-from django_oapif_tests.tests.models import GeometryZ_2056, LayerWithDate, LayerWithFile, Point_2056_10fields
+from django_oapif.geojson import CircularString, Coordinate2D
+from django_oapif_tests.tests.models import (
+    Arc_2056_10fields,
+    GeometryZ_2056,
+    LayerWithDate,
+    LayerWithFile,
+    Point_2056_10fields,
+)
 from geoarrow.pyarrow import WkbType
+from pydantic import ValidationError as PydanticValidationError
 from geoarrow.types.crs import StringCrs
 
 logger = logging.getLogger(__name__)
@@ -611,3 +619,49 @@ class TestCrs(TestCase):
         self.assertIsNone(collection_response.json().get("crs"))
         items = self.client.get(f"{collections_url}/tests.nogeom_10fields/items?limit=1&crs={crs_base}/EPSG/0/3857")
         self.assertEqual(items.status_code, 200)
+
+
+class TestCircularString(TestCase):
+    """A CircularString is a sequence of arcs, so any odd number of at least 3 points is valid."""
+
+    POINT_COUNTS = (3, 5, 13, 27)
+
+    @staticmethod
+    def arc_wkt(point_count: int) -> str:
+        points = ", ".join(f"{2508500 + i * 10} {1152000 + (i % 2) * 10}" for i in range(point_count))
+        return f"CIRCULARSTRING({points})"
+
+    @classmethod
+    def setUpTestData(cls):
+        # The GEOS version used by geodjango does not support curves, so insert the WKT as is
+        table_name = connection.ops.quote_name(Arc_2056_10fields._meta.db_table)
+        cls.ids = {count: uuid.uuid4() for count in cls.POINT_COUNTS}
+        with connection.cursor() as cursor:
+            cursor.executemany(
+                f"INSERT INTO {table_name} (id, geom) VALUES (%s, ST_GeomFromText(%s, 2056))",
+                [(cls.ids[count], cls.arc_wkt(count)) for count in cls.POINT_COUNTS],
+            )
+
+    def test_arc_of_any_odd_length_is_served(self):
+        for count in self.POINT_COUNTS:
+            with self.subTest(points=count):
+                response = self.client.get(f"{collections_url}/tests.arc_2056_10fields/items/{self.ids[count]}")
+
+                self.assertEqual(response.status_code, 200)
+                geometry = response.json()["geometry"]
+                self.assertEqual(geometry["type"], "CircularString")
+                self.assertEqual(len(geometry["coordinates"]), count)
+
+    def test_empty_arc_is_accepted(self):
+        arc = CircularString[Coordinate2D](type="CircularString", coordinates=[])
+
+        self.assertEqual(arc.coordinates, [])
+
+    def test_arc_of_even_or_too_few_points_is_rejected(self):
+        for count in (1, 2, 4, 12):
+            with self.subTest(points=count):
+                with self.assertRaises(PydanticValidationError):
+                    CircularString[Coordinate2D](
+                        type="CircularString",
+                        coordinates=[(float(i), 0.0) for i in range(count)],
+                    )

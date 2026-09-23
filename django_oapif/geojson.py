@@ -1,7 +1,7 @@
 from typing import Annotated, Any, Literal
 
 from ninja import Field, Schema
-from pydantic import ConfigDict
+from pydantic import AfterValidator, ConfigDict
 
 from django_oapif.schema import OAPIFLink
 
@@ -49,16 +49,16 @@ class MultiPolygon[C: Coordinate](GeometryBase):
     coordinates: list[list[Annotated[list[C], Field(min_length=4)]]]
 
 
+def arc_points[T: list](coordinates: T) -> T:
+    """A CircularString is a sequence of arcs, each defined by a start, a middle and an end point."""
+    if coordinates and (len(coordinates) < 3 or len(coordinates) % 2 == 0):
+        raise ValueError("a CircularString must be empty or have an odd number of at least 3 points")
+    return coordinates
+
+
 class CircularString[C: Coordinate](GeometryBase):
     type: Literal["CircularString"]
-    coordinates: (
-        Annotated[list[C], Field(min_length=0, max_length=0)]
-        | Annotated[list[C], Field(min_length=3, max_length=3)]
-        | Annotated[list[C], Field(min_length=5, max_length=5)]
-        | Annotated[list[C], Field(min_length=7, max_length=7)]
-        | Annotated[list[C], Field(min_length=9, max_length=9)]
-        | Annotated[list[C], Field(min_length=11, max_length=11)]
-    )
+    coordinates: Annotated[list[C], AfterValidator(arc_points)]
 
 
 class CompoundCurve[C: Coordinate](GeometryBase):
