@@ -74,8 +74,11 @@ been reported to the [test suite](https://github.com/opengeospatial/ets-ogcapi-f
 `tests/benchmark/main.py` times `/items` for five collections, three limits and both formats, in CRS84,
 which reprojects the features, and in EPSG:2056, the CRS they are stored in. CI runs it on every pull
 request, under gunicorn with persistent connections as a deployment would, and comments the median
-times, compared with `tests/benchmark/baseline.csv`: once a pull request is merged, the run on `main`
-stores its results there, for the next ones.
+times, compared with those of the base branch. As runners differ too much from one another for a
+comparison with the results of another run, a second server, from the same image and on the same data,
+serves the `django_oapif` of the base branch, and the requests go to each server in turn. Only the
+library differs: changes to the dependencies or to the test app are not compared, nor are the cases
+that the library of the base branch does not serve, or not in the same format.
 
 To run it locally, on the same stack:
 
@@ -87,7 +90,16 @@ docker compose exec django python manage.py populate_data -s 1000
 scripts/download-fixtures.sh
 docker compose exec django python manage.py loaddata polygon_2056
 pip install -r requirements-bench.txt
-python tests/benchmark/main.py --baseline tests/benchmark/baseline.csv
+python tests/benchmark/main.py
+```
+
+To compare with another branch, serve its library next to it:
+
+```bash
+mkdir -p /tmp/base && git archive main django_oapif | tar -x -C /tmp/base
+docker compose run --detach --no-deps --name django_base --publish 7181:8000 \
+  --volume /tmp/base/django_oapif:/usr/src/django_oapif django
+python tests/benchmark/main.py --base-url http://localhost:7181/oapif/collections --base-name main
 ```
 
 The results, a chart and the table of the comment, are written to `tests/benchmark/output/`.
