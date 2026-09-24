@@ -6,3 +6,5 @@ flameprof
 gprof2dot
 requests
 gunicorn
+# the database driver of the test app, which the library leaves to the projects using it
+psycopg[binary]
