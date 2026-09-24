@@ -72,3 +72,14 @@ urlpatterns += [
     ...,
 ]
 ```
+
+## Deployment
+
+Use persistent database connections. PostGIS prepares each reprojection once per connection, then keeps
+it: without them, every request for features in another CRS than the one they are stored in pays for it
+again, about 130 ms on the test stack, against well under a millisecond once it is prepared. CRS84, the
+default, is such a CRS for any collection stored in a projected one.
+
+Set [`CONN_MAX_AGE`](https://docs.djangoproject.com/en/stable/ref/settings/#conn-max-age) with a
+production server such as gunicorn, or use a connection pooler. Django's development server opens a new
+connection for every request, whatever the setting.
