@@ -2,6 +2,7 @@ from typing import Annotated, Any, Literal
 
 from ninja import Field, Schema
 from pydantic import AfterValidator, ConfigDict
+from pydantic_core import PydanticCustomError
 
 from django_oapif.schema import OAPIFLink
 
@@ -49,7 +50,10 @@ class MultiPolygon[C: Coordinate](GeometryBase):
 def arc_points[T: list](coordinates: T) -> T:
     """A CircularString is a sequence of arcs, each defined by a start, a middle and an end point."""
     if coordinates and (len(coordinates) < 3 or len(coordinates) % 2 == 0):
-        raise ValueError("a CircularString must be empty or have an odd number of at least 3 points")
+        # a PydanticCustomError, as a ValueError would end up in the error context and fail to serialize
+        raise PydanticCustomError(
+            "circularstring_points", "a CircularString must be empty or have an odd number of at least 3 points"
+        )
     return coordinates
 
 
