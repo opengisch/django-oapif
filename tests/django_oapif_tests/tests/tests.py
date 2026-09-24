@@ -578,6 +578,28 @@ class TestOutputFormat(TestCase):
         for link in geojson["links"]:
             self.assertIn(f'<{link["href"]}>; rel="{link["rel"]}"', arrow.headers["Link"])
 
+    def test_encodings_vary_on_accept(self):
+        # the same URL serves both encodings, which a cache has to tell apart
+        url = f"{collections_url}/tests.point_2056_10fields/items"
+        accepts = ["application/geo+json", *(["application/vnd.apache.arrow.stream"] if ARROW_AVAILABLE else [])]
+        for item_url in (url, f"{url}/{Point_2056_10fields.objects.first().pk}"):
+            for accept in accepts:
+                with self.subTest(url=item_url, accept=accept):
+                    response = self.client.get(item_url, headers={"Accept": accept})
+
+                    self.assertEqual(response.status_code, 200)
+                    self.assertIn("Accept", [value.strip() for value in response.headers["Vary"].split(",")])
+
+    def test_collection_links_its_items_in_each_encoding(self):
+        response = self.client.get(f"{collections_url}/tests.point_2056_10fields")
+
+        self.assertEqual(response.status_code, 200)
+        items = [link for link in response.json()["links"] if link["rel"] == "items"]
+        encodings = {"application/geo+json", *({"application/vnd.apache.arrow.stream"} if ARROW_AVAILABLE else ())}
+        self.assertEqual({link["type"] for link in items}, encodings)
+        # a single URL, negotiated with the Accept header
+        self.assertEqual(len({link["href"] for link in items}), 1)
+
     def test_geojson_bbox_is_the_extent_of_the_page(self):
         for crs_uri, geometry in ((None, Transform("geom", 4326)), (crs_2056, "geom")):
             with self.subTest(crs=crs_uri or crs84):
