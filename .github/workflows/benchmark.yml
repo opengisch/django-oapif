@@ -12,15 +12,17 @@ on:
         required: true
         default: 1000
         type: number
-  push:
-    branches:
-      - main
+      base:
+        description: 'the branch, tag or commit whose django_oapif to compare with'
+        required: true
+        default: main
+        type: string
   pull_request:
     branches:
       - main
 
 permissions:
-  contents: write  # to store the baseline, on main
+  contents: read
   pull-requests: write  # for the comment
 
 jobs:
@@ -36,6 +38,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v6
+      with:
+        # a pull request is checked out merged into its base branch, which is then the first parent
+        fetch-depth: 2
 
     - name: Create env
       run: cp .env.example .env
@@ -62,8 +67,34 @@ jobs:
         docker compose exec django python manage.py populate_data -s ${SIZE}
         docker compose exec django python manage.py loaddata polygon_2056
 
+    # a second server, from the same image and on the same data, with the django_oapif of the base, as runners
+    # differ too much from one another for a comparison with the results of another run
+    - name: Start Django with the base library
+      id: base
+      env:
+        BASE_REF: ${{ inputs.base }}
+      run: |
+        if [ -n "$BASE_REF" ]; then
+          git fetch --no-tags --depth=1 origin "$BASE_REF"
+          BASE=FETCH_HEAD
+        else
+          BASE=HEAD^1
+          BASE_REF=$GITHUB_BASE_REF
+        fi
+        mkdir "$RUNNER_TEMP/base"
+        git archive "$BASE" django_oapif | tar -x -C "$RUNNER_TEMP/base"
+        docker compose run --detach --no-deps --name django_base --publish 7181:8000 \
+          --volume "$RUNNER_TEMP/base/django_oapif:/usr/src/django_oapif" django
+        echo "name=\`$BASE_REF\` at $(git rev-parse --short "$BASE")" >> "$GITHUB_OUTPUT"
+
     - name: Run benchmark
-      run: python tests/benchmark/main.py --baseline tests/benchmark/baseline.csv
+      env:
+        BASE_NAME: ${{ steps.base.outputs.name }}
+      run: python tests/benchmark/main.py --base-url http://localhost:7181/oapif/collections --base-name "$BASE_NAME"
+
+    - name: Logs of the base server
+      if: always()
+      run: docker logs django_base
 
     - uses: actions/upload-artifact@v7
       id: artifact
@@ -71,19 +102,6 @@ jobs:
         name: benchmark
         path: tests/benchmark/output/*
         if-no-files-found: error
-
-    # after a merge, the results of main become what the next pull requests are compared with; should main be
-    # protected, GitHub Actions has to be allowed to push to it
-    - name: Store the baseline
-      if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-      run: cp tests/benchmark/output/result.csv tests/benchmark/baseline.csv
-
-    - name: Commit the baseline
-      if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-      uses: EndBug/add-and-commit@v9
-      with:
-        add: tests/benchmark/baseline.csv
-        message: update benchmark baseline
 
     - name: 💬 Prepare comment
       if: ${{ github.event_name == 'pull_request' }}
