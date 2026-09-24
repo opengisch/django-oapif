@@ -92,6 +92,8 @@ DATABASES = {
         "PORT": os.getenv("POSTGRES_PORT"),
         "USER": os.getenv("POSTGRES_USER"),
         "PASSWORD": os.getenv("POSTGRES_PASSWORD"),
+        # persistent under a production server: the development server opens a connection per request anyway
+        "CONN_MAX_AGE": int(os.getenv("DJANGO_CONN_MAX_AGE", "0")),
     }
 }
 
