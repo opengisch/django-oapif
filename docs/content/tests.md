@@ -73,12 +73,12 @@ been reported to the [test suite](https://github.com/opengeospatial/ets-ogcapi-f
 
 `tests/benchmark/main.py` times `/items` for five collections, three limits and both formats, in CRS84,
 which reprojects the features, and in EPSG:2056, the CRS they are stored in. CI runs it on every pull
-request, under gunicorn with persistent connections as a deployment would, and comments the median
-times, compared with those of the base branch. As runners differ too much from one another for a
-comparison with the results of another run, a second server, from the same image and on the same data,
-serves the `django_oapif` of the base branch, and the requests go to each server in turn. Only the
-library differs: changes to the dependencies or to the test app are not compared, nor are the cases
-that the library of the base branch does not serve, or not in the same format.
+request, under gunicorn with persistent connections and without debug mode, as a deployment would, and
+comments the median times, compared with those of the base branch. As runners differ too much from one
+another for a comparison with the results of another run, a second server, from the same image and on
+the same data, serves the `django_oapif` of the base branch, and the requests go to each server in turn.
+Only the library differs: changes to the dependencies or to the test app are not compared, nor are the
+cases that the library of the base branch does not serve, or not in the same format.
 
 To run it locally, on the same stack:
 

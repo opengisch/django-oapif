@@ -1,10 +1,12 @@
 # The django service as it would be deployed, for the benchmark: under gunicorn, with persistent database
-# connections. The development server opens a connection per request, and each one pays for its setup and
-# for PostGIS preparing its reprojections again, which would outweigh most of what the benchmark measures.
+# connections, and without debug mode. The development server opens a connection per request, and each one
+# pays for its setup and for PostGIS preparing its reprojections again, which would outweigh most of what
+# the benchmark measures; the debug toolbar adds about 5 ms to each request, as much as a small one takes.
 # Add it to COMPOSE_FILE: tests/docker-compose.yml:tests/docker-compose.dev.yml:tests/docker-compose.benchmark.yml
 
 services:
   django:
     environment:
       DJANGO_CONN_MAX_AGE: 600
+      DJANGO_DEBUG: "false"
     command: gunicorn django_oapif_tests.tests.wsgi --bind 0.0.0.0:8000 --workers 1
