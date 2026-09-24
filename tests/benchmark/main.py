@@ -1,4 +1,5 @@
 import argparse
+import os
 import time
 from pathlib import Path
 
@@ -32,9 +33,16 @@ ACCEPTS = [
     "application/vnd.apache.arrow.stream",
 ]
 
+LABELS = {
+    "application/geo+json": "GeoJSON",
+    "application/vnd.apache.arrow.stream": "GeoArrow",
+}
+
 ITERATIONS = 20
 
-BASE_URL = "https://localhost/oapif/collections"
+# Django itself, on the port the dev compose file publishes: the Caddy of the test stack only has a
+# certificate for OGCAPIF_HOST, and timing it would add TLS and proxying to what is measured
+BASE_URL = f"http://localhost:{os.getenv('DJANGO_DEV_PORT', '7180')}/oapif/collections"
 
 OUTPUT_PATH = Path(__file__).parent / "output"
 
@@ -47,8 +55,43 @@ def time_request(session: requests.Session, url: str, accept: str) -> float:
     return (time.perf_counter() - started) * 1000
 
 
-def main() -> None:
+def write_markdown(summary_df: pl.DataFrame, features: dict[str, int]) -> None:
+    """A table of the mean response times, for a pull request comment."""
+    lines = [
+        "## ⏱️ Benchmark",
+        "",
+        f"`/items` response time in ms: mean ± standard deviation of {ITERATIONS} requests, after a warm-up one.",
+        "The runners are shared, so compare orders of magnitude rather than milliseconds.",
+        "",
+        f"| Collection | Features | Limit | {' | '.join(LABELS[accept] for accept in ACCEPTS)} |",
+        f"|---|---:|---:|{'---:|' * len(ACCEPTS)}",
+    ]
+    for layer in COLLECTIONS:
+        for index, limit in enumerate(LIMITS):
+            times = []
+            for accept in ACCEPTS:
+                row = summary_df.filter(
+                    (pl.col("layer") == layer) & (pl.col("limit") == limit) & (pl.col("accept") == accept)
+                ).row(0, named=True)
+                times.append(f"{row['mean_ms']:.1f} ± {row['stddev_ms'] or 0:.1f}")
+            collection, count = (f"`{layer}`", str(features[layer])) if index == 0 else ("", "")
+            lines.append(f"| {collection} | {count} | {limit} | {' | '.join(times)} |")
+    (OUTPUT_PATH / "result.md").write_text("\n".join(lines) + "\n")
+
+
+def main(base_url: str) -> None:
     with requests.Session() as session:
+        features = {
+            layer: session.get(
+                f"{base_url}/{layer}/items?limit=1", headers={"Accept": "application/geo+json"}, verify=False
+            ).json()["numberMatched"]
+            for layer in COLLECTIONS
+        }
+        # untimed, so that caches filled by the first request do not weigh on the mean
+        for layer in COLLECTIONS:
+            for limit in LIMITS:
+                for accept in ACCEPTS:
+                    time_request(session, f"{base_url}/{layer}/items?limit={limit}", accept)
         result_df = pl.DataFrame([
             {
                 "layer": layer,
@@ -56,7 +99,7 @@ def main() -> None:
                 "accept": accept,
                 "time_ms": time_request(
                     session,
-                    f"{BASE_URL}/{layer}/items?limit={limit}",
+                    f"{base_url}/{layer}/items?limit={limit}",
                     accept,
                 ),
                 "iteration": iteration,
@@ -80,6 +123,7 @@ def main() -> None:
 
     OUTPUT_PATH.mkdir(parents=True, exist_ok=True)
     summary_df.write_csv(OUTPUT_PATH / "result.csv")
+    write_markdown(summary_df, features)
 
     y_max = (
         max(
@@ -128,5 +172,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Benchmark OAPIF /items response times.")
+    parser.add_argument("--base-url", default=BASE_URL, help=f"the collections endpoint (default: {BASE_URL})")
     args = parser.parse_args()
-    main()
+    main(args.base_url)
