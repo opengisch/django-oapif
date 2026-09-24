@@ -20,7 +20,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write  # to store the baseline, on main
   pull-requests: write  # for the comment
 
 jobs:
@@ -63,7 +63,7 @@ jobs:
         docker compose exec django python manage.py loaddata polygon_2056
 
     - name: Run benchmark
-      run: python tests/benchmark/main.py
+      run: python tests/benchmark/main.py --baseline tests/benchmark/baseline.csv
 
     - uses: actions/upload-artifact@v7
       id: artifact
@@ -71,6 +71,19 @@ jobs:
         name: benchmark
         path: tests/benchmark/output/*
         if-no-files-found: error
+
+    # after a merge, the results of main become what the next pull requests are compared with; should main be
+    # protected, GitHub Actions has to be allowed to push to it
+    - name: Store the baseline
+      if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      run: cp tests/benchmark/output/result.csv tests/benchmark/baseline.csv
+
+    - name: Commit the baseline
+      if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      uses: EndBug/add-and-commit@v9
+      with:
+        add: tests/benchmark/baseline.csv
+        message: update benchmark baseline
 
     - name: 💬 Prepare comment
       if: ${{ github.event_name == 'pull_request' }}
