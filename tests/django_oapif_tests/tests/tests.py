@@ -1,7 +1,9 @@
 import datetime
+import json
 import logging
 import re
 import uuid
+from typing import Annotated
 
 import pyarrow as pa
 from django.contrib.auth.models import User
@@ -27,6 +29,10 @@ from django_oapif_tests.tests.models import (
     Point_2056_Empty,
 )
 from geoarrow.pyarrow import WkbType
+from ninja import Schema
+from ninja.errors import ValidationError as NinjaValidationError
+from ninja.responses import NinjaJSONEncoder
+from pydantic import AfterValidator
 from pydantic import ValidationError as PydanticValidationError
 from geoarrow.types.crs import StringCrs
 
@@ -303,6 +309,20 @@ class TestSchema(TestCase):
 
         self.assertEqual(ignoring.model_config["extra"], "ignore")
         self.assertEqual(forbidding.model_config["extra"], "forbid")
+
+    def test_validation_errors_serialize(self):
+        # a validator raising a ValueError leaves the exception in the error context, which made the 422 a 500
+        def refuse(value):
+            raise ValueError("refused")
+
+        class Refusing(Schema):
+            name: Annotated[str, AfterValidator(refuse)]
+
+        collection = oapif.collections["tests.point_2056_10fields"]
+        with self.assertRaises(NinjaValidationError) as raised:
+            collection.validate_feature_or_raise(RequestFactory().get("/"), Refusing, {"name": "x"})
+
+        self.assertIn('"refused"', json.dumps(raised.exception.errors, cls=NinjaJSONEncoder))
 
     def test_schema_subset_recognition(self):
         self.maxDiff = None
