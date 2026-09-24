@@ -1,7 +1,7 @@
 from datetime import date, datetime, time
 from functools import cache
 from types import NoneType, new_class
-from typing import Literal, cast, get_args, overload
+from typing import Annotated, Literal, cast, get_args, overload
 from uuid import UUID
 
 from django.contrib.auth import get_permission_codename
@@ -20,7 +20,7 @@ from django.db.models import (
     TextField,
 )
 from django.http import HttpRequest
-from ninja import ModelSchema, Schema
+from ninja import Field, ModelSchema, Schema
 from ninja.errors import ValidationError
 from ninja.schema import NinjaGenerateJsonSchema
 from pydantic import ConfigDict
@@ -31,6 +31,7 @@ from django_oapif import jsonfg
 from django_oapif.crs import CRS, CRS84_SRID, BBox
 from django_oapif.geojson import (
     CircularString,
+    CircularStringParts,
     CompoundCurve,
     Coordinate2D,
     Coordinate3D,
@@ -351,7 +352,10 @@ class OapifCollection[M: Model]:
         elif geom_field.geom_type.startswith("GEOMETRYCOLLECTION"):
             GeometryType = GeometryCollection[CoordType]
         elif geom_field.geom_type.startswith("CIRCULARSTRING"):
-            GeometryType = CircularString[CoordType]
+            # a CircularString longer than JSON-FG allows is served in parts, and comes back that way
+            GeometryType = Annotated[
+                CircularString[CoordType] | CircularStringParts[CoordType], Field(discriminator="type")
+            ]
         elif geom_field.geom_type.startswith("COMPOUNDCURVE"):
             GeometryType = CompoundCurve[CoordType]
         elif geom_field.geom_type.startswith("CURVEPOLYGON"):

@@ -951,9 +951,46 @@ class TestCircularString(TestCase):
                 response = self.client.get(f"{collections_url}/tests.arc_2056_10fields/items/{self.ids[count]}")
 
                 self.assertEqual(response.status_code, 200)
+                self.assertEqual(len(arc_points(response.json()["geometry"])), count)
+
+    def test_long_arc_is_served_in_parts(self):
+        # JSON-FG allows 11 points in a CircularString, so a longer one is the CompoundCurve of its arcs
+        for count, sizes in ((5, None), (13, [11, 3]), (27, [11, 11, 7])):
+            with self.subTest(points=count):
+                response = self.client.get(f"{collections_url}/tests.arc_2056_10fields/items/{self.ids[count]}")
+
                 geometry = response.json()["geometry"]
-                self.assertEqual(geometry["type"], "CircularString")
-                self.assertEqual(len(geometry["coordinates"]), count)
+                if sizes is None:
+                    self.assertEqual(geometry["type"], "CircularString")
+                else:
+                    self.assertEqual(geometry["type"], "CompoundCurve")
+                    self.assertEqual([len(part["coordinates"]) for part in geometry["geometries"]], sizes)
+
+    def test_long_arc_in_a_compound_curve_is_flattened(self):
+        # a CompoundCurve cannot hold another, so the parts of the arc take its place
+        line = "(2508480 1152000, 2508500 1152000)"
+        arc = self.arc_wkt(13).removeprefix("CIRCULARSTRING")
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT ST_AsBinary(ST_GeomFromText(%s))", [f"COMPOUNDCURVE({line}, CIRCULARSTRING{arc})"])
+            geometry = jsonfg.loads(bytes(cursor.fetchone()[0]))
+
+        self.assertEqual(geometry["type"], "CompoundCurve")
+        self.assertEqual([part["type"] for part in geometry["geometries"]], ["LineString", *["CircularString"] * 2])
+
+    def test_disjoint_arc_parts_are_a_client_error(self):
+        # parts that do not follow one another cannot be joined back into a CircularString
+        self.client.force_login(User.objects.get(username="demo_editor"))
+        parts = [{"type": "CircularString", "coordinates": arc(x, 1152000.0)} for x in (2508500.0, 2508600.0)]
+
+        response = self.client.post(
+            f"{collections_url}/tests.arc_2056_10fields/items",
+            {"type": "Feature", "geometry": {"type": "CompoundCurve", "geometries": parts}, "properties": {}},
+            headers=headers,
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("last point of the previous", response.content.decode())
 
     def test_bbox_follows_the_arcs(self):
         # an arc can reach beyond its control points: this one goes up to 1200100, its points to 1200060
@@ -1077,6 +1114,14 @@ def ring(x, y, size=10.0):
 
 def arc(x, y, size=10.0):
     return [[x, y], [x + size, y + size], [x + 2 * size, y]]
+
+
+def arc_points(geometry):
+    """The points of a CircularString, joined back when it is served in parts."""
+    if geometry["type"] == "CircularString":
+        return geometry["coordinates"]
+    parts = [part["coordinates"] for part in geometry["geometries"]]
+    return parts[0] + [point for part in parts[1:] for point in part[1:]]
 
 
 class TestWriteGeometries(TestCase):
@@ -1245,6 +1290,28 @@ class TestWriteGeometries(TestCase):
 
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(self.client.get(f"{item_url}?crs={crs_2056}").json()["geometry"], curve)
+
+    @skipUnless(writes_curves(), "needs GEOS 3.13 or newer and a Django that supports curves")
+    def test_long_arc_round_trips_in_parts(self):
+        # served as a CompoundCurve, it goes back into its column as the CircularString it was
+        wkt = TestCircularString.arc_wkt(13)
+        table_name = connection.ops.quote_name(Arc_2056_10fields._meta.db_table)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"UPDATE {table_name} SET geom = ST_GeomFromText(%s, 2056) WHERE id = %s", [wkt, self.arc_id]
+            )
+        item_url = f"{collections_url}/tests.arc_2056_10fields/items/{self.arc_id}"
+        served = self.client.get(f"{item_url}?crs={crs_2056}").json()
+
+        response = self.client.put(item_url, served, headers=headers, content_type="application/json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.client.get(f"{item_url}?crs={crs_2056}").json()["geometry"], served["geometry"])
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"SELECT ST_Equals(geom, ST_GeomFromText(%s, 2056)) FROM {table_name} WHERE id = %s", [wkt, self.arc_id]
+            )
+            self.assertTrue(cursor.fetchone()[0])
 
     @skipUnless(writes_curves(), "needs GEOS 3.13 or newer and a Django that supports curves")
     def test_arc_is_reprojected_on_the_way_in(self):

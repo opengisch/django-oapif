@@ -26,6 +26,9 @@ _TYPES = {
 }
 # GeoJSON puts homogeneous multi-parts under "coordinates", curves under "geometries"
 _FLATTEN = {"MultiPoint", "MultiLineString", "MultiPolygon"}
+# JSON-FG allows 5 arcs in a CircularString: a longer one is served as the CompoundCurve of its arcs,
+# 5 at a time, which draws the very same curve
+_MAX_ARC_POINTS = 11
 
 
 def _coords(buf, off, n, dim, e):
@@ -59,6 +62,11 @@ def _geom(buf, off):
 
     if kind == "pts":
         pts, off = _coords(buf, off, n, dim, e)
+        if name == "CircularString" and n > _MAX_ARC_POINTS:
+            # each part starts on the last point of the previous one
+            step = _MAX_ARC_POINTS - 1
+            parts = [{"type": name, "coordinates": pts[i : i + _MAX_ARC_POINTS]} for i in range(0, n - 1, step)]
+            return {"type": "CompoundCurve", "geometries": parts}, off
         return {"type": name, "coordinates": pts}, off
 
     if kind == "rings":
@@ -74,6 +82,9 @@ def _geom(buf, off):
     for _ in range(n):
         part, off = _geom(buf, off)
         parts.append(part)
+    if name == "CompoundCurve":
+        # a CompoundCurve cannot hold another, so the parts of a long CircularString join its own
+        parts = [member for part in parts for member in part.get("geometries", [part])]
     if name in _FLATTEN:
         return {"type": name, "coordinates": [p["coordinates"] for p in parts]}, off
     return {"type": name, "geometries": parts}, off

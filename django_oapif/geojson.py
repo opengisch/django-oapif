@@ -73,6 +73,25 @@ class CompoundCurve[C: Coordinate](GeometryBase):
     geometries: list[LineString[C] | CircularString[C]]
 
 
+def joined_arcs[T: list](parts: T) -> T:
+    """The parts of a CircularString must follow one another, to be joined back without changing the curve."""
+    for previous, part in zip(parts, parts[1:]):
+        if not previous.coordinates or not part.coordinates or previous.coordinates[-1] != part.coordinates[0]:
+            raise PydanticCustomError("circularstring_parts", "each part must start on the last point of the previous")
+    return parts
+
+
+class CircularStringParts[C: Coordinate](GeometryBase):
+    """A CircularString longer than JSON-FG allows, served as the CompoundCurve of its arcs."""
+
+    type: Literal["CompoundCurve"]
+    geometries: Annotated[list[CircularString[C]], Field(min_length=1), AfterValidator(joined_arcs)]
+
+    def circular_string(self) -> dict:
+        coordinates = self.geometries[0].coordinates + [c for part in self.geometries[1:] for c in part.coordinates[1:]]
+        return {"type": "CircularString", "coordinates": coordinates}
+
+
 class CurvePolygon[C: Coordinate](GeometryBase):
     type: Literal["CurvePolygon"]
     geometries: list[LineString[C] | CircularString[C] | CompoundCurve[C]]
