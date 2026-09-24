@@ -15,10 +15,22 @@ on:
 
 jobs:
   tests:
+    # the stock entry keeps the name of the check it has always been
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: tests
+            compose_file: tests/docker-compose.yml:tests/docker-compose.dev.yml
+          # GEOS 3.13 and a Django fork that knows curves, where they can be written
+          - name: tests (curves)
+            compose_file: tests/docker-compose.yml:tests/docker-compose.dev.yml:tests/docker-compose.curves.yml
     env:
       DOCKER_BUILDKIT: 1
       COMPOSE_DOCKER_CLI_BUILD: 1
+      COMPOSE_FILE: ${{ matrix.compose_file }}
 
     steps:
     - uses: actions/checkout@v6

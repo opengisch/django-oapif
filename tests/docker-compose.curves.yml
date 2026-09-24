@@ -1,0 +1,10 @@
+# The test stack on GEOS 3.13 and a Django that knows curves, so that writing them is tested too.
+# Add it to COMPOSE_FILE: tests/docker-compose.yml:tests/docker-compose.dev.yml:tests/docker-compose.curves.yml
+
+services:
+  django:
+    image: opengisch/django-oapif:curves
+    build:
+      args:
+        PYTHON_IMAGE: python:3.12-trixie
+        DJANGO_REQUIREMENT: django @ https://github.com/opengisch/django/archive/refs/heads/suricactus_arcarcarc.tar.gz
