@@ -105,6 +105,16 @@ def get_item_or_404(collection: OapifCollection, request: HttpRequest, item_id: 
     return get_object_or_404(query, pk=item_id)
 
 
+def primary_keys(collection: OapifCollection) -> set[str]:
+    """
+    The primary key of the model, and those of the models it inherits from. An item to replace or update is
+    the one of the URL: taking its key from the payload would save another row, even a copy of it, as the
+    input schema gives a key with a default a fresh value.
+    """
+    keys = [collection.opts.pk, *(parent._meta.pk for parent in collection.opts.get_parent_list())]
+    return {name for key in keys for name in (key.name, key.attname)}
+
+
 def get_related_object_or_raise(field: str, value: Any, related_model: type[Model]):
     try:
         return related_model.objects.get(pk=value)
@@ -377,6 +387,8 @@ def create_collections_router(collections: dict[str, OapifCollection]):
             raise AuthorizationError()
         feature = collection.validate_feature_input_or_raise(request, feature)
         for field, value in feature.properties.model_dump().items():
+            if field in primary_keys(collection):
+                continue
             if value is not None and (related_model := collection.foreign_key_fields.get(field)):
                 value = get_related_object_or_raise(field, value, related_model)
             setattr(item, field, value)
@@ -414,6 +426,8 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         feature = collection.validate_feature_patch_or_raise(request, feature)
         if feature.properties is not None:
             for field, value in feature.properties.model_dump(exclude_unset=True).items():
+                if field in primary_keys(collection):
+                    continue
                 if value is not None and (related_model := collection.foreign_key_fields.get(field)):
                     value = get_related_object_or_raise(field, value, related_model)
                 setattr(item, field, value)

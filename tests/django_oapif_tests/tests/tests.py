@@ -121,6 +121,29 @@ class TestBasicAuth(TestCase):
                 response = self.client.post(url, data, headers=headers, content_type="application/json")
                 self.assertEqual(response.status_code, status)
 
+    def test_put_and_patch_change_the_feature_of_the_url(self):
+        # the payload used to set the primary key: a PUT without it inserted a copy under a fresh key, and one
+        # carrying another feature's key overwrote that feature
+        self.client.force_login(user=User.objects.get(username="admin"))
+        url = f"{collections_url}/tests.point_2056_10fields/items"
+        target = Point_2056_10fields.objects.create(geom="SRID=2056;POINT(2600000 1200000)", field_str_0="target")
+        other = Point_2056_10fields.objects.create(geom="SRID=2056;POINT(2600100 1200100)", field_str_0="other")
+        count = Point_2056_10fields.objects.count()
+        for method, key in ((self.client.put, None), (self.client.put, other.pk), (self.client.patch, other.pk)):
+            with self.subTest(method=method.__name__, key=key):
+                properties = {"field_str_0": "changed"} | ({"id": str(key)} if key else {})
+                geometry = {"type": "Point", "coordinates": [2600500.0, 1200500.0]}
+                feature = {"type": "Feature", "geometry": geometry, "properties": properties}
+
+                response = method(f"{url}/{target.pk}", feature, headers=headers, content_type="application/json")
+
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(Point_2056_10fields.objects.count(), count)
+                target.refresh_from_db()
+                other.refresh_from_db()
+                self.assertEqual((target.field_str_0, target.geom.coords), ("changed", (2600500.0, 1200500.0)))
+                self.assertEqual(other.field_str_0, "other")
+
     def test_unknown_property_is_rejected_after_a_read(self):
         self.client.force_login(user=self.demo_editor)
         url = f"{collections_url}/tests.point_2056_10fields/items"
