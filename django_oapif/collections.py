@@ -8,6 +8,7 @@ from django.contrib.gis.geos.libgeos import geos_version_tuple
 from django.db.models import Model
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404
+from django.utils.cache import patch_vary_headers
 from ninja import Header, Query, Router, Schema
 from ninja.errors import AuthorizationError, HttpError, ValidationError
 
@@ -85,6 +86,15 @@ def geojson_response(geojson: Schema, crs: CRS) -> HttpResponse:
     """
     response = HttpResponse(geojson.model_dump_json(), content_type=GEOJSON_MEDIA_TYPE)
     response["Content-Crs"] = crs.uri_header()
+    # the same URL serves GeoArrow too: a cache must not hand one encoding to a request for the other
+    patch_vary_headers(response, ["Accept"])
+    return response
+
+
+def arrow_response(stream, crs: CRS) -> HttpResponse:
+    response = HttpResponse(stream.getvalue().to_pybytes(), content_type=ARROW_STREAM_MEDIA_TYPE)
+    response["Content-Crs"] = crs.uri_header()
+    patch_vary_headers(response, ["Accept"])
     return response
 
 
@@ -217,6 +227,16 @@ def get_collection_response(request: HttpRequest, collection: OapifCollection):
             ),
         ],
     )
+    if ARROW_AVAILABLE:
+        # the same URL, negotiated with the Accept header: clients only pick an encoding the collection lists
+        response.links.append(
+            OAPIFLink(
+                rel="items",
+                title="Collection items as GeoArrow",
+                type=ARROW_STREAM_MEDIA_TYPE,
+                href=request.build_absolute_uri(f"{uri_prefix}{collection.id}/items"),
+            )
+        )
 
     if geom := collection.geometry_field:
         response.crs = [crs.uri() for crs in collection.supported_crs()]
@@ -306,15 +326,12 @@ def create_collections_router(collections: dict[str, OapifCollection]):
 
         if accepts_geoarrow(request):
             stream = collection.queryset_to_arrow_stream(request, paginated_query, crs)
-            arrow_response = HttpResponse(stream.getvalue().to_pybytes(), content_type=ARROW_STREAM_MEDIA_TYPE)
-            arrow_response["Content-Crs"] = crs.uri_header()
+            response = arrow_response(stream, crs)
             # an Arrow stream has nowhere to put them, and the row count is the only one a client
             # cannot work out from the table itself
-            arrow_response["Link"] = link_header(
-                get_page_links(request, limit, offset, total_count, ARROW_STREAM_MEDIA_TYPE)
-            )
-            arrow_response["OGC-NumberMatched"] = str(total_count)
-            return arrow_response
+            response["Link"] = link_header(get_page_links(request, limit, offset, total_count, ARROW_STREAM_MEDIA_TYPE))
+            response["OGC-NumberMatched"] = str(total_count)
+            return response
 
         feature_collection = collection.queryset_to_featurecollection(
             request,
@@ -360,9 +377,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
             raise AuthorizationError()
         if accepts_geoarrow(request):
             stream = collection.queryset_to_arrow_stream(request, query.filter(pk=item_id), crs)
-            arrow_response = HttpResponse(stream.getvalue().to_pybytes(), content_type=ARROW_STREAM_MEDIA_TYPE)
-            arrow_response["Content-Crs"] = crs.uri_header()
-            return arrow_response
+            return arrow_response(stream, crs)
         return geojson_response(collection.model_to_feature(request, item), crs)
 
     @router.post(
