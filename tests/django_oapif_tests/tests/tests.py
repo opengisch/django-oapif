@@ -1246,3 +1246,15 @@ class TestWriteGeometries(TestCase):
         for position, expected in zip(stored.json()["geometry"]["coordinates"], curve["coordinates"], strict=True):
             self.assertAlmostEqual(position[0], expected[0], places=7)
             self.assertAlmostEqual(position[1], expected[1], places=7)
+
+
+class TestConformance(TestCase):
+    def test_openapi_class_matches_the_served_document(self):
+        # django-ninja serves OpenAPI 3.1: a 3.0 class would be a false claim, and only the 1.1 draft of
+        # Features Part 1 has one for 3.1
+        conforms_to = self.client.get("/oapif/conformance").json()["conformsTo"]
+        openapi = self.client.get("/oapif/openapi.json").json()["openapi"]
+
+        self.assertRegex(openapi, r"^3\.1\.")
+        self.assertIn("http://www.opengis.net/spec/ogcapi-features-1/1.1/conf/oas31", conforms_to)
+        self.assertEqual([uri for uri in conforms_to if uri.endswith("/conf/oas30")], [])
