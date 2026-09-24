@@ -947,6 +947,20 @@ class TestCircularString(TestCase):
         self.assertEqual(response.status_code, 422)
         self.assertIn("odd number", response.content.decode())
 
+    def test_other_geometry_type_is_a_client_error(self):
+        # a curve column validated against any geometry type, and the insert then failed in the database
+        self.client.force_login(User.objects.create_superuser(username="arc_typist", email=None, password="123"))
+        line = {"type": "LineString", "coordinates": [[2508500.0, 1152000.0], [2508520.0, 1152000.0]]}
+
+        response = self.client.post(
+            f"{collections_url}/tests.arc_2056_10fields/items",
+            {"type": "Feature", "geometry": line, "properties": {}},
+            headers=headers,
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 422)
+
     def test_empty_arc_is_accepted(self):
         arc = CircularString[Coordinate2D](type="CircularString", coordinates=[])
 
