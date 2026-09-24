@@ -310,7 +310,6 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         feature_collection = collection.queryset_to_featurecollection(
             request,
             paginated_query,
-            crs,
             number_matched=total_count,
             links=get_page_links(request, limit, offset, total_count),
         )
