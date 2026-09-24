@@ -4,6 +4,7 @@ import logging
 import re
 import uuid
 from typing import Annotated
+from unittest import skipIf, skipUnless
 
 import pyarrow as pa
 from django.contrib.auth.models import User
@@ -15,6 +16,7 @@ from django.test import RequestFactory
 from django.test.testcases import TestCase
 from django.test.utils import CaptureQueriesContext
 from django_oapif import jsonfg
+from django_oapif.collections import writes_curves
 from django_oapif.crs import CRS
 from django_oapif.geojson import CircularString, Coordinate2D
 from django_oapif.handler import AnonReadOnlyCollection
@@ -1032,3 +1034,190 @@ class TestOrdering(TestCase):
         collection = ReversedCollection(LayerWithOrdering)
 
         self.assertEqual(collection.get_ordering(None), ("-name",))
+
+
+def ring(x, y, size=10.0):
+    return [[x, y], [x + size, y], [x + size, y + size], [x, y]]
+
+
+def arc(x, y, size=10.0):
+    return [[x, y], [x + size, y + size], [x + 2 * size, y]]
+
+
+class TestWriteGeometries(TestCase):
+    """Every geometry type goes to GEOS as WKB: GeoJSON ones everywhere, curves with GEOS 3.13 and a Django for them."""
+
+    GEOJSON = {
+        "point": {"type": "Point", "coordinates": [2508500.0, 1152000.0]},
+        "multipoint": {"type": "MultiPoint", "coordinates": [[2508500.0, 1152000.0], [2508600.0, 1152100.0]]},
+        "linestring": {"type": "LineString", "coordinates": [[2508500.0, 1152000.0], [2508600.0, 1152100.0]]},
+        "multilinestring": {
+            "type": "MultiLineString",
+            "coordinates": [[[2508500.0, 1152000.0], [2508600.0, 1152100.0]]],
+        },
+        "polygon": {"type": "Polygon", "coordinates": [ring(2508500.0, 1152000.0)]},
+        "multipolygon": {
+            "type": "MultiPolygon",
+            "coordinates": [[ring(2508500.0, 1152000.0)], [ring(2508600.0, 1152000.0)]],
+        },
+        "geometrycollection": {
+            "type": "GeometryCollection",
+            "geometries": [
+                {"type": "Point", "coordinates": [2508500.0, 1152000.0]},
+                {"type": "LineString", "coordinates": [[2508500.0, 1152000.0], [2508600.0, 1152100.0]]},
+            ],
+        },
+    }
+    CURVES = {
+        "circularstring": {"type": "CircularString", "coordinates": arc(2508500.0, 1152000.0)},
+        "compoundcurve": {
+            "type": "CompoundCurve",
+            "geometries": [
+                {"type": "LineString", "coordinates": [[2508480.0, 1152000.0], [2508500.0, 1152000.0]]},
+                {"type": "CircularString", "coordinates": arc(2508500.0, 1152000.0)},
+            ],
+        },
+        "curvepolygon": {
+            "type": "CurvePolygon",
+            "geometries": [
+                {
+                    "type": "CircularString",
+                    "coordinates": [
+                        [2508500.0, 1152000.0],
+                        [2508510.0, 1152010.0],
+                        [2508520.0, 1152000.0],
+                        [2508510.0, 1151990.0],
+                        [2508500.0, 1152000.0],
+                    ],
+                }
+            ],
+        },
+        "multicurve": {
+            "type": "MultiCurve",
+            "geometries": [
+                {"type": "LineString", "coordinates": [[2508500.0, 1152000.0], [2508600.0, 1152100.0]]},
+                {"type": "CircularString", "coordinates": arc(2508700.0, 1152000.0)},
+            ],
+        },
+        "multisurface": {
+            "type": "MultiSurface",
+            "geometries": [
+                {"type": "Polygon", "coordinates": [ring(2508500.0, 1152000.0)]},
+                {
+                    "type": "CurvePolygon",
+                    "geometries": [{"type": "LineString", "coordinates": ring(2508600.0, 1152000.0)}],
+                },
+            ],
+        },
+        "geometrycollection with a curve": {
+            "type": "GeometryCollection",
+            "geometries": [
+                {"type": "Point", "coordinates": [2508500.0, 1152000.0]},
+                {"type": "CircularString", "coordinates": arc(2508500.0, 1152000.0)},
+            ],
+        },
+    }
+
+    @classmethod
+    def setUpTestData(cls):
+        # an arc to replace and update, inserted as it is: GEOS may not know curves
+        table_name = connection.ops.quote_name(Arc_2056_10fields._meta.db_table)
+        cls.arc_id = uuid.uuid4()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"INSERT INTO {table_name} (id, geom) VALUES (%s, ST_GeomFromText(%s, 2056))",
+                [cls.arc_id, "CIRCULARSTRING(2508500 1152000, 2508510 1152010, 2508520 1152000)"],
+            )
+
+    def setUp(self):
+        self.client.force_login(User.objects.create_superuser(username="writer", email=None, password="123"))
+
+    def post(self, collection, geometry, crs=crs_2056):
+        return self.client.post(
+            f"{collections_url}/{collection}/items",
+            {"type": "Feature", "geometry": geometry, "properties": {}},
+            headers={"Content-Crs": crs},
+            content_type="application/json",
+        )
+
+    def assert_round_trip(self, collection, geometries):
+        for name, geometry in geometries.items():
+            with self.subTest(geometry=name):
+                response = self.post(collection, geometry)
+
+                self.assertEqual(response.status_code, 201)
+                item = self.client.get(f"{collections_url}/{collection}/items/{response.json()['id']}?crs={crs_2056}")
+                self.assertEqual(item.json()["geometry"], geometry)
+
+    def test_geojson_geometries_round_trip(self):
+        self.assert_round_trip("tests.geometry_2056", self.GEOJSON)
+
+    def test_3d_geometry_round_trips(self):
+        line = {"type": "LineString", "coordinates": [[2508500.0, 1152000.0, 1.0], [2508600.0, 1152100.0, 2.0]]}
+
+        self.assert_round_trip("tests.geometryz_2056", {"linestring": line})
+
+    def test_invalid_geometry_is_a_client_error(self):
+        # GEOS refuses a ring that is not closed, which used to be a 500
+        unclosed = {"type": "Polygon", "coordinates": [ring(2508500.0, 1152000.0)[:-1] + [[2508505.0, 1152005.0]]]}
+
+        self.assertEqual(self.post("tests.geometry_2056", unclosed).status_code, 422)
+
+    @skipIf(writes_curves(), "this GEOS and Django can write curves")
+    def test_curves_are_not_implemented_without_support(self):
+        curve = self.CURVES["circularstring"]
+        feature = {"type": "Feature", "geometry": curve, "properties": {}}
+        item_url = f"{collections_url}/tests.arc_2056_10fields/items/{self.arc_id}"
+
+        self.assertEqual(self.post("tests.arc_2056_10fields", curve).status_code, 501)
+        for method in (self.client.put, self.client.patch):
+            response = method(item_url, feature, headers=headers, content_type="application/json")
+            self.assertEqual(response.status_code, 501)
+
+    @skipUnless(writes_curves(), "needs GEOS 3.13 or newer and a Django that supports curves")
+    def test_curves_round_trip(self):
+        self.assert_round_trip("tests.geometry_2056", self.CURVES)
+
+    @skipUnless(writes_curves(), "needs GEOS 3.13 or newer and a Django that supports curves")
+    def test_3d_curve_round_trips(self):
+        curve = {
+            "type": "CompoundCurve",
+            "geometries": [
+                {"type": "LineString", "coordinates": [[2508480.0, 1152000.0, 1.0], [2508500.0, 1152000.0, 2.0]]},
+                {
+                    "type": "CircularString",
+                    "coordinates": [
+                        [2508500.0, 1152000.0, 2.0],
+                        [2508510.0, 1152010.0, 3.0],
+                        [2508520.0, 1152000.0, 4.0],
+                    ],
+                },
+            ],
+        }
+
+        self.assert_round_trip("tests.geometryz_2056", {"compoundcurve": curve})
+
+    @skipUnless(writes_curves(), "needs GEOS 3.13 or newer and a Django that supports curves")
+    def test_arc_is_replaced_and_updated(self):
+        item_url = f"{collections_url}/tests.arc_2056_10fields/items/{self.arc_id}"
+        for method, x in ((self.client.put, 2508700.0), (self.client.patch, 2508900.0)):
+            with self.subTest(method=method.__name__):
+                curve = {"type": "CircularString", "coordinates": arc(x, 1152000.0)}
+                feature = {"type": "Feature", "geometry": curve, "properties": {}}
+
+                response = method(item_url, feature, headers=headers, content_type="application/json")
+
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(self.client.get(f"{item_url}?crs={crs_2056}").json()["geometry"], curve)
+
+    @skipUnless(writes_curves(), "needs GEOS 3.13 or newer and a Django that supports curves")
+    def test_arc_is_reprojected_on_the_way_in(self):
+        curve = {"type": "CircularString", "coordinates": [[7.44, 46.95], [7.4401, 46.9501], [7.4402, 46.95]]}
+
+        response = self.post("tests.arc_2056_10fields", curve, crs=crs84)
+
+        self.assertEqual(response.status_code, 201)
+        stored = self.client.get(f"{collections_url}/tests.arc_2056_10fields/items/{response.json()['id']}")
+        for position, expected in zip(stored.json()["geometry"]["coordinates"], curve["coordinates"], strict=True):
+            self.assertAlmostEqual(position[0], expected[0], places=7)
+            self.assertAlmostEqual(position[1], expected[1], places=7)

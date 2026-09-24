@@ -1,13 +1,17 @@
 from typing import Any
 
+from functools import cache
+
 from django.contrib.gis.db.models import Extent
-from django.contrib.gis.geos import GEOSGeometry
+from django.contrib.gis.geos import GEOSException, GEOSGeometry
+from django.contrib.gis.geos.libgeos import geos_version_tuple
 from django.db.models import Model
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404
 from ninja import Header, Query, Router
 from ninja.errors import AuthorizationError, HttpError, ValidationError
 
+from django_oapif import jsonfg
 from django_oapif.crs import CRS, CRS84_SRID, CRS84_URI, BBox
 from django_oapif.geojson import (
     GenericFeature,
@@ -113,6 +117,50 @@ def primary_keys(collection: OapifCollection) -> set[str]:
     """
     keys = [collection.opts.pk, *(parent._meta.pk for parent in collection.opts.get_parent_list())]
     return {name for key in keys for name in (key.name, key.attname)}
+
+
+# the geometry types of GeoJSON, the only ones GEOS knew before its 3.13
+GEOJSON_TYPES = {
+    "Point",
+    "MultiPoint",
+    "LineString",
+    "MultiLineString",
+    "Polygon",
+    "MultiPolygon",
+    "GeometryCollection",
+}
+
+
+def is_geojson(geometry) -> bool:
+    if geometry.type not in GEOJSON_TYPES:
+        return False
+    return geometry.type != "GeometryCollection" or all(is_geojson(member) for member in geometry.geometries)
+
+
+@cache
+def writes_curves() -> bool:
+    """Whether curves can be written: it takes GEOS 3.13, and a Django whose GEOS bindings know them."""
+    try:
+        from django.contrib.gis.geos import CircularString  # noqa: F401
+    except ImportError:
+        return False
+    return geos_version_tuple() >= (3, 13, 0)
+
+
+def geometry_to_save(geometry, crs: CRS) -> GEOSGeometry | None:
+    """
+    The GEOS geometry to store for a feature geometry. It is built from WKB, which GEOS reads for every
+    type it knows, where GDAL only reads the GeoJSON ones from JSON.
+    """
+    if geometry is None:
+        return None
+    if not is_geojson(geometry) and not writes_curves():
+        raise HttpError(501, "Curves can only be written with GEOS 3.13 or newer and a Django that supports them")
+    try:
+        return GEOSGeometry(memoryview(jsonfg.dumps(geometry.model_dump())), srid=crs.srid)
+    except GEOSException:
+        # GEOS checks what the schema cannot, such as the closing of the rings
+        raise HttpError(422, "Invalid geometry")
 
 
 def get_related_object_or_raise(field: str, value: Any, related_model: type[Model]):
@@ -331,9 +379,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
             if value is not None and (related_model := collection.foreign_key_fields.get(field)):
                 item_properties[field] = get_related_object_or_raise(field, value, related_model)
         if (geom_field := collection.geometry_field) and feature.geometry:
-            geometry = GEOSGeometry(feature.geometry.model_dump_json())
-            geometry.srid = crs.srid
-            item_properties[geom_field] = geometry
+            item_properties[geom_field] = geometry_to_save(feature.geometry, crs)
         item = collection.model(**item_properties)
         if not collection.has_add_permission(request, item):
             raise AuthorizationError()
@@ -393,12 +439,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
                 value = get_related_object_or_raise(field, value, related_model)
             setattr(item, field, value)
         if geom_field := collection.geometry_field:
-            if feature.geometry:
-                geometry = GEOSGeometry(feature.geometry.model_dump_json())
-                geometry.srid = crs.srid
-            else:
-                geometry = None
-            setattr(item, geom_field, geometry)
+            setattr(item, geom_field, geometry_to_save(feature.geometry, crs))
         collection.save_model(request, item, True)
         item = collection.query(request, DEFAULT_CRS).get(pk=item_id)
         response["Content-Crs"] = DEFAULT_CRS.uri_header()
@@ -432,12 +473,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
                     value = get_related_object_or_raise(field, value, related_model)
                 setattr(item, field, value)
         if (geom_field := collection.geometry_field) and "geometry" in feature.model_fields_set:
-            if feature.geometry:
-                geometry = GEOSGeometry(feature.geometry.model_dump_json())
-                geometry.srid = crs.srid
-            else:
-                geometry = None
-            setattr(item, geom_field, geometry)
+            setattr(item, geom_field, geometry_to_save(feature.geometry, crs))
         collection.save_model(request, item, True)
         item = collection.query(request, DEFAULT_CRS).get(pk=item_id)
         response["Content-Crs"] = DEFAULT_CRS.uri_header()
