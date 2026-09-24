@@ -38,6 +38,19 @@ docker compose up --build -d
 docker compose exec django python manage.py test
 ```
 
+### Other Django versions
+
+The stack installs the latest Django. CI also tests the oldest that django-oapif supports, 5.2, and 6.0:
+to run the tests on one of them, build the stack from `docker-compose.django.yml` as well, with
+`DJANGO_VERSION` set to it:
+
+```bash
+export COMPOSE_FILE=tests/docker-compose.yml:tests/docker-compose.dev.yml:tests/docker-compose.django.yml
+export DJANGO_VERSION=5.2
+docker compose up --build -d
+docker compose exec django python manage.py test
+```
+
 ## OGC Conformance
 
 You can run the OGC API conformance test suite like this:

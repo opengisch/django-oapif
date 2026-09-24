@@ -7,6 +7,9 @@ hide:
 
 ## Installation
 
+django-oapif needs Python 3.12 and Django 5.2 or later, and is tested on Django 5.2, 6.0 and the latest
+release.
+
 Install with your favorite package manager
 
 ```bash

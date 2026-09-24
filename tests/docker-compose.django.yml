@@ -1,0 +1,10 @@
+# The test stack on an earlier Django than the latest, which DJANGO_VERSION names, such as 5.2, the oldest that
+# django-oapif supports: its latest patch release is installed over the one of the image.
+# Add it to COMPOSE_FILE: tests/docker-compose.yml:tests/docker-compose.dev.yml:tests/docker-compose.django.yml
+
+services:
+  django:
+    image: opengisch/django-oapif:django-${DJANGO_VERSION:?}
+    build:
+      args:
+        DJANGO_REQUIREMENT: django~=${DJANGO_VERSION:?}.0
