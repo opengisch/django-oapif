@@ -56,3 +56,26 @@ Support for OpenAPI 3.1 came to the standard with version 1.1
 ([ogcapi-features#404](https://github.com/opengeospatial/ogcapi-features/issues/404),
 [1.1 draft](https://docs.ogc.org/DRAFTS/17-069r5.html)). As of September 2026, no issue about it has
 been reported to the [test suite](https://github.com/opengeospatial/ets-ogcapi-features10/issues).
+
+## Benchmark
+
+`tests/benchmark/main.py` times `/items` for five collections, three limits and both formats, in CRS84,
+which reprojects the features, and in EPSG:2056, the CRS they are stored in. CI runs it on every pull
+request, under gunicorn with persistent connections as a deployment would, and comments the median
+times, compared with `tests/benchmark/baseline.csv`: once a pull request is merged, the run on `main`
+stores its results there, for the next ones.
+
+To run it locally, on the same stack:
+
+```bash
+export COMPOSE_FILE=tests/docker-compose.yml:tests/docker-compose.dev.yml:tests/docker-compose.benchmark.yml
+docker compose up --build -d
+docker compose exec django python manage.py migrate --no-input
+docker compose exec django python manage.py populate_data -s 1000
+scripts/download-fixtures.sh
+docker compose exec django python manage.py loaddata polygon_2056
+pip install -r requirements-bench.txt
+python tests/benchmark/main.py --baseline tests/benchmark/baseline.csv
+```
+
+The results, a chart and the table of the comment, are written to `tests/benchmark/output/`.
