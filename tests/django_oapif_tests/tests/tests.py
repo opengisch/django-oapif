@@ -1027,6 +1027,14 @@ class TestCircularString(TestCase):
                         coordinates=[(float(i), 0.0) for i in range(count)],
                     )
 
+    def test_arc_lengths_are_published(self):
+        # the validator does not show in the OpenAPI document, so the lengths of JSON-FG are listed there
+        schemas = self.client.get("/oapif/openapi.json").json()["components"]["schemas"]
+        lengths = schemas["CircularString_Coordinate_"]["properties"]["coordinates"]["oneOf"]
+
+        self.assertEqual([length.get("minItems", 0) for length in lengths], [0, 3, 5, 7, 9, 11])
+        self.assertEqual([length["maxItems"] for length in lengths], [0, 3, 5, 7, 9, 11])
+
 
 class TestOrdering(TestCase):
     # inserted in reverse, so ordering by pk gives exactly the opposite of the model ordering

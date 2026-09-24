@@ -57,9 +57,15 @@ def arc_points[T: list](coordinates: T) -> T:
     return coordinates
 
 
+# JSON Schema cannot tell an odd length, so JSON-FG lists the lengths it allows, up to 11 points.
+# The published schema says as much, while the validator also takes the longer arcs PostGIS stores.
+MAX_ARC_POINTS = 11
+ARC_LENGTHS = {"oneOf": [{"maxItems": 0}] + [{"minItems": n, "maxItems": n} for n in range(3, MAX_ARC_POINTS + 1, 2)]}
+
+
 class CircularString[C: Coordinate](GeometryBase):
     type: Literal["CircularString"]
-    coordinates: Annotated[list[C], AfterValidator(arc_points)]
+    coordinates: Annotated[list[C], AfterValidator(arc_points), Field(json_schema_extra=ARC_LENGTHS)]
 
 
 class CompoundCurve[C: Coordinate](GeometryBase):
