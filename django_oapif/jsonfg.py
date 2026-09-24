@@ -1,6 +1,6 @@
-"""Minimal WKB (ISO and EWKB) -> JSON-FG geometry dict reader. Stdlib only."""
+"""Minimal JSON-FG geometry dict <-> WKB conversions: reads ISO and EWKB, writes ISO. Stdlib only."""
 
-from struct import unpack_from
+from struct import pack, unpack_from
 
 # base type code -> (JSON-FG name, structure)
 #   "pts"  : count + flat coordinate run
@@ -82,3 +82,59 @@ def _geom(buf, off):
 def loads(wkb):
     """Parse one ISO (or EWKB) geometry into a JSON-FG geometry dict."""
     return _geom(wkb, 0)[0]
+
+
+# base type code of each JSON-FG type, for writing: the polyhedral ones are read as (Multi)Polygons
+_CODES = {name: code for code, (name, _) in _TYPES.items() if code <= 12}
+
+
+def _dimension(geometry):
+    # the number of ordinates of its first position: all its positions have the same
+    pending = [geometry]
+    while pending:
+        part = pending.pop()
+        if "geometries" in part:
+            pending.extend(part["geometries"])
+            continue
+        coordinates = part["coordinates"]
+        while coordinates and isinstance(coordinates[0], (list, tuple)):
+            coordinates = coordinates[0]
+        if coordinates:
+            return len(coordinates)
+    return 2
+
+
+def _positions(out, positions, dim):
+    out += pack(f"<I{len(positions) * dim}d", len(positions), *(v for position in positions for v in position))
+
+
+def _write(out, geometry, dim):
+    name = geometry["type"]
+    code = _CODES[name]
+    kind = _TYPES[code][1]
+    out += pack("<BI", 1, code + (dim - 2) * 1000)
+    if kind == "pt":
+        # POINT EMPTY is encoded as NaNs
+        out += pack(f"<{dim}d", *(geometry["coordinates"] or [float("nan")] * dim))
+    elif kind == "pts":
+        _positions(out, geometry["coordinates"], dim)
+    elif kind == "rings":
+        out += pack("<I", len(geometry["coordinates"]))
+        for ring in geometry["coordinates"]:
+            _positions(out, ring, dim)
+    else:
+        if name in _FLATTEN:
+            member = name.removeprefix("Multi")
+            members = [{"type": member, "coordinates": coordinates} for coordinates in geometry["coordinates"]]
+        else:
+            members = geometry["geometries"]
+        out += pack("<I", len(members))
+        for part in members:
+            _write(out, part, dim)
+
+
+def dumps(geometry):
+    """Write a JSON-FG geometry dict as ISO WKB."""
+    out = bytearray()
+    _write(out, geometry, _dimension(geometry))
+    return bytes(out)
