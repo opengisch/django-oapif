@@ -30,17 +30,22 @@ from pydantic.config import ExtraValues
 from django_oapif import jsonfg
 from django_oapif.crs import CRS, CRS84_SRID, BBox
 from django_oapif.geojson import (
+    CircularString,
+    CompoundCurve,
     Coordinate2D,
     Coordinate3D,
+    CurvePolygon,
     Feature,
     FeatureCollection,
     FeaturePatch,
     Geometry,
     GeometryCollection,
     LineString,
+    MultiCurve,
     MultiLineString,
     MultiPoint,
     MultiPolygon,
+    MultiSurface,
     Point,
     Polygon,
 )
@@ -345,6 +350,16 @@ class OapifCollection[M: Model]:
             GeometryType = MultiPolygon[CoordType]
         elif geom_field.geom_type.startswith("GEOMETRYCOLLECTION"):
             GeometryType = GeometryCollection[CoordType]
+        elif geom_field.geom_type.startswith("CIRCULARSTRING"):
+            GeometryType = CircularString[CoordType]
+        elif geom_field.geom_type.startswith("COMPOUNDCURVE"):
+            GeometryType = CompoundCurve[CoordType]
+        elif geom_field.geom_type.startswith("CURVEPOLYGON"):
+            GeometryType = CurvePolygon[CoordType]
+        elif geom_field.geom_type.startswith("MULTICURVE"):
+            GeometryType = MultiCurve[CoordType]
+        elif geom_field.geom_type.startswith("MULTISURFACE"):
+            GeometryType = MultiSurface[CoordType]
         else:
             GeometryType = Geometry[CoordType]
 
