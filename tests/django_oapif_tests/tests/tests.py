@@ -278,7 +278,7 @@ class TestBasicAuth(TestCase):
 
     def test_date_field(self):
         today = datetime.date.today()
-        now = datetime.datetime.now()
+        now = datetime.datetime.now(datetime.UTC)
         obj = LayerWithDate.objects.create(date=today, time=now)
         obj.refresh_from_db()
         feature = {
@@ -288,7 +288,7 @@ class TestBasicAuth(TestCase):
             "properties": {
                 "date": str(today),
                 # to the millisecond, as Django writes them, where pydantic would go to the microsecond
-                "time": now.isoformat(timespec="milliseconds") + "Z",
+                "time": now.isoformat(timespec="milliseconds").replace("+00:00", "Z"),
                 "id": str(obj.id),
             },
         }

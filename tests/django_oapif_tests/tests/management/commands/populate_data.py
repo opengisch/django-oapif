@@ -103,7 +103,7 @@ class Command(BaseCommand):
         NoGeom_100fields.objects.bulk_create(no_geoms_100fields, batch_size=10000)
         Line_2056_10fields.objects.bulk_create(lines, batch_size=10000)
         LayerWithForeignKey.objects.create(point=Point_2056_10fields.objects.first())
-        LayerWithDate.objects.create(date=datetime.date.today(), time=datetime.datetime.now())
+        LayerWithDate.objects.create(date=datetime.date.today(), time=datetime.datetime.now(datetime.UTC))
         # Call 'update_data' to update computed properties
         call_command("updatedata")
         print("🤖 testdata added!")
