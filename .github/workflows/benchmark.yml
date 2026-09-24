@@ -31,7 +31,7 @@ jobs:
     env:
       DOCKER_BUILDKIT: 1
       COMPOSE_DOCKER_CLI_BUILD: 1
-      # django under gunicorn with persistent connections, as it would be deployed
+      # django under gunicorn, with persistent connections and without debug mode, as it would be deployed
       COMPOSE_FILE: tests/docker-compose.yml:tests/docker-compose.dev.yml:tests/docker-compose.benchmark.yml
       # enough features for the largest limit the benchmark asks for, 500
       SIZE: ${{ inputs.size || 1000 }}
