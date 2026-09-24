@@ -912,6 +912,21 @@ class TestCircularString(TestCase):
         self.assertEqual(self.client.delete(url).status_code, 200)
         self.assertEqual(self.client.get(url).status_code, 404)
 
+    def test_arc_of_even_points_is_a_client_error(self):
+        # the validation error used to carry a ValueError, which could not be serialized: a 500
+        self.client.force_login(User.objects.create_superuser(username="arc_writer", email=None, password="123"))
+        arc = {"type": "CircularString", "coordinates": [[2508500.0, 1152000.0], [2508510.0, 1152010.0]]}
+
+        response = self.client.post(
+            f"{collections_url}/tests.arc_2056_10fields/items",
+            {"type": "Feature", "geometry": arc, "properties": {}},
+            headers=headers,
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("odd number", response.content.decode())
+
     def test_empty_arc_is_accepted(self):
         arc = CircularString[Coordinate2D](type="CircularString", coordinates=[])
 
