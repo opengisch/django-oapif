@@ -30,10 +30,18 @@ jobs:
           # without the arrow extra, which django-oapif and its tests have to do without
           - name: tests (without arrow)
             compose_file: tests/docker-compose.yml:tests/docker-compose.dev.yml:tests/docker-compose.no-arrow.yml
+          # the oldest Django that django-oapif supports, and 6.0: the other entries get the latest release
+          - name: tests (Django 5.2)
+            compose_file: tests/docker-compose.yml:tests/docker-compose.dev.yml:tests/docker-compose.django.yml
+            django: "5.2"
+          - name: tests (Django 6.0)
+            compose_file: tests/docker-compose.yml:tests/docker-compose.dev.yml:tests/docker-compose.django.yml
+            django: "6.0"
     env:
       DOCKER_BUILDKIT: 1
       COMPOSE_DOCKER_CLI_BUILD: 1
       COMPOSE_FILE: ${{ matrix.compose_file }}
+      DJANGO_VERSION: ${{ matrix.django }}
 
     steps:
     - uses: actions/checkout@v6

@@ -12,6 +12,9 @@ description = "Easily expose your Django models through an OGCAPI-Features endpo
 keywords =  ["django", "ogc", "api", "wfs3", "features", "rest", "gis", "ogcapif", "oapif"]
 classifiers = [
     "Framework :: Django",
+    "Framework :: Django :: 5.2",
+    "Framework :: Django :: 6.0",
+    "Framework :: Django :: 6.1",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering :: GIS",
