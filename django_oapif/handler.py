@@ -553,6 +553,10 @@ class OapifCollection[M: Model]:
             errors = e.errors()
             for error in errors:
                 error["loc"] = ("body", "feature", *error["loc"])
+                # an exception raised by a validator is left in the context, where it would not serialize:
+                # ninja turns it into its message for its own errors, and so must this
+                if isinstance(error.get("ctx", {}).get("error"), Exception):
+                    error["ctx"]["error"] = str(error["ctx"]["error"])
             raise ValidationError(errors)  # type: ignore
 
 
