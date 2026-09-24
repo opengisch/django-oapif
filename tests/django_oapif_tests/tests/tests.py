@@ -5,8 +5,8 @@ import re
 import uuid
 from typing import Annotated
 from unittest import skipIf, skipUnless
+from unittest.mock import patch
 
-import pyarrow as pa
 from django.contrib.auth.models import User
 from django.contrib.gis.db.models import Extent
 from django.contrib.gis.db.models.functions import Transform
@@ -19,7 +19,7 @@ from django_oapif import jsonfg
 from django_oapif.collections import writes_curves
 from django_oapif.crs import CRS
 from django_oapif.geojson import CircularString, Coordinate2D
-from django_oapif.handler import AnonReadOnlyCollection
+from django_oapif.handler import ARROW_AVAILABLE, AnonReadOnlyCollection
 from django_oapif_tests.tests.oapif import oapif
 from django_oapif_tests.tests.models import (
     Arc_2056_10fields,
@@ -30,13 +30,20 @@ from django_oapif_tests.tests.models import (
     Point_2056_10fields,
     Point_2056_Empty,
 )
-from geoarrow.pyarrow import WkbType
 from ninja import Schema
 from ninja.errors import ValidationError as NinjaValidationError
 from ninja.responses import NinjaJSONEncoder
 from pydantic import AfterValidator
 from pydantic import ValidationError as PydanticValidationError
-from geoarrow.types.crs import StringCrs
+
+try:  # Arrow is an optional extra, and its tests are skipped without it
+    import pyarrow as pa
+    from geoarrow.pyarrow import WkbType
+    from geoarrow.types.crs import StringCrs
+except ImportError:
+    pass
+
+requires_arrow = skipUnless(ARROW_AVAILABLE, "needs the arrow extra")
 
 logger = logging.getLogger(__name__)
 
@@ -460,6 +467,18 @@ class TestOutputFormat(TestCase):
                 else:
                     self.assertEqual(feature["geometry"], None)
 
+    @patch("django_oapif.collections.ARROW_AVAILABLE", False)
+    def test_arrow_without_the_extra_is_not_acceptable(self):
+        url = f"{collections_url}/tests.point_2056_10fields/items"
+        for item_url in (url, f"{url}/{Point_2056_10fields.objects.first().pk}"):
+            with self.subTest(url=item_url):
+                response = self.client.get(item_url, headers={"Accept": "application/vnd.apache.arrow.stream"})
+
+                self.assertEqual(response.status_code, 406)
+                geojson = self.client.get(item_url, headers={"Accept": "application/geo+json"})
+                self.assertEqual(geojson.status_code, 200)
+
+    @requires_arrow
     def test_arrow_empty_page(self):
         # an empty page used to come back as a table without a single column
         for collection in ("tests.point_2056_10fields", "tests.nogeom_10fields"):
@@ -477,6 +496,7 @@ class TestOutputFormat(TestCase):
                 self.assertEqual(empty_table.num_rows, 0)
                 self.assertEqual(empty_table.schema.names, populated_table.schema.names)
 
+    @requires_arrow
     def test_arrow_empty_collection(self):
         response = self.client.get(
             f"{collections_url}/tests.point_2056_empty/items",
@@ -489,6 +509,7 @@ class TestOutputFormat(TestCase):
         self.assertIn("geometry", table.schema.names)
         self.assertIsInstance(table.schema.field("geometry").type, WkbType)
 
+    @requires_arrow
     def test_arrow_pages_share_one_schema(self):
         # a column that is all null on one page used to be null-typed, and stop concatenating
         Point_2056_Empty.objects.create(geom="POINT(2508500 1152000)", field_int=1)
@@ -506,6 +527,7 @@ class TestOutputFormat(TestCase):
         self.assertEqual(pages[0].schema, pages[1].schema)
         self.assertEqual(pa.concat_tables(pages).num_rows, 2)
 
+    @requires_arrow
     def test_arrow_columns_keep_the_declared_order(self):
         # the order of a set changes from one process to the next, so pages served by different
         # workers used to come back with their columns shuffled, and no longer concatenated
@@ -529,6 +551,7 @@ class TestOutputFormat(TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(pa.ipc.open_stream(response.content).schema.names, columns)
 
+    @requires_arrow
     def test_arrow_reports_the_total_and_the_page_links(self):
         # an Arrow stream cannot carry them in the payload, so they go to the headers
         url = f"{collections_url}/tests.point_2056_10fields/items?limit=1&offset=1"
@@ -568,6 +591,7 @@ class TestOutputFormat(TestCase):
         self.assertEqual(feature_collection.numberMatched, 5)
         self.assertIsNotNone(feature_collection.bbox)
 
+    @requires_arrow
     def test_arrow_crs_matches_coordinates(self):
         # the column crs must describe the coordinates that are in it, not the storage srid
         for crs_uri, expected_crs in ((None, "OGC:CRS84"), (crs_2056, "EPSG:2056")):
@@ -587,6 +611,7 @@ class TestOutputFormat(TestCase):
                     geojson.json()["features"][0]["geometry"],
                 )
 
+    @requires_arrow
     def test_arrow_geometry_types(self):
         for collection, geometry_type in self.COLLECTIONS.items():
             with self.subTest(collection=collection):
