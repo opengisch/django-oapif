@@ -990,6 +990,24 @@ class TestCrs(TestCase):
                         response = method(item_url, feature, content_type="application/json", headers=crs_header)
                         self.assertEqual(response.status_code, 400)
 
+    def test_content_crs_of_a_response_is_taken_by_writes(self):
+        # the header has the URI in angle brackets: a client that sent it back as it came used to be refused
+        self.client.force_login(User.objects.get(username="demo_editor"))
+        url = f"{collections_url}/tests.point_2056_10fields/items"
+        content_crs = self.client.get(f"{url}?limit=1&crs={crs_2056}").headers["Content-Crs"]
+        feature = {
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [2600000.0, 1200000.0]},
+            "properties": {},
+        }
+
+        post = self.client.post(url, feature, content_type="application/json", headers={"Content-Crs": content_crs})
+
+        self.assertEqual(content_crs, f"<{crs_2056}>")
+        self.assertEqual(post.status_code, 201)
+        # and read in the CRS it names
+        self.assertEqual(Point_2056_10fields.objects.get(pk=post.json()["id"]).geom.coords, (2600000.0, 1200000.0))
+
     def test_unadvertised_bbox_crs_is_rejected(self):
         url = f"{collections_url}/tests.point_2056_10fields/items?bbox=0,0,1,1&bbox-crs={crs_base}/EPSG/0/3857"
 

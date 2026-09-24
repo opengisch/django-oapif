@@ -21,6 +21,10 @@ class CRS:
     def __get_pydantic_core_schema__(cls, _source: Any, _handler: GetCoreSchemaHandler):
 
         def validate_crs(uri: str):
+            # a Content-Crs header has the URI in angle brackets, as the responses send it, and so may the
+            # clients that write back what they read
+            if uri.startswith("<") and uri.endswith(">"):
+                uri = uri[1:-1]
             if result := CRS_URI_PATTERN.match(uri):
                 auth, code = result.groups()
                 if auth == "OGC" and code in ("CRS84", "CRS84h"):
