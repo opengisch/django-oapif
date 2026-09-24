@@ -8,7 +8,7 @@ from django.contrib.gis.geos.libgeos import geos_version_tuple
 from django.db.models import Model
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404
-from ninja import Header, Query, Router
+from ninja import Header, Query, Router, Schema
 from ninja.errors import AuthorizationError, HttpError, ValidationError
 
 from django_oapif import jsonfg
@@ -76,6 +76,16 @@ def get_page_links(
             )
         )
     return links
+
+
+def geojson_response(geojson: Schema, crs: CRS) -> HttpResponse:
+    """
+    Serialized by pydantic: returned as they are, ninja would validate the features all over again, and
+    render them with json.dumps, which takes ten times as long.
+    """
+    response = HttpResponse(geojson.model_dump_json(), content_type=GEOJSON_MEDIA_TYPE)
+    response["Content-Crs"] = crs.uri_header()
+    return response
 
 
 def link_header(links: list[OAPIFLink]) -> str:
@@ -278,7 +288,6 @@ def create_collections_router(collections: dict[str, OapifCollection]):
     )
     def get_items(
         request: HttpRequest,
-        response: HttpResponse,
         collection_id: str,
         limit: int = 100,
         offset: int = 0,
@@ -313,9 +322,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
             number_matched=total_count,
             links=get_page_links(request, limit, offset, total_count),
         )
-        response["Content-Crs"] = crs.uri_header()
-        response["Content-Type"] = GEOJSON_MEDIA_TYPE
-        return feature_collection
+        return geojson_response(feature_collection, crs)
 
     @router.api_operation(
         ["OPTIONS"],
@@ -341,7 +348,6 @@ def create_collections_router(collections: dict[str, OapifCollection]):
     )
     def get_item(
         request: HttpRequest,
-        response: HttpResponse,
         collection_id: str,
         item_id: str,
         crs: CRS = DEFAULT_CRS,
@@ -357,9 +363,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
             arrow_response = HttpResponse(stream.getvalue().to_pybytes(), content_type=ARROW_STREAM_MEDIA_TYPE)
             arrow_response["Content-Crs"] = crs.uri_header()
             return arrow_response
-        response["Content-Crs"] = crs.uri_header()
-        response["Content-Type"] = GEOJSON_MEDIA_TYPE
-        return collection.model_to_feature(request, item)
+        return geojson_response(collection.model_to_feature(request, item), crs)
 
     @router.post(
         "/{collection_id}/items",
