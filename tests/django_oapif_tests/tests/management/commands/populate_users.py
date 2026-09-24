@@ -1,6 +1,9 @@
+from django.contrib.auth import get_permission_codename
 from django.contrib.auth.models import Group, Permission, User
+from django.contrib.contenttypes.models import ContentType
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django_oapif_tests.tests.oapif import oapif
 
 
 class Command(BaseCommand):
@@ -14,23 +17,11 @@ class Command(BaseCommand):
         viewing = []
         deleting = []
 
-        for model in (
-            "point_2056_10fields",
-            "nogeom_10fields",
-            "nogeom_100fields",
-            "line_2056_10fields",
-            "polygon_2056",
-            "secretlayer",
-            "mandatoryfield",
-            "geometry_2056",
-            "point_2056_empty",
-            "layerwithforeignkey",
-            "layerwithfile",
-        ):
-            adding.append(Permission.objects.get(codename=f"add_{model}"))
-            modifying.append(Permission.objects.get(codename=f"change_{model}"))
-            deleting.append(Permission.objects.get(codename=f"delete_{model}"))
-            viewing.append(Permission.objects.get(codename=f"view_{model}"))
+        # the models of every registered collection, so that a new one cannot be left out
+        for model in dict.fromkeys(collection.model for collection in oapif.collections.values()):
+            permissions = Permission.objects.filter(content_type=ContentType.objects.get_for_model(model))
+            for action, granted in (("add", adding), ("change", modifying), ("delete", deleting), ("view", viewing)):
+                granted.append(permissions.get(codename=get_permission_codename(action, model._meta)))
 
         editing = adding + modifying + deleting + viewing
 

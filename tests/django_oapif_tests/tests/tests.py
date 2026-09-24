@@ -111,7 +111,7 @@ class TestBasicAuth(TestCase):
 
     def test_line_must_have_the_dimension_of_its_collection(self):
         # LineString used to take any dimension, and the insert then failed in the database with a 500
-        self.client.force_login(user=User.objects.get(username="admin"))
+        self.client.force_login(user=self.demo_editor)
         line_2d = [[2508500.0, 1152000.0], [2508600.0, 1152100.0]]
         line_3d = [[2508500.0, 1152000.0, 1.0], [2508600.0, 1152100.0, 2.0]]
         for collection, coordinates, status in (
@@ -133,7 +133,7 @@ class TestBasicAuth(TestCase):
     def test_put_and_patch_change_the_feature_of_the_url(self):
         # the payload used to set the primary key: a PUT without it inserted a copy under a fresh key, and one
         # carrying another feature's key overwrote that feature
-        self.client.force_login(user=User.objects.get(username="admin"))
+        self.client.force_login(user=self.demo_editor)
         url = f"{collections_url}/tests.point_2056_10fields/items"
         target = Point_2056_10fields.objects.create(geom="SRID=2056;POINT(2600000 1200000)", field_str_0="target")
         other = Point_2056_10fields.objects.create(geom="SRID=2056;POINT(2600100 1200100)", field_str_0="other")
@@ -823,6 +823,7 @@ class TestGeometry3D(TestCase):
 class TestCrs(TestCase):
     @classmethod
     def setUpTestData(cls):
+        call_command("populate_users")
         call_command("populate_data", "-s 100")
 
     def test_uri_keeps_the_requested_authority(self):
@@ -885,7 +886,7 @@ class TestCrs(TestCase):
     def test_writes_take_only_an_advertised_content_crs(self):
         # coordinates are always read as x/y: a client sending EPSG:4326 latitude first would have its
         # features stored with swapped coordinates, so a CRS the collection does not offer is refused
-        self.client.force_login(User.objects.create_superuser(username="crs_admin", email=None, password="123"))
+        self.client.force_login(User.objects.get(username="demo_editor"))
         url = f"{collections_url}/tests.point_2056_10fields/items"
         item_url = f"{url}/{Point_2056_10fields.objects.first().pk}"
         for crs, coordinates, status in (
@@ -934,6 +935,7 @@ class TestCircularString(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        call_command("populate_users")
         # The GEOS version used by geodjango does not support curves, so insert the WKT as is
         table_name = connection.ops.quote_name(Arc_2056_10fields._meta.db_table)
         cls.ids = {count: uuid.uuid4() for count in cls.POINT_COUNTS}
@@ -976,7 +978,7 @@ class TestCircularString(TestCase):
 
     def test_arc_can_be_deleted(self):
         # fetching an item to act on used to load the geometry through GEOS, which has no curve support
-        self.client.force_login(User.objects.create_superuser(username="arc_admin", email=None, password="123"))
+        self.client.force_login(User.objects.get(username="demo_editor"))
         url = f"{collections_url}/tests.arc_2056_10fields/items/{self.ids[3]}"
 
         self.assertEqual(self.client.delete(url).status_code, 200)
@@ -984,7 +986,7 @@ class TestCircularString(TestCase):
 
     def test_arc_of_even_points_is_a_client_error(self):
         # the validation error used to carry a ValueError, which could not be serialized: a 500
-        self.client.force_login(User.objects.create_superuser(username="arc_writer", email=None, password="123"))
+        self.client.force_login(User.objects.get(username="demo_editor"))
         arc = {"type": "CircularString", "coordinates": [[2508500.0, 1152000.0], [2508510.0, 1152010.0]]}
 
         response = self.client.post(
@@ -999,7 +1001,7 @@ class TestCircularString(TestCase):
 
     def test_other_geometry_type_is_a_client_error(self):
         # a curve column validated against any geometry type, and the insert then failed in the database
-        self.client.force_login(User.objects.create_superuser(username="arc_typist", email=None, password="123"))
+        self.client.force_login(User.objects.get(username="demo_editor"))
         line = {"type": "LineString", "coordinates": [[2508500.0, 1152000.0], [2508520.0, 1152000.0]]}
 
         response = self.client.post(
@@ -1145,6 +1147,7 @@ class TestWriteGeometries(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        call_command("populate_users")
         # an arc to replace and update, inserted as it is: GEOS may not know curves
         table_name = connection.ops.quote_name(Arc_2056_10fields._meta.db_table)
         cls.arc_id = uuid.uuid4()
@@ -1155,7 +1158,7 @@ class TestWriteGeometries(TestCase):
             )
 
     def setUp(self):
-        self.client.force_login(User.objects.create_superuser(username="writer", email=None, password="123"))
+        self.client.force_login(User.objects.get(username="demo_editor"))
 
     def post(self, collection, geometry, crs=crs_2056):
         return self.client.post(
