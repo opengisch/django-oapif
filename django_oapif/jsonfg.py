@@ -1,5 +1,6 @@
 """Minimal JSON-FG geometry dict <-> WKB conversions: reads ISO and EWKB, writes ISO. Stdlib only."""
 
+from math import sqrt
 from struct import pack, unpack_from
 
 # base type code -> (JSON-FG name, structure)
@@ -29,14 +30,58 @@ _FLATTEN = {"MultiPoint", "MultiLineString", "MultiPolygon"}
 # JSON-FG allows 5 arcs in a CircularString: a longer one is served as the CompoundCurve of its arcs,
 # 5 at a time, which draws the very same curve
 _MAX_ARC_POINTS = 11
+# below this, PostGIS takes the ends of an arc for the same point, and its points for aligned ones
+_EPSILON_SQLMM = 1e-8
 
 
-def _coords(buf, off, n, dim, e):
+def _coords(buf, off, n, dim, e, bounds=None):
     vals = unpack_from(f"{e}{n * dim}d", buf, off)
+    if bounds is not None and n:
+        xs, ys = vals[0::dim], vals[1::dim]
+        bounds.append((min(xs), min(ys), max(xs), max(ys)))
     return [list(vals[i : i + dim]) for i in range(0, len(vals), dim)], off + 8 * n * dim
 
 
-def _geom(buf, off):
+def _side(x1, y1, x2, y2, x, y):
+    """Which side of the line from 1 to 2 the point is on: -1, 0 on it, or 1."""
+    side = (x - x1) * (y2 - y1) - (x2 - x1) * (y - y1)
+    return (side > 0) - (side < 0)
+
+
+def _arc_box(x1, y1, x2, y2, x3, y3):
+    """
+    The box of the arc from 1 through 2 to 3, computed as PostGIS does, so that it comes out the same: its
+    circle reaches beyond the ends on the side of the chord where the middle point is.
+    """
+    if abs(x1 - x3) < _EPSILON_SQLMM and abs(y1 - y3) < _EPSILON_SQLMM:
+        # a full circle, whose middle point is the opposite of its ends
+        cx, cy = x1 + (x2 - x1) / 2.0, y1 + (y2 - y1) / 2.0
+    else:
+        dx21, dy21, dx31, dy31 = x2 - x1, y2 - y1, x3 - x1, y3 - y1
+        h21, h31 = dx21**2 + dy21**2, dx31**2 + dy31**2
+        d = 2 * (dx21 * dy31 - dx31 * dy21)
+        if abs(d) < _EPSILON_SQLMM:
+            # aligned points, a straight segment
+            return min(x1, x3), min(y1, y3), max(x1, x3), max(y1, y3)
+        cx = x1 + (h21 * dy31 - h31 * dy21) / d
+        cy = y1 - (h21 * dx31 - h31 * dx21) / d
+    r = sqrt((cx - x1) ** 2 + (cy - y1) ** 2)
+    if x1 == x3 and y1 == y3:
+        return cx - r, cy - r, cx + r, cy + r
+    xmin, ymin, xmax, ymax = min(x1, x3), min(y1, y3), max(x1, x3), max(y1, y3)
+    middle = _side(x1, y1, x3, y3, x2, y2)
+    if _side(x1, y1, x3, y3, cx - r, cy) == middle:
+        xmin = cx - r
+    if _side(x1, y1, x3, y3, cx, cy - r) == middle:
+        ymin = cy - r
+    if _side(x1, y1, x3, y3, cx + r, cy) == middle:
+        xmax = cx + r
+    if _side(x1, y1, x3, y3, cx, cy + r) == middle:
+        ymax = cy + r
+    return xmin, ymin, xmax, ymax
+
+
+def _geom(buf, off, bounds=None):
     e = "<" if buf[off] == 1 else ">"
     (code,) = unpack_from(e + "I", buf, off + 1)
     off += 5
@@ -55,14 +100,20 @@ def _geom(buf, off):
     if kind == "pt":
         pts, off = _coords(buf, off, 1, dim, e)
         empty = all(v != v for v in pts[0])  # POINT EMPTY is encoded as NaNs
+        if bounds is not None and not empty:
+            x, y = pts[0][:2]
+            bounds.append((x, y, x, y))
         return {"type": name, "coordinates": [] if empty else pts[0]}, off
 
     (n,) = unpack_from(e + "I", buf, off)
     off += 4
 
     if kind == "pts":
-        pts, off = _coords(buf, off, n, dim, e)
-        if name == "CircularString" and n > _MAX_ARC_POINTS:
+        arcs = name == "CircularString"
+        pts, off = _coords(buf, off, n, dim, e, None if arcs else bounds)
+        if arcs and bounds is not None:
+            bounds.extend(_arc_box(*pts[i][:2], *pts[i + 1][:2], *pts[i + 2][:2]) for i in range(0, n - 2, 2))
+        if arcs and n > _MAX_ARC_POINTS:
             # each part starts on the last point of the previous one
             step = _MAX_ARC_POINTS - 1
             parts = [{"type": name, "coordinates": pts[i : i + _MAX_ARC_POINTS]} for i in range(0, n - 1, step)]
@@ -74,13 +125,13 @@ def _geom(buf, off):
         for _ in range(n):
             (m,) = unpack_from(e + "I", buf, off)
             off += 4
-            pts, off = _coords(buf, off, m, dim, e)
+            pts, off = _coords(buf, off, m, dim, e, bounds)
             rings.append(pts)
         return {"type": name, "coordinates": rings}, off
 
     parts = []
     for _ in range(n):
-        part, off = _geom(buf, off)
+        part, off = _geom(buf, off, bounds)
         parts.append(part)
     if name == "CompoundCurve":
         # a CompoundCurve cannot hold another, so the parts of a long CircularString join its own
@@ -90,9 +141,12 @@ def _geom(buf, off):
     return {"type": name, "geometries": parts}, off
 
 
-def loads(wkb):
-    """Parse one ISO (or EWKB) geometry into a JSON-FG geometry dict."""
-    return _geom(wkb, 0)[0]
+def loads(wkb, bounds: list | None = None):
+    """
+    Parse one ISO (or EWKB) geometry into a JSON-FG geometry dict. Given a list, adds to it the boxes
+    (xmin, ymin, xmax, ymax) of its parts, whose union is the box PostGIS computes for it, arcs included.
+    """
+    return _geom(wkb, 0, bounds)[0]
 
 
 # base type code of each JSON-FG type, for writing: the polyhedral ones are read as (Multi)Polygons

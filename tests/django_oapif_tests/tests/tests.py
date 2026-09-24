@@ -12,6 +12,7 @@ from django.contrib.gis.db.models import Extent
 from django.contrib.gis.db.models.functions import Transform
 from django.core.management import call_command
 from django.db import connection
+from django.db.models import FloatField, Func, Max, Min
 from django.test import RequestFactory
 from django.test.testcases import TestCase
 from django.test.utils import CaptureQueriesContext
@@ -54,6 +55,15 @@ crs84 = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
 crs_base = "http://www.opengis.net/def/crs"
 
 headers = {"Content-Crs": crs_2056}
+
+
+def extent(queryset, geometry) -> tuple[float, float, float, float]:
+    """The extent of the geometries, at the full precision of their coordinates, which Extent rounds to 15 digits."""
+    aggregates = {
+        name: aggregate(Func(geometry, function=f"ST_{name}", output_field=FloatField()))
+        for name, aggregate in (("XMin", Min), ("YMin", Min), ("XMax", Max), ("YMax", Max))
+    }
+    return tuple(queryset.aggregate(**aggregates).values())
 
 
 class TestBasicAuth(TestCase):
@@ -575,9 +585,12 @@ class TestOutputFormat(TestCase):
 
                 self.assertEqual(response.status_code, 200)
                 page = Point_2056_10fields.objects.order_by("pk")[20:30]
-                self.assertEqual(tuple(response.json()["bbox"]), page.aggregate(extent=Extent(geometry))["extent"])
-                # the boxes come along with the features, instead of from a query of their own
+                self.assertEqual(tuple(response.json()["bbox"]), extent(page, geometry))
+                # the boxes come along with the features, instead of from a query of their own, or from
+                # reprojecting the geometries again
                 self.assertFalse(any("ST_Extent" in query["sql"] for query in queries.captured_queries))
+                transforms = sum(query["sql"].count("ST_Transform") for query in queries.captured_queries)
+                self.assertEqual(transforms, 0 if crs_uri else 1)
 
     def test_featurecollection_is_complete_on_its_own(self):
         # it used to come back with numberMatched=0 and no bbox, for the endpoint to fill in
@@ -585,7 +598,7 @@ class TestOutputFormat(TestCase):
         request = RequestFactory().get("/")
         crs = CRS("OGC", 4326)
 
-        feature_collection = collection.queryset_to_featurecollection(request, collection.query(request, crs)[:5], crs)
+        feature_collection = collection.queryset_to_featurecollection(request, collection.query(request, crs)[:5])
 
         self.assertEqual(feature_collection.numberReturned, 5)
         self.assertEqual(feature_collection.numberMatched, 5)
@@ -820,6 +833,48 @@ class TestGeometry3D(TestCase):
         self.assertAlmostEqual(coordinates[2], 555.0, places=3)
 
 
+class TestBounds(TestCase):
+    """The bbox of a page is the union of the boxes the WKB reader gathers: they have to be the PostGIS ones."""
+
+    WKTS = (
+        "POINT (2600000 1200000)",
+        "POINT EMPTY",
+        "LINESTRING (0 0, 3 -1, 2 5)",
+        "POLYGON ((0 0, 4 0, 4 3, 0 0), (1 0.5, 3 0.5, 3 2, 1 0.5))",
+        "POLYGON Z ((0 0 5, 4 0 6, 4 3 7, 0 0 5))",
+        "MULTIPOINT ((0 0), (5 -1))",
+        "MULTIPOLYGON (((0 0, 1 0, 1 1, 0 0)), ((10 10, 11 10, 11 12, 10 10)))",
+        "GEOMETRYCOLLECTION (POINT (-3 7), LINESTRING (0 0, 1 1))",
+        # an arc that reaches beyond its points, a full circle, and aligned points
+        "CIRCULARSTRING (0.5 0.8660254037844386, -1 0, 0.5 -0.8660254037844386)",
+        "CIRCULARSTRING (0 0, 2 0, 0 0)",
+        "CIRCULARSTRING (0 0, 1 1, 2 2)",
+        "COMPOUNDCURVE (CIRCULARSTRING (0 0, 1 1, 2 0), (2 0, 3 -1))",
+        "CURVEPOLYGON (CIRCULARSTRING (0 0, 4 0, 0 0), (1 -1, 3 -1, 3 1, 1 -1))",
+        "MULTICURVE (CIRCULARSTRING (0 0, 1 1, 2 0), (5 5, 6 7))",
+        "MULTISURFACE (CURVEPOLYGON (CIRCULARSTRING (0 0, 4 0, 0 0)), ((10 10, 11 10, 11 12, 10 10)))",
+    )
+
+    def test_bounds_are_the_postgis_box(self):
+        for wkt in self.WKTS:
+            with self.subTest(wkt=wkt):
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT ST_AsBinary(g), ST_XMin(b), ST_YMin(b), ST_XMax(b), ST_YMax(b)"
+                        " FROM ST_GeomFromText(%s) AS g, Box2D(g) AS b",
+                        [wkt],
+                    )
+                    wkb, *box = cursor.fetchone()
+                bounds = []
+                jsonfg.loads(bytes(wkb), bounds)
+
+                if box[0] is None:
+                    self.assertEqual(bounds, [])
+                else:
+                    xmins, ymins, xmaxs, ymaxs = zip(*bounds)
+                    self.assertEqual((min(xmins), min(ymins), max(xmaxs), max(ymaxs)), tuple(box))
+
+
 class TestCrs(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -1001,12 +1056,16 @@ class TestCircularString(TestCase):
                 [uuid.uuid4(), "CIRCULARSTRING(2600000 1200000, 2600020 1200060, 2600200 1200000)"],
             )
 
-        response = self.client.get(f"{collections_url}/tests.arc_2056_10fields/items?crs={crs_2056}")
+        for crs_uri, geometry in ((None, Transform("geom", 4326)), (crs_2056, "geom")):
+            with self.subTest(crs=crs_uri or crs84):
+                url = f"{collections_url}/tests.arc_2056_10fields/items"
+                response = self.client.get(f"{url}?crs={crs_uri}" if crs_uri else url)
 
-        self.assertEqual(response.status_code, 200)
-        bbox = tuple(response.json()["bbox"])
-        self.assertEqual(bbox, Arc_2056_10fields.objects.aggregate(extent=Extent("geom"))["extent"])
-        self.assertGreater(bbox[3], 1200099)
+                self.assertEqual(response.status_code, 200)
+                bbox = tuple(response.json()["bbox"])
+                self.assertEqual(bbox, extent(Arc_2056_10fields.objects, geometry))
+                if crs_uri:
+                    self.assertGreater(bbox[3], 1200099)
 
     def test_arc_item_options(self):
         response = self.client.options(f"{collections_url}/tests.arc_2056_10fields/items/{self.ids[3]}")

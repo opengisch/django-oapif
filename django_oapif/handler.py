@@ -84,16 +84,6 @@ model_config = {
 }
 
 
-class Box2D(Func):
-    """
-    The 2D box of a geometry, as PostGIS computes it: only it knows where a curve goes between its
-    control points, and an arc can reach well beyond them.
-    """
-
-    function = "Box2D"
-    output_field = TextField()
-
-
 def parse_box2d(value: str) -> tuple[float, float, float, float]:
     """Read a PostGIS box, which comes as 'BOX(xmin ymin,xmax ymax)'."""
     xmin, ymin, xmax, ymax = map(float, value.removeprefix("BOX(").removesuffix(")").replace(",", " ").split())
@@ -462,7 +452,6 @@ class OapifCollection[M: Model]:
         self,
         request: HttpRequest,
         qs: QuerySet,
-        crs: CRS,
         *,
         number_matched: int | None = None,
         links: list[OAPIFLink] | None = None,
@@ -473,15 +462,12 @@ class OapifCollection[M: Model]:
         """
         FeatureSchema = self.get_feature_output_schema(request)
         FeatureCollectionSchema = FeatureCollection[FeatureSchema]
-        if self.geometry_field:
-            # the box of each geometry comes along with it, so that the collection one takes no extra query
-            qs = qs.annotate(_oapif_bbox=Box2D(self._geometry_in(crs)))
         features = []
+        # the boxes of the geometries, taken as they are read, so that the collection one takes no extra
+        # query, nor reprojecting them all again
         boxes = []
         for obj in qs:
-            features.append(self._model_to_feature(FeatureSchema, obj))
-            if box := getattr(obj, "_oapif_bbox", None):
-                boxes.append(parse_box2d(box))
+            features.append(self._model_to_feature(FeatureSchema, obj, boxes))
         bbox = None
         if boxes:
             xmins, ymins, xmaxs, ymaxs = zip(*boxes)
@@ -544,12 +530,12 @@ class OapifCollection[M: Model]:
         schema = self.get_feature_output_schema(request)
         return self._model_to_feature(schema, obj)
 
-    def _model_to_feature(self, schema: type[Feature], obj: M) -> Feature:
+    def _model_to_feature(self, schema: type[Feature], obj: M, bounds: list | None = None) -> Feature:
         geometry_wkb = getattr(obj, "_oapif_geometry", None)
         return schema(
             type="Feature",
             id=str(obj.pk),
-            geometry=jsonfg.loads(bytes(geometry_wkb)) if geometry_wkb else None,
+            geometry=jsonfg.loads(bytes(geometry_wkb), bounds) if geometry_wkb else None,
             properties=obj,
         )
 
