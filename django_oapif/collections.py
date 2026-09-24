@@ -14,6 +14,7 @@ from ninja.errors import AuthorizationError, HttpError, ValidationError
 from django_oapif import jsonfg
 from django_oapif.crs import CRS, CRS84_SRID, CRS84_URI, BBox
 from django_oapif.geojson import (
+    CircularStringParts,
     GenericFeature,
     GenericFeatureCollection,
     GenericFeaturePatch,
@@ -156,8 +157,10 @@ def geometry_to_save(geometry, crs: CRS) -> GEOSGeometry | None:
         return None
     if not is_geojson(geometry) and not writes_curves():
         raise HttpError(501, "Curves can only be written with GEOS 3.13 or newer and a Django that supports them")
+    # a CircularString served in parts goes back into its column as one
+    data = geometry.circular_string() if isinstance(geometry, CircularStringParts) else geometry.model_dump()
     try:
-        return GEOSGeometry(memoryview(jsonfg.dumps(geometry.model_dump())), srid=crs.srid)
+        return GEOSGeometry(memoryview(jsonfg.dumps(data)), srid=crs.srid)
     except GEOSException:
         # GEOS checks what the schema cannot, such as the closing of the rings
         raise HttpError(422, "Invalid geometry")
