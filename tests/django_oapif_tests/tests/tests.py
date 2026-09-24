@@ -281,22 +281,26 @@ class TestBasicAuth(TestCase):
         now = datetime.datetime.now()
         obj = LayerWithDate.objects.create(date=today, time=now)
         obj.refresh_from_db()
-        url = f"{collections_url}/tests.layerwithdate/items/{obj.id}"
-        response = self.client.get(url, headers=headers, content_type="application/json")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            response.json(),
-            {
+        feature = {
+            "id": str(obj.id),
+            "type": "Feature",
+            "geometry": None,
+            "properties": {
+                "date": str(today),
+                # to the millisecond, as Django writes them, where pydantic would go to the microsecond
+                "time": now.isoformat(timespec="milliseconds") + "Z",
                 "id": str(obj.id),
-                "type": "Feature",
-                "geometry": None,
-                "properties": {
-                    "date": str(today),
-                    "time": now.isoformat(timespec="milliseconds") + "Z",
-                    "id": str(obj.id),
-                },
             },
-        )
+        }
+        url = f"{collections_url}/tests.layerwithdate/items"
+
+        item = self.client.get(f"{url}/{obj.id}", headers=headers, content_type="application/json")
+        items = self.client.get(url, headers=headers, content_type="application/json")
+
+        self.assertEqual(item.status_code, 200)
+        self.assertEqual(item.json(), feature)
+        self.assertEqual(items.status_code, 200)
+        self.assertIn(feature, items.json()["features"])
 
 
 class TestSchema(TestCase):

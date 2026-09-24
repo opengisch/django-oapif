@@ -8,7 +8,10 @@ from django.contrib.auth import get_permission_codename
 from django.contrib.gis.db.models import Extent, GeometryField
 from django.contrib.gis.db.models.functions import AsWKB, Transform
 from django.contrib.gis.geos import Polygon as GEOSPolygon
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import (
+    DateTimeField,
+    DurationField,
     FileField,
     ForeignKey,
     Func,
@@ -18,12 +21,13 @@ from django.db.models import (
     Model,
     QuerySet,
     TextField,
+    TimeField,
 )
 from django.http import HttpRequest
 from ninja import Field, ModelSchema, Schema
 from ninja.errors import ValidationError
 from ninja.schema import NinjaGenerateJsonSchema
-from pydantic import ConfigDict
+from pydantic import ConfigDict, field_serializer
 from pydantic import ValidationError as PydanticValidationError
 from pydantic.config import ExtraValues
 
@@ -381,16 +385,25 @@ class OapifCollection[M: Model]:
 
         # qualified as nested in the schema, so that pydantic does not take it for a field
         Meta.__qualname__ = f"{name}.Meta"
-        return new_class(
-            name,
-            (ModelSchema,),
-            exec_body=lambda namespace: namespace.update(
-                __module__=__name__,
-                __qualname__=name,
-                model_config=ConfigDict(**model_config, extra=extra),
-                Meta=Meta,
-            ),
-        )
+        body = {
+            "__module__": __name__,
+            "__qualname__": name,
+            "model_config": ConfigDict(**model_config, extra=extra),
+            "Meta": Meta,
+        }
+        # the JSON of pydantic writes times to the microsecond, and durations its own way: they are written
+        # as Django does, whether ninja renders the features or the endpoints serialize them themselves. The
+        # fields are not there to check yet: ninja adds them to a subclass of the one the body makes
+        temporal = [
+            field.name
+            for field in self.model._meta.concrete_fields
+            if isinstance(field, (DateTimeField, TimeField, DurationField))
+            and (properties_fields == "__all__" or field.name in properties_fields)
+        ]
+        if temporal:
+            serialize = field_serializer(*temporal, when_used="json-unless-none", check_fields=False)
+            body["serialize_temporal"] = serialize(DjangoJSONEncoder().default)
+        return new_class(name, (ModelSchema,), exec_body=lambda namespace: namespace.update(body))
 
     def get_feature_input_schema(self, request: HttpRequest) -> type[Feature]:
         fields = without(self.get_fields(request), self.get_exclude(request), self.get_readonly_fields(request))
