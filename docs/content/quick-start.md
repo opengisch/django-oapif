@@ -13,6 +13,14 @@ Install with your favorite package manager
 pip install --user https://github.com/opengisch/django-oapif
 ```
 
+Django needs a driver for PostgreSQL, which django-oapif leaves to your project to choose. Unless it has one
+already, install [psycopg 3](https://www.psycopg.org/psycopg3/docs/basic/install.html), which Django
+recommends:
+
+```bash
+pip install "psycopg[binary]"
+```
+
 To serve [GeoArrow](geoarrow.md) as well, install the `arrow` extra:
 
 ```bash
