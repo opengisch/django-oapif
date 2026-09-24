@@ -21,7 +21,9 @@ COPY requirements-arrow.txt .
 
 RUN pip install -r requirements.txt
 RUN pip install -r requirements-dev.txt
-RUN pip install -r requirements-arrow.txt
+# the optional arrow extra, left out to test django-oapif without it
+ARG ARROW=true
+RUN if [ "$ARROW" = "true" ]; then pip install -r requirements-arrow.txt; fi
 
 COPY . /usr/src/
 

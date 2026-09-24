@@ -1,0 +1,9 @@
+# The test stack without the arrow extra, which django-oapif and its tests have to do without.
+# Add it to COMPOSE_FILE: tests/docker-compose.yml:tests/docker-compose.dev.yml:tests/docker-compose.no-arrow.yml
+
+services:
+  django:
+    image: opengisch/django-oapif:no-arrow
+    build:
+      args:
+        ARROW: "false"

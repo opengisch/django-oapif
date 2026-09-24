@@ -26,6 +26,18 @@ docker compose up --build -d
 docker compose exec django python manage.py test
 ```
 
+### Without the arrow extra
+
+GeoArrow is an optional extra, which django-oapif and its tests have to do without. To check it, build the
+stack from `docker-compose.no-arrow.yml` as well, which leaves the extra out, and the Arrow tests are
+skipped:
+
+```bash
+export COMPOSE_FILE=tests/docker-compose.yml:tests/docker-compose.dev.yml:tests/docker-compose.no-arrow.yml
+docker compose up --build -d
+docker compose exec django python manage.py test
+```
+
 ## OGC Conformance
 
 You can run the OGC API conformance test suite like this:

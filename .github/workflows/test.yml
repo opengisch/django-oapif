@@ -27,6 +27,9 @@ jobs:
           # GEOS 3.13 and a Django fork that knows curves, where they can be written
           - name: tests (curves)
             compose_file: tests/docker-compose.yml:tests/docker-compose.dev.yml:tests/docker-compose.curves.yml
+          # without the arrow extra, which django-oapif and its tests have to do without
+          - name: tests (without arrow)
+            compose_file: tests/docker-compose.yml:tests/docker-compose.dev.yml:tests/docker-compose.no-arrow.yml
     env:
       DOCKER_BUILDKIT: 1
       COMPOSE_DOCKER_CLI_BUILD: 1
@@ -48,6 +51,11 @@ jobs:
         docker compose exec django python manage.py migrate --no-input
         docker compose exec django python manage.py populate_users
         docker compose exec django python manage.py populate_data
+
+    - name: Check that Arrow is missing
+      # otherwise a dependency bringing pyarrow back would make this job test the default stack again
+      if: ${{ matrix.name == 'tests (without arrow)' }}
+      run: docker compose exec django python manage.py shell -c "import sys; from django_oapif.handler import ARROW_AVAILABLE; sys.exit(ARROW_AVAILABLE)"
 
     - name: Run unit tests
       run: docker compose exec django python manage.py test
