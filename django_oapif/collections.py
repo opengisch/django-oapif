@@ -11,6 +11,8 @@ from django.shortcuts import get_object_or_404
 from django.utils.cache import patch_vary_headers
 from ninja import Header, Query, Router, Schema
 from ninja.errors import AuthorizationError, HttpError, ValidationError
+from pydantic import TypeAdapter
+from pydantic import ValidationError as PydanticValidationError
 
 from django_oapif import jsonfg
 from django_oapif.crs import CRS, CRS84_SRID, CRS84_URI, BBox
@@ -41,6 +43,7 @@ ACCEPTED_TYPES = [
 ]
 
 DEFAULT_CRS = CRS("OGC", CRS84_SRID)
+CRS_ADAPTER = TypeAdapter(CRS)
 
 
 def get_page_links(
@@ -120,6 +123,23 @@ def validate_crs_or_raise(collection: OapifCollection, crs: CRS, parameter: str)
         400,
         f"Unsupported {parameter} '{crs.uri()}'. Supported: {', '.join(c.uri() for c in supported)}",
     )
+
+
+def take_jsonfg_members_or_raise(feature: GenericFeature | GenericFeaturePatch, crs: CRS) -> None:
+    """
+    JSON-FG writes the geometries GeoJSON cannot carry, like the ones with arcs, in "place", its "geometry" being
+    then their linearized fallback or null: a "place" is the geometry to store. Coordinates are read in the
+    Content-Crs, so a coordRefSys naming another CRS is refused.
+    """
+    if feature.coordRefSys is not None:
+        try:
+            coord_ref_sys = CRS_ADAPTER.validate_python(feature.coordRefSys)
+        except PydanticValidationError:
+            raise HttpError(400, f"Unsupported coordRefSys '{feature.coordRefSys}'")
+        if coord_ref_sys != crs:
+            raise HttpError(400, f"coordRefSys '{coord_ref_sys.uri()}' differs from the Content-Crs '{crs.uri()}'")
+    if feature.place is not None:
+        feature.geometry = feature.place
 
 
 def get_item_or_404(collection: OapifCollection, request: HttpRequest, item_id: str):
@@ -394,6 +414,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
     ):
         collection = get_collection_by_id(collection_id, request)
         validate_crs_or_raise(collection, crs, "Content-Crs")
+        take_jsonfg_members_or_raise(feature, crs)
         feature = collection.validate_feature_input_or_raise(request, feature)
         item_properties = feature.properties.model_dump() or {}
         for field, value in item_properties.items():
@@ -449,6 +470,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
     ):
         collection = get_collection_by_id(collection_id, request)
         validate_crs_or_raise(collection, crs, "Content-Crs")
+        take_jsonfg_members_or_raise(feature, crs)
         item = get_item_or_404(collection, request, item_id)
         if not collection.has_change_permission(request, item):
             raise AuthorizationError()
@@ -482,6 +504,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
     ):
         collection = get_collection_by_id(collection_id, request)
         validate_crs_or_raise(collection, crs, "Content-Crs")
+        take_jsonfg_members_or_raise(feature, crs)
         item = get_item_or_404(collection, request, item_id)
         if not collection.has_change_permission(request, item):
             raise AuthorizationError()

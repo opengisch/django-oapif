@@ -136,6 +136,10 @@ class Feature[G: Geometry | None, P: Schema](Schema):
     id: int | str | None = None
     geometry: G
     properties: P
+    # JSON-FG members of a feature written: the geometry GeoJSON cannot carry, "geometry" being then its
+    # fallback, and the CRS of its coordinates. They are not served.
+    place: G | None = Field(None, exclude=True)
+    coordRefSys: Any = Field(None, exclude=True)
 
 
 class FeaturePatch[G: Geometry | None, P: Schema](Schema):
@@ -143,6 +147,8 @@ class FeaturePatch[G: Geometry | None, P: Schema](Schema):
     id: int | str | None = None
     geometry: G | None = None
     properties: P | None = None
+    place: G | None = Field(None, exclude=True)
+    coordRefSys: Any = Field(None, exclude=True)
 
 
 class FeatureCollection[F: Feature](Schema):
