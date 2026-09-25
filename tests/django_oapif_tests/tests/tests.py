@@ -1,4 +1,5 @@
 import datetime
+import decimal
 import json
 import logging
 import re
@@ -28,6 +29,7 @@ from django_oapif_tests.tests.models import (
     LayerWithDate,
     LayerWithFile,
     LayerWithOrdering,
+    LayerWithVariousTypes,
     Point_2056_10fields,
     Point_2056_Empty,
 )
@@ -564,6 +566,46 @@ class TestOutputFormat(TestCase):
 
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(pa.ipc.open_stream(response.content).schema.names, columns)
+
+    @requires_arrow
+    def test_arrow_writes_the_other_types_as_the_geojson(self):
+        # their column types used to be inferred from the values: an IP address could not be encoded, nor a
+        # JSON field of objects and lists, failing the whole page, and pages could differ in their schema
+        LayerWithVariousTypes.objects.create(
+            data={"kind": 1, "tags": ["a"]},
+            ip="192.168.0.1",
+            amount=decimal.Decimal("1.50"),
+            delay=datetime.timedelta(hours=2),
+        )
+        LayerWithVariousTypes.objects.create(data=["x", {"kind": "é"}], ip="::1")
+        LayerWithVariousTypes.objects.create(amount=decimal.Decimal("-3"), delay=datetime.timedelta(0))
+        url = f"{collections_url}/tests.layerwithvarioustypes/items"
+        arrow_headers = {"Accept": "application/vnd.apache.arrow.stream"}
+
+        response = self.client.get(url, headers=arrow_headers)
+
+        self.assertEqual(response.status_code, 200)
+        table = pa.ipc.open_stream(response.content).read_all()
+        # the canonical extension of JSON text, whether this pyarrow knows it or not
+        data_type = table.schema.field("data").type
+        self.assertEqual(getattr(data_type, "storage_type", data_type), pa.string())
+        self.assertIn(b"arrow.json", response.content)
+        for name in ("ip", "amount", "delay"):
+            self.assertEqual(table.schema.field(name).type, pa.string())
+        geojson = self.client.get(url, headers={"Accept": "application/geo+json"}).json()
+        expected = {feature["id"]: feature["properties"] for feature in geojson["features"]}
+        for row in table.to_pylist():
+            with self.subTest(id=row["id"]):
+                properties = expected[row["id"]]
+                self.assertEqual(None if row["data"] is None else json.loads(row["data"]), properties["data"])
+                for name in ("ip", "amount", "delay"):
+                    self.assertEqual(row[name], properties[name])
+
+        pages = [
+            pa.ipc.open_stream(self.client.get(f"{url}?limit=1&offset={offset}", headers=arrow_headers).content)
+            for offset in range(3)
+        ]
+        self.assertEqual(len({page.schema for page in pages}), 1)
 
     @requires_arrow
     def test_arrow_reports_the_total_and_the_page_links(self):
