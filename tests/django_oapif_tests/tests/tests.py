@@ -1582,3 +1582,20 @@ class TestConformance(TestCase):
         self.assertIn({"$ref": "#/components/parameters/limit"}, parameters)
         # and in its place: declared inline as well, the operation would have it twice
         self.assertNotIn("limit", [parameter.get("name") for parameter in parameters])
+
+    def test_openapi_describes_the_jsonfg_members_of_writes_only(self):
+        # the requests used to be described with the schema of the responses, which do not have them
+        document = self.client.get("/oapif/openapi.json").json()
+        items = document["paths"]["/oapif/collections/{collection_id}/items"]
+        item = document["paths"]["/oapif/collections/{collection_id}/items/{item_id}"]
+
+        def members(schema: dict) -> set[str]:
+            return set(document["components"]["schemas"][schema["$ref"].rsplit("/", 1)[-1]]["properties"])
+
+        for method, operation in (("POST", items["post"]), ("PUT", item["put"]), ("PATCH", item["patch"])):
+            with self.subTest(method=method):
+                body = operation["requestBody"]["content"]["application/json"]["schema"]
+                response = next(iter(operation["responses"].values()))["content"]["application/json"]["schema"]
+
+                self.assertLessEqual({"place", "coordRefSys"}, members(body))
+                self.assertFalse({"place", "coordRefSys"} & members(response))
