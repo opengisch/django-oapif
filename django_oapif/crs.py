@@ -12,10 +12,18 @@ CRS84_URI = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
 CRS_URI_PATTERN = re.compile(r"^http://www.opengis\.net/def/crs/(?P<auth>EPSG|OGC)/[\d|\.]+?/(?P<code>\w+?)$")
 
 
-@dataclass
 class CRS:
-    auth: str
-    srid: int
+    def __init__(self, auth: str, srid: int) -> None:
+        self.auth = auth
+        self.srid = srid
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, CRS):
+            return NotImplemented
+        return (self.auth, self.srid) == (other.auth, other.srid)
+
+    def __repr__(self) -> str:
+        return f"CRS(auth={self.auth!r}, srid={self.srid!r})"
 
     @classmethod
     def __get_pydantic_core_schema__(cls, _source: Any, _handler: GetCoreSchemaHandler):
@@ -40,6 +48,7 @@ class CRS:
         return core_schema.no_info_after_validator_function(
             validate_crs,
             core_schema.str_schema(),
+            serialization=core_schema.plain_serializer_function_ser_schema(cls.uri),
         )
 
     def uri(self) -> str:
