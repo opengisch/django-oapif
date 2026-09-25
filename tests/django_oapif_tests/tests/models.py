@@ -191,3 +191,12 @@ class LayerWithDate(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     date = models.DateField()
     time = models.DateTimeField()
+
+
+class LayerWithVariousTypes(models.Model):
+    # properties that Arrow has no type for, which the GeoArrow encoding writes as the GeoJSON does
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    data = models.JSONField(null=True)
+    ip = models.GenericIPAddressField(null=True)
+    amount = models.DecimalField(max_digits=6, decimal_places=2, null=True)
+    delay = models.DurationField(null=True)

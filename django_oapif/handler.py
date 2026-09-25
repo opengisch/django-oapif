@@ -1,7 +1,8 @@
+import json
 from datetime import date, datetime, time
 from functools import cache
-from types import NoneType, new_class
-from typing import Annotated, Literal, cast, get_args, overload
+from types import NoneType, UnionType, new_class
+from typing import Annotated, Any, Literal, Union, cast, get_args, get_origin, overload
 from uuid import UUID
 
 from django.contrib.auth import get_permission_codename
@@ -27,7 +28,7 @@ from django.http import HttpRequest
 from ninja import Field, ModelSchema, Schema
 from ninja.errors import ValidationError
 from ninja.schema import NinjaGenerateJsonSchema
-from pydantic import ConfigDict, field_serializer
+from pydantic import ConfigDict, TypeAdapter, field_serializer
 from pydantic import ValidationError as PydanticValidationError
 from pydantic.config import ExtraValues
 
@@ -75,9 +76,29 @@ try:
         date: pa.date32(),
         datetime: pa.timestamp("us", tz="UTC"),
         time: pa.time64("us"),
+        bytes: pa.binary(),
     }
+    # The other properties are written as in the JSON of the GeoJSON, to the type of their JSON schema:
+    # decimals, durations and IP addresses as strings, for instance
+    JSON_SCHEMA_ARROW_TYPES = {
+        "boolean": pa.bool_(),
+        "integer": pa.int64(),
+        "number": pa.float64(),
+        "string": pa.string(),
+    }
+    # Objects, arrays, and any value of no single JSON type, as JSON text: GDAL reads the canonical
+    # JSON extension back as JSON, and QGIS as the same object or list fields as from GeoJSON
+    JSON_TEXT_METADATA = {"ARROW:extension:name": "arrow.json"}
 except ImportError:
     ARROW_AVAILABLE = False
+
+
+def json_schema_type(annotation: Any) -> str | None:
+    """The JSON type a property of this annotation is serialized to, if it has a single one."""
+    try:
+        return TypeAdapter(annotation).json_schema(mode="serialization").get("type")
+    except Exception:
+        return None
 
 
 model_config = {
@@ -494,33 +515,48 @@ class OapifCollection[M: Model]:
             links=links or [],
         )
 
-    def get_arrow_properties_schema(self, properties_schema: type[Schema], properties: list[dict]) -> "pa.Schema":
-        """Arrow schema of the feature properties, so that every page of a collection shares one."""
+    def get_arrow_properties_schema(self, properties_schema: type[Schema]) -> tuple["pa.Schema", dict[str, str]]:
+        """
+        Arrow schema of the feature properties, derived from their types so that every page of a collection
+        shares one, and where the values of each column come from: "python" for the types Arrow has, "json"
+        for the others, written as in the GeoJSON, and "json_text" for the ones written as JSON text.
+        """
         fields = []
+        sources = {}
         for name, field in properties_schema.model_fields.items():
             annotation = field.annotation
-            if optional := [arg for arg in get_args(annotation) if arg is not NoneType]:
-                annotation = optional[0] if len(optional) == 1 else None
-            arrow_type = ARROW_TYPES.get(annotation)
-            if arrow_type is None:
-                # not a type we know: let pyarrow work it out from the values, as it did before
-                arrow_type = pa.array([row[name] for row in properties]).type if properties else pa.null()
-            fields.append(pa.field(name, arrow_type))
-        return pa.schema(fields)
+            # a nullable property is the union of its type and None
+            if get_origin(annotation) in (Union, UnionType):
+                if len(optional := [arg for arg in get_args(annotation) if arg is not NoneType]) == 1:
+                    annotation = optional[0]
+            if (arrow_type := ARROW_TYPES.get(annotation)) is not None:
+                fields.append(pa.field(name, arrow_type))
+                sources[name] = "python"
+            elif (arrow_type := JSON_SCHEMA_ARROW_TYPES.get(json_schema_type(annotation))) is not None:
+                fields.append(pa.field(name, arrow_type))
+                sources[name] = "json"
+            else:
+                fields.append(pa.field(name, pa.string(), metadata=JSON_TEXT_METADATA))
+                sources[name] = "json_text"
+        return pa.schema(fields), sources
 
     def queryset_to_arrow_stream(self, request: HttpRequest, qs: QuerySet, crs: CRS):
         """Convert a queryset (as produced by `query()`) to a pyarrow Table with a GeoArrow-WKB geometry column."""
 
         PropertiesSchema = self.get_feature_properties_schema(request)
+        schema, sources = self.get_arrow_properties_schema(PropertiesSchema)
+        from_json = {name for name, source in sources.items() if source != "python"}
         rows = list(qs)
-        properties = [
-            {
-                name: str(value) if isinstance(value, UUID) else value
-                for name, value in PropertiesSchema.from_orm(row).dict().items()
-            }
-            for row in rows
-        ]
-        table = pa.Table.from_pylist(properties, schema=self.get_arrow_properties_schema(PropertiesSchema, properties))
+        properties = []
+        for row in rows:
+            instance = PropertiesSchema.from_orm(row)
+            values = {name: str(value) if isinstance(value, UUID) else value for name, value in instance.dict().items()}
+            if from_json:
+                for name, value in instance.model_dump(mode="json", include=from_json).items():
+                    as_text = sources[name] == "json_text" and value is not None
+                    values[name] = json.dumps(value, ensure_ascii=False) if as_text else value
+            properties.append(values)
+        table = pa.Table.from_pylist(properties, schema=schema)
 
         if self.geometry_field:
             # the type has to be spelled out: a page whose geometries are all null would infer as null
