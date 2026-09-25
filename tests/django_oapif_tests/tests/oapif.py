@@ -3,9 +3,14 @@ from django_oapif.auth import BasicAuth, DjangoAuth
 from django_oapif.handler import AnonReadOnlyCollection, OapifCollection
 
 from .models import (
+    Arc_2056_10fields,
     Geometry_2056,
+    GeometryZ_2056,
+    LayerWithDate,
     LayerWithFile,
     LayerWithForeignKey,
+    LayerWithOrdering,
+    LayerWithVariousTypes,
     Line_2056_10fields,
     MandatoryField,
     NoGeom_10fields,
@@ -26,9 +31,14 @@ oapif.register_collection(Polygon_2056, AnonReadOnlyCollection)
 oapif.register_collection(SecretLayer, OapifCollection)
 oapif.register_collection(MandatoryField, AnonReadOnlyCollection)
 oapif.register_collection(Geometry_2056, AnonReadOnlyCollection)
+oapif.register_collection(GeometryZ_2056, AnonReadOnlyCollection)
 oapif.register_collection(Point_2056_Empty, AnonReadOnlyCollection)
 oapif.register_collection(LayerWithForeignKey, AnonReadOnlyCollection)
 oapif.register_collection(LayerWithFile, AnonReadOnlyCollection)
+oapif.register_collection(LayerWithDate, AnonReadOnlyCollection)
+oapif.register_collection(LayerWithOrdering, AnonReadOnlyCollection)
+oapif.register_collection(LayerWithVariousTypes, AnonReadOnlyCollection)
+oapif.register_collection(Arc_2056_10fields, AnonReadOnlyCollection)
 
 
 @oapif.register(Point_2056_10fields)

@@ -1,16 +1,71 @@
+import datetime
+import decimal
+import json
 import logging
 import re
+import uuid
+from typing import Annotated
+from unittest import skipIf, skipUnless
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.contrib.gis.db.models import Extent
+from django.contrib.gis.db.models.functions import Transform
 from django.core.management import call_command
+from django.db import connection
+from django.db.models import FloatField, Func, Max, Min
+from django.test import RequestFactory
 from django.test.testcases import TestCase
-from django_oapif_tests.tests.models import LayerWithFile, Point_2056_10fields
+from django.test.utils import CaptureQueriesContext
+from django_oapif import jsonfg
+from django_oapif.collections import writes_curves
+from django_oapif.crs import CRS
+from django_oapif.geojson import CircularString, Coordinate2D
+from django_oapif.handler import ARROW_AVAILABLE, AnonReadOnlyCollection
+from django_oapif_tests.tests.oapif import oapif
+from django_oapif_tests.tests.models import (
+    Arc_2056_10fields,
+    GeometryZ_2056,
+    LayerWithDate,
+    LayerWithFile,
+    LayerWithOrdering,
+    LayerWithVariousTypes,
+    Point_2056_10fields,
+    Point_2056_Empty,
+)
+from ninja import Schema
+from ninja.errors import ValidationError as NinjaValidationError
+from ninja.responses import NinjaJSONEncoder
+from pydantic import AfterValidator
+from pydantic import ValidationError as PydanticValidationError
+
+try:  # Arrow is an optional extra, and its tests are skipped without it
+    import pyarrow as pa
+    from geoarrow.pyarrow import WkbType
+    from geoarrow.types.crs import StringCrs
+except ImportError:
+    pass
+
+requires_arrow = skipUnless(ARROW_AVAILABLE, "needs the arrow extra")
 
 logger = logging.getLogger(__name__)
 
 collections_url = "/oapif/collections"
 
-headers = {"Content-Crs": "http://www.opengis.net/def/crs/EPSG/0/2056"}
+crs_2056 = "http://www.opengis.net/def/crs/EPSG/0/2056"
+crs84 = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+crs_base = "http://www.opengis.net/def/crs"
+
+headers = {"Content-Crs": crs_2056}
+
+
+def extent(queryset, geometry) -> tuple[float, float, float, float]:
+    """The extent of the geometries, at the full precision of their coordinates, which Extent rounds to 15 digits."""
+    aggregates = {
+        name: aggregate(Func(geometry, function=f"ST_{name}", output_field=FloatField()))
+        for name, aggregate in (("XMin", Min), ("YMin", Min), ("XMax", Max), ("YMax", Max))
+    }
+    return tuple(queryset.aggregate(**aggregates).values())
 
 
 class TestBasicAuth(TestCase):
@@ -65,6 +120,63 @@ class TestBasicAuth(TestCase):
         url = f"{collections_url}/tests.nogeom_10fields/items"
         post_to_items = self.client.post(url, data, headers=headers, content_type="application/json")
         self.assertIn(post_to_items.status_code, (200, 201), (url, data, post_to_items))
+
+    def test_line_must_have_the_dimension_of_its_collection(self):
+        # LineString used to take any dimension, and the insert then failed in the database with a 500
+        self.client.force_login(user=self.demo_editor)
+        line_2d = [[2508500.0, 1152000.0], [2508600.0, 1152100.0]]
+        line_3d = [[2508500.0, 1152000.0, 1.0], [2508600.0, 1152100.0, 2.0]]
+        for collection, coordinates, status in (
+            ("tests.line_2056_10fields", line_2d, 201),
+            ("tests.line_2056_10fields", line_3d, 422),
+            ("tests.geometryz_2056", line_3d, 201),
+            ("tests.geometryz_2056", line_2d, 422),
+        ):
+            with self.subTest(collection=collection, dimension=len(coordinates[0])):
+                data = {
+                    "type": "Feature",
+                    "geometry": {"type": "LineString", "coordinates": coordinates},
+                    "properties": {},
+                }
+                url = f"{collections_url}/{collection}/items"
+                response = self.client.post(url, data, headers=headers, content_type="application/json")
+                self.assertEqual(response.status_code, status)
+
+    def test_put_and_patch_change_the_feature_of_the_url(self):
+        # the payload used to set the primary key: a PUT without it inserted a copy under a fresh key, and one
+        # carrying another feature's key overwrote that feature
+        self.client.force_login(user=self.demo_editor)
+        url = f"{collections_url}/tests.point_2056_10fields/items"
+        target = Point_2056_10fields.objects.create(geom="SRID=2056;POINT(2600000 1200000)", field_str_0="target")
+        other = Point_2056_10fields.objects.create(geom="SRID=2056;POINT(2600100 1200100)", field_str_0="other")
+        count = Point_2056_10fields.objects.count()
+        for method, key in ((self.client.put, None), (self.client.put, other.pk), (self.client.patch, other.pk)):
+            with self.subTest(method=method.__name__, key=key):
+                properties = {"field_str_0": "changed"} | ({"id": str(key)} if key else {})
+                geometry = {"type": "Point", "coordinates": [2600500.0, 1200500.0]}
+                feature = {"type": "Feature", "geometry": geometry, "properties": properties}
+
+                response = method(f"{url}/{target.pk}", feature, headers=headers, content_type="application/json")
+
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(Point_2056_10fields.objects.count(), count)
+                target.refresh_from_db()
+                other.refresh_from_db()
+                self.assertEqual((target.field_str_0, target.geom.coords), ("changed", (2600500.0, 1200500.0)))
+                self.assertEqual(other.field_str_0, "other")
+
+    def test_unknown_property_is_rejected_after_a_read(self):
+        self.client.force_login(user=self.demo_editor)
+        url = f"{collections_url}/tests.point_2056_10fields/items"
+        self.assertEqual(self.client.get(url).status_code, 200)
+        data = {
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [2508500.0, 1152000.0]},
+            "properties": {"field_str_0": "test123456", "not_a_field": 1},
+        }
+
+        post_to_items = self.client.post(url, data, headers=headers, content_type="application/json")
+        self.assertEqual(post_to_items.status_code, 422)
 
     def test_returned_id(self):
         self.client.force_login(user=self.demo_editor)
@@ -166,6 +278,32 @@ class TestBasicAuth(TestCase):
             },
         )
 
+    def test_date_field(self):
+        today = datetime.date.today()
+        now = datetime.datetime.now(datetime.UTC)
+        obj = LayerWithDate.objects.create(date=today, time=now)
+        obj.refresh_from_db()
+        feature = {
+            "id": str(obj.id),
+            "type": "Feature",
+            "geometry": None,
+            "properties": {
+                "date": str(today),
+                # to the millisecond, as Django writes them, where pydantic would go to the microsecond
+                "time": now.isoformat(timespec="milliseconds").replace("+00:00", "Z"),
+                "id": str(obj.id),
+            },
+        }
+        url = f"{collections_url}/tests.layerwithdate/items"
+
+        item = self.client.get(f"{url}/{obj.id}", headers=headers, content_type="application/json")
+        items = self.client.get(url, headers=headers, content_type="application/json")
+
+        self.assertEqual(item.status_code, 200)
+        self.assertEqual(item.json(), feature)
+        self.assertEqual(items.status_code, 200)
+        self.assertIn(feature, items.json()["features"])
+
 
 class TestSchema(TestCase):
     @classmethod
@@ -207,6 +345,32 @@ class TestSchema(TestCase):
         schema_response = self.client.get(url, headers=headers, content_type="application/json")
         self.assertEqual(schema_response.status_code, 200)
         self.assertEqual(schema_response.json(), expected_schema)
+
+    def test_properties_schema_keeps_its_extra_behaviour(self):
+        # ninja caches schemas by name and fields but not by config: the output schema, built first by
+        # a read, used to be handed to writes too, which then silently dropped unknown properties
+        collection = oapif.collections["tests.point_2056_10fields"]
+        fields = ("field_str_9", "field_str_8")  # built nowhere else, so nothing is cached for it yet
+
+        ignoring = collection.get_properties_schema(fields, extra="ignore")
+        forbidding = collection.get_properties_schema(fields)
+
+        self.assertEqual(ignoring.model_config["extra"], "ignore")
+        self.assertEqual(forbidding.model_config["extra"], "forbid")
+
+    def test_validation_errors_serialize(self):
+        # a validator raising a ValueError leaves the exception in the error context, which made the 422 a 500
+        def refuse(value):
+            raise ValueError("refused")
+
+        class Refusing(Schema):
+            name: Annotated[str, AfterValidator(refuse)]
+
+        collection = oapif.collections["tests.point_2056_10fields"]
+        with self.assertRaises(NinjaValidationError) as raised:
+            collection.validate_feature_or_raise(RequestFactory().get("/"), Refusing, {"name": "x"})
+
+        self.assertIn('"refused"', json.dumps(raised.exception.errors, cls=NinjaJSONEncoder))
 
     def test_schema_subset_recognition(self):
         self.maxDiff = None
@@ -289,3 +453,1149 @@ class TestSchema(TestCase):
             schema_response.json()["properties"]["geom"],
             {"title": "geometry", "x-ogc-role": "primary-geometry", "format": "geometry-any"},
         )
+
+
+class TestOutputFormat(TestCase):
+    COLLECTIONS = {
+        "tests.nogeom_10fields": None,
+        "tests.point_2056_10fields": "Point",
+        "tests.line_2056_10fields": "LineString",
+        "tests.arc_2056_10fields": "CircularString",
+    }
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("populate_data", "-s 100")
+        call_command("populate_users")
+
+    def test_geojson_geometry_types(self):
+        for collection, geometry_type in self.COLLECTIONS.items():
+            with self.subTest(collection=collection):
+                response = self.client.get(
+                    f"{collections_url}/{collection}/items?limit=1",
+                    headers={"Accept": "application/geo+json"},
+                )
+
+                self.assertEqual(response.status_code, 200)
+                feature = response.json()["features"][0]
+                if geometry_type:
+                    self.assertEqual(feature["geometry"]["type"], geometry_type)
+                else:
+                    self.assertEqual(feature["geometry"], None)
+
+    @patch("django_oapif.collections.ARROW_AVAILABLE", False)
+    def test_arrow_without_the_extra_is_not_acceptable(self):
+        url = f"{collections_url}/tests.point_2056_10fields/items"
+        for item_url in (url, f"{url}/{Point_2056_10fields.objects.first().pk}"):
+            with self.subTest(url=item_url):
+                response = self.client.get(item_url, headers={"Accept": "application/vnd.apache.arrow.stream"})
+
+                self.assertEqual(response.status_code, 406)
+                geojson = self.client.get(item_url, headers={"Accept": "application/geo+json"})
+                self.assertEqual(geojson.status_code, 200)
+
+    @requires_arrow
+    def test_arrow_empty_page(self):
+        # an empty page used to come back as a table without a single column
+        for collection in ("tests.point_2056_10fields", "tests.nogeom_10fields"):
+            with self.subTest(collection=collection):
+                url = f"{collections_url}/{collection}/items?limit=1"
+                arrow_headers = {"Accept": "application/vnd.apache.arrow.stream"}
+                populated = self.client.get(url, headers=arrow_headers)
+                empty = self.client.get(f"{url}&offset=1000000", headers=arrow_headers)
+
+                self.assertEqual(populated.status_code, 200)
+                self.assertEqual(empty.status_code, 200)
+                populated_table = pa.ipc.open_stream(populated.content).read_all()
+                empty_table = pa.ipc.open_stream(empty.content).read_all()
+                self.assertEqual(populated_table.num_rows, 1)
+                self.assertEqual(empty_table.num_rows, 0)
+                self.assertEqual(empty_table.schema.names, populated_table.schema.names)
+
+    @requires_arrow
+    def test_arrow_empty_collection(self):
+        response = self.client.get(
+            f"{collections_url}/tests.point_2056_empty/items",
+            headers={"Accept": "application/vnd.apache.arrow.stream"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        table = pa.ipc.open_stream(response.content).read_all()
+        self.assertEqual(table.num_rows, 0)
+        self.assertIn("geometry", table.schema.names)
+        self.assertIsInstance(table.schema.field("geometry").type, WkbType)
+
+    @requires_arrow
+    def test_arrow_pages_share_one_schema(self):
+        # a column that is all null on one page used to be null-typed, and stop concatenating
+        Point_2056_Empty.objects.create(geom="POINT(2508500 1152000)", field_int=1)
+        Point_2056_Empty.objects.create(geom="POINT(2508600 1152100)", field_int=None)
+        pages = []
+        for offset in (0, 1):
+            response = self.client.get(
+                f"{collections_url}/tests.point_2056_empty/items?limit=1&offset={offset}",
+                headers={"Accept": "application/vnd.apache.arrow.stream"},
+            )
+
+            self.assertEqual(response.status_code, 200)
+            pages.append(pa.ipc.open_stream(response.content).read_all())
+
+        self.assertEqual(pages[0].schema, pages[1].schema)
+        self.assertEqual(pa.concat_tables(pages).num_rows, 2)
+
+    @requires_arrow
+    def test_arrow_columns_keep_the_declared_order(self):
+        # the order of a set changes from one process to the next, so pages served by different
+        # workers used to come back with their columns shuffled, and no longer concatenated
+        expected = {
+            "tests.point_2056_10fields": [
+                "id",
+                "field_bool",
+                "field_int",
+                *(f"field_str_{i}" for i in range(10)),
+                "geometry",
+            ],
+            "tests.point_2056_10fields_subset": ["field_int", "field_str_0", "geometry"],
+        }
+        for collection, columns in expected.items():
+            with self.subTest(collection=collection):
+                response = self.client.get(
+                    f"{collections_url}/{collection}/items?limit=1",
+                    headers={"Accept": "application/vnd.apache.arrow.stream"},
+                )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(pa.ipc.open_stream(response.content).schema.names, columns)
+
+    @requires_arrow
+    def test_arrow_writes_the_other_types_as_the_geojson(self):
+        # their column types used to be inferred from the values: an IP address could not be encoded, nor a
+        # JSON field of objects and lists, failing the whole page, and pages could differ in their schema
+        LayerWithVariousTypes.objects.create(
+            data={"kind": 1, "tags": ["a"]},
+            ip="192.168.0.1",
+            amount=decimal.Decimal("1.50"),
+            delay=datetime.timedelta(hours=2),
+        )
+        LayerWithVariousTypes.objects.create(data=["x", {"kind": "é"}], ip="::1")
+        LayerWithVariousTypes.objects.create(amount=decimal.Decimal("-3"), delay=datetime.timedelta(0))
+        url = f"{collections_url}/tests.layerwithvarioustypes/items"
+        arrow_headers = {"Accept": "application/vnd.apache.arrow.stream"}
+
+        response = self.client.get(url, headers=arrow_headers)
+
+        self.assertEqual(response.status_code, 200)
+        table = pa.ipc.open_stream(response.content).read_all()
+        # the canonical extension of JSON text, whether this pyarrow knows it or not
+        data_type = table.schema.field("data").type
+        self.assertEqual(getattr(data_type, "storage_type", data_type), pa.string())
+        self.assertIn(b"arrow.json", response.content)
+        for name in ("ip", "amount", "delay"):
+            self.assertEqual(table.schema.field(name).type, pa.string())
+        geojson = self.client.get(url, headers={"Accept": "application/geo+json"}).json()
+        expected = {feature["id"]: feature["properties"] for feature in geojson["features"]}
+        for row in table.to_pylist():
+            with self.subTest(id=row["id"]):
+                properties = expected[row["id"]]
+                self.assertEqual(None if row["data"] is None else json.loads(row["data"]), properties["data"])
+                for name in ("ip", "amount", "delay"):
+                    self.assertEqual(row[name], properties[name])
+
+        pages = [
+            pa.ipc.open_stream(self.client.get(f"{url}?limit=1&offset={offset}", headers=arrow_headers).content)
+            for offset in range(3)
+        ]
+        self.assertEqual(len({page.schema for page in pages}), 1)
+
+    @requires_arrow
+    def test_arrow_reports_the_total_and_the_page_links(self):
+        # an Arrow stream cannot carry them in the payload, so they go to the headers
+        url = f"{collections_url}/tests.point_2056_10fields/items?limit=1&offset=1"
+        arrow = self.client.get(url, headers={"Accept": "application/vnd.apache.arrow.stream"})
+        geojson = self.client.get(url, headers={"Accept": "application/geo+json"}).json()
+
+        self.assertEqual(arrow.status_code, 200)
+        self.assertEqual(arrow.headers["OGC-NumberMatched"], str(geojson["numberMatched"]))
+        self.assertEqual({link["rel"] for link in geojson["links"]}, {"self", "prev", "next"})
+        for link in geojson["links"]:
+            self.assertIn(f'<{link["href"]}>; rel="{link["rel"]}"', arrow.headers["Link"])
+
+    def test_encodings_vary_on_accept(self):
+        # the same URL serves both encodings, which a cache has to tell apart
+        url = f"{collections_url}/tests.point_2056_10fields/items"
+        accepts = ["application/geo+json", *(["application/vnd.apache.arrow.stream"] if ARROW_AVAILABLE else [])]
+        for item_url in (url, f"{url}/{Point_2056_10fields.objects.first().pk}"):
+            for accept in accepts:
+                with self.subTest(url=item_url, accept=accept):
+                    response = self.client.get(item_url, headers={"Accept": accept})
+
+                    self.assertEqual(response.status_code, 200)
+                    self.assertIn("Accept", [value.strip() for value in response.headers["Vary"].split(",")])
+
+    def test_collection_links_its_items_in_each_encoding(self):
+        response = self.client.get(f"{collections_url}/tests.point_2056_10fields")
+
+        self.assertEqual(response.status_code, 200)
+        items = [link for link in response.json()["links"] if link["rel"] == "items"]
+        encodings = {"application/geo+json", *({"application/vnd.apache.arrow.stream"} if ARROW_AVAILABLE else ())}
+        self.assertEqual({link["type"] for link in items}, encodings)
+        # a single URL, negotiated with the Accept header
+        self.assertEqual(len({link["href"] for link in items}), 1)
+
+    def test_geojson_bbox_is_the_extent_of_the_page(self):
+        for crs_uri, geometry in ((None, Transform("geom", 4326)), (crs_2056, "geom")):
+            with self.subTest(crs=crs_uri or crs84):
+                url = f"{collections_url}/tests.point_2056_10fields/items?limit=10&offset=20"
+                if crs_uri:
+                    url += f"&crs={crs_uri}"
+                with CaptureQueriesContext(connection) as queries:
+                    response = self.client.get(url, headers={"Accept": "application/geo+json"})
+
+                self.assertEqual(response.status_code, 200)
+                page = Point_2056_10fields.objects.order_by("pk")[20:30]
+                self.assertEqual(tuple(response.json()["bbox"]), extent(page, geometry))
+                # the boxes come along with the features, instead of from a query of their own, or from
+                # reprojecting the geometries again
+                self.assertFalse(any("ST_Extent" in query["sql"] for query in queries.captured_queries))
+                transforms = sum(query["sql"].count("ST_Transform") for query in queries.captured_queries)
+                self.assertEqual(transforms, 0 if crs_uri else 1)
+
+    def test_featurecollection_is_complete_on_its_own(self):
+        # it used to come back with numberMatched=0 and no bbox, for the endpoint to fill in
+        collection = oapif.collections["tests.point_2056_10fields"]
+        request = RequestFactory().get("/")
+        crs = CRS("OGC", 4326)
+
+        feature_collection = collection.queryset_to_featurecollection(request, collection.query(request, crs)[:5])
+
+        self.assertEqual(feature_collection.numberReturned, 5)
+        self.assertEqual(feature_collection.numberMatched, 5)
+        self.assertIsNotNone(feature_collection.bbox)
+
+    @requires_arrow
+    def test_arrow_crs_matches_coordinates(self):
+        # the column crs must describe the coordinates that are in it, not the storage srid
+        for crs_uri, expected_crs in ((None, "OGC:CRS84"), (crs_2056, "EPSG:2056")):
+            with self.subTest(crs=expected_crs):
+                url = f"{collections_url}/tests.point_2056_10fields/items?limit=1"
+                if crs_uri:
+                    url += f"&crs={crs_uri}"
+                arrow = self.client.get(url, headers={"Accept": "application/vnd.apache.arrow.stream"})
+                geojson = self.client.get(url, headers={"Accept": "application/geo+json"})
+
+                self.assertEqual(arrow.status_code, 200)
+                self.assertEqual(geojson.status_code, 200)
+                table = pa.ipc.open_stream(arrow.content).read_all()
+                self.assertEqual(table.schema.field("geometry").type.crs, StringCrs(expected_crs))
+                self.assertEqual(
+                    jsonfg.loads(table["geometry"][0].as_py()),
+                    geojson.json()["features"][0]["geometry"],
+                )
+
+    @requires_arrow
+    def test_arrow_geometry_types(self):
+        for collection, geometry_type in self.COLLECTIONS.items():
+            with self.subTest(collection=collection):
+                response = self.client.get(
+                    f"{collections_url}/{collection}/items?limit=1",
+                    headers={"Accept": "application/vnd.apache.arrow.stream"},
+                )
+
+                self.assertEqual(response.status_code, 200)
+                table = pa.ipc.open_stream(response.content).read_all()
+                if geometry_type is not None:
+                    self.assertIn("geometry", table.schema.names)
+                    geometry_field = table.schema.field("geometry")
+                    self.assertIsNotNone(geometry_field)
+                    self.assertIsInstance(geometry_field.type, WkbType)
+                    self.assertEqual(geometry_field.type.crs, StringCrs("OGC:CRS84"))
+                    self.assertEqual(geometry_field.type.extension_name, "geoarrow.wkb")
+                    self.assertEqual(table.num_rows, 1)
+                else:
+                    self.assertNotIn("geometry", table.schema.names)
+
+
+class TestGeometry3D(TestCase):
+    """Z ordinates must survive the WKB -> JSON-FG round trip, whatever the geometry type."""
+
+    # WKT to store -> geometry expected back, unprojected, in EPSG:2056
+    GEOMETRIES = {
+        "point": (
+            "POINT Z (2508500 1152000 555)",
+            {"type": "Point", "coordinates": [2508500.0, 1152000.0, 555.0]},
+        ),
+        "linestring": (
+            "LINESTRING Z (2508500 1152000 1, 2508600 1152100 2)",
+            {"type": "LineString", "coordinates": [[2508500.0, 1152000.0, 1.0], [2508600.0, 1152100.0, 2.0]]},
+        ),
+        "polygon": (
+            "POLYGON Z ((2508500 1152000 1, 2508600 1152000 2, 2508600 1152100 3, 2508500 1152000 1))",
+            {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [2508500.0, 1152000.0, 1.0],
+                        [2508600.0, 1152000.0, 2.0],
+                        [2508600.0, 1152100.0, 3.0],
+                        [2508500.0, 1152000.0, 1.0],
+                    ]
+                ],
+            },
+        ),
+        "multipoint": (
+            "MULTIPOINT Z ((2508500 1152000 1), (2508600 1152100 2))",
+            {"type": "MultiPoint", "coordinates": [[2508500.0, 1152000.0, 1.0], [2508600.0, 1152100.0, 2.0]]},
+        ),
+        "multilinestring": (
+            "MULTILINESTRING Z ((2508500 1152000 1, 2508600 1152100 2))",
+            {
+                "type": "MultiLineString",
+                "coordinates": [[[2508500.0, 1152000.0, 1.0], [2508600.0, 1152100.0, 2.0]]],
+            },
+        ),
+        "multipolygon": (
+            "MULTIPOLYGON Z (((2508500 1152000 1, 2508600 1152000 2, 2508600 1152100 3, 2508500 1152000 1)))",
+            {
+                "type": "MultiPolygon",
+                "coordinates": [
+                    [
+                        [
+                            [2508500.0, 1152000.0, 1.0],
+                            [2508600.0, 1152000.0, 2.0],
+                            [2508600.0, 1152100.0, 3.0],
+                            [2508500.0, 1152000.0, 1.0],
+                        ]
+                    ]
+                ],
+            },
+        ),
+        "geometrycollection": (
+            "GEOMETRYCOLLECTION Z (POINT Z (2508500 1152000 1), LINESTRING Z (2508500 1152000 1, 2508600 1152100 2))",
+            {
+                "type": "GeometryCollection",
+                "geometries": [
+                    {"type": "Point", "coordinates": [2508500.0, 1152000.0, 1.0]},
+                    {
+                        "type": "LineString",
+                        "coordinates": [[2508500.0, 1152000.0, 1.0], [2508600.0, 1152100.0, 2.0]],
+                    },
+                ],
+            },
+        ),
+        # GeoJSON has no polyhedral types, so they come back as their closest equivalent
+        "triangle": (
+            "TRIANGLE Z ((2508500 1152000 1, 2508600 1152000 2, 2508600 1152100 3, 2508500 1152000 1))",
+            {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [2508500.0, 1152000.0, 1.0],
+                        [2508600.0, 1152000.0, 2.0],
+                        [2508600.0, 1152100.0, 3.0],
+                        [2508500.0, 1152000.0, 1.0],
+                    ]
+                ],
+            },
+        ),
+        "tin": (
+            "TIN Z (((2508500 1152000 1, 2508600 1152000 2, 2508600 1152100 3, 2508500 1152000 1)))",
+            {
+                "type": "MultiPolygon",
+                "coordinates": [
+                    [
+                        [
+                            [2508500.0, 1152000.0, 1.0],
+                            [2508600.0, 1152000.0, 2.0],
+                            [2508600.0, 1152100.0, 3.0],
+                            [2508500.0, 1152000.0, 1.0],
+                        ]
+                    ]
+                ],
+            },
+        ),
+        "polyhedralsurface": (
+            "POLYHEDRALSURFACE Z (((2508500 1152000 1, 2508600 1152000 1, 2508600 1152100 1, "
+            "2508500 1152100 1, 2508500 1152000 1)))",
+            {
+                "type": "MultiPolygon",
+                "coordinates": [
+                    [
+                        [
+                            [2508500.0, 1152000.0, 1.0],
+                            [2508600.0, 1152000.0, 1.0],
+                            [2508600.0, 1152100.0, 1.0],
+                            [2508500.0, 1152100.0, 1.0],
+                            [2508500.0, 1152000.0, 1.0],
+                        ]
+                    ]
+                ],
+            },
+        ),
+        "circularstring": (
+            "CIRCULARSTRING Z (2508500 1152000 1, 2508550 1152050 2, 2508600 1152000 3)",
+            {
+                "type": "CircularString",
+                "coordinates": [
+                    [2508500.0, 1152000.0, 1.0],
+                    [2508550.0, 1152050.0, 2.0],
+                    [2508600.0, 1152000.0, 3.0],
+                ],
+            },
+        ),
+    }
+
+    @classmethod
+    def setUpTestData(cls):
+        # The GEOS version used by geodjango does not support curves, so insert the WKT as is
+        table_name = connection.ops.quote_name(GeometryZ_2056._meta.db_table)
+        cls.ids = {name: uuid.uuid4() for name in cls.GEOMETRIES}
+        with connection.cursor() as cursor:
+            cursor.executemany(
+                f"INSERT INTO {table_name} (id, geom) VALUES (%s, ST_GeomFromEWKT(%s))",
+                [(cls.ids[name], f"SRID=2056;{wkt}") for name, (wkt, _) in cls.GEOMETRIES.items()],
+            )
+
+    def test_item_keeps_z(self):
+        for name, (_, expected) in self.GEOMETRIES.items():
+            with self.subTest(geometry=name):
+                response = self.client.get(
+                    f"{collections_url}/tests.geometryz_2056/items/{self.ids[name]}?crs={crs_2056}",
+                    headers={"Accept": "application/geo+json"},
+                )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()["geometry"], expected)
+
+    def test_items_keep_z(self):
+        response = self.client.get(
+            f"{collections_url}/tests.geometryz_2056/items?crs={crs_2056}",
+            headers={"Accept": "application/geo+json"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        features = {feature["id"]: feature["geometry"] for feature in response.json()["features"]}
+        expected = {str(self.ids[name]): geometry for name, (_, geometry) in self.GEOMETRIES.items()}
+        self.assertEqual(features, expected)
+
+    def test_wkb_reader_accepts_iso_and_ewkb(self):
+        # query() asks for ISO WKB, but the reader must cope with the EWKB a bytea cast returns too
+        for name, (wkt, expected) in self.GEOMETRIES.items():
+            for flavour in ("ST_AsBinary", "ST_AsEWKB"):
+                with self.subTest(geometry=name, flavour=flavour):
+                    with connection.cursor() as cursor:
+                        cursor.execute(f"SELECT {flavour}(ST_GeomFromEWKT(%s))", [f"SRID=2056;{wkt}"])
+                        wkb = bytes(cursor.fetchone()[0])
+
+                    self.assertEqual(jsonfg.loads(wkb), expected)
+
+    def test_item_reprojected_keeps_z(self):
+        # Transform() must not drop the Z ordinate either
+        response = self.client.get(
+            f"{collections_url}/tests.geometryz_2056/items/{self.ids['point']}",
+            headers={"Accept": "application/geo+json"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        coordinates = response.json()["geometry"]["coordinates"]
+        self.assertEqual(len(coordinates), 3)
+        self.assertAlmostEqual(coordinates[2], 555.0, places=3)
+
+
+class TestBounds(TestCase):
+    """The bbox of a page is the union of the boxes the WKB reader gathers: they have to be the PostGIS ones."""
+
+    WKTS = (
+        "POINT (2600000 1200000)",
+        "POINT EMPTY",
+        "LINESTRING (0 0, 3 -1, 2 5)",
+        "POLYGON ((0 0, 4 0, 4 3, 0 0), (1 0.5, 3 0.5, 3 2, 1 0.5))",
+        "POLYGON Z ((0 0 5, 4 0 6, 4 3 7, 0 0 5))",
+        "MULTIPOINT ((0 0), (5 -1))",
+        "MULTIPOLYGON (((0 0, 1 0, 1 1, 0 0)), ((10 10, 11 10, 11 12, 10 10)))",
+        "GEOMETRYCOLLECTION (POINT (-3 7), LINESTRING (0 0, 1 1))",
+        # an arc that reaches beyond its points, a full circle, and aligned points
+        "CIRCULARSTRING (0.5 0.8660254037844386, -1 0, 0.5 -0.8660254037844386)",
+        "CIRCULARSTRING (0 0, 2 0, 0 0)",
+        "CIRCULARSTRING (0 0, 1 1, 2 2)",
+        "COMPOUNDCURVE (CIRCULARSTRING (0 0, 1 1, 2 0), (2 0, 3 -1))",
+        "CURVEPOLYGON (CIRCULARSTRING (0 0, 4 0, 0 0), (1 -1, 3 -1, 3 1, 1 -1))",
+        "MULTICURVE (CIRCULARSTRING (0 0, 1 1, 2 0), (5 5, 6 7))",
+        "MULTISURFACE (CURVEPOLYGON (CIRCULARSTRING (0 0, 4 0, 0 0)), ((10 10, 11 10, 11 12, 10 10)))",
+    )
+
+    def test_bounds_are_the_postgis_box(self):
+        for wkt in self.WKTS:
+            with self.subTest(wkt=wkt):
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT ST_AsBinary(g), ST_XMin(b), ST_YMin(b), ST_XMax(b), ST_YMax(b)"
+                        " FROM ST_GeomFromText(%s) AS g, Box2D(g) AS b",
+                        [wkt],
+                    )
+                    wkb, *box = cursor.fetchone()
+                bounds = []
+                jsonfg.loads(bytes(wkb), bounds)
+
+                if box[0] is None:
+                    self.assertEqual(bounds, [])
+                else:
+                    xmins, ymins, xmaxs, ymaxs = zip(*bounds)
+                    self.assertEqual((min(xmins), min(ymins), max(xmaxs), max(ymaxs)), tuple(box))
+
+
+class TestCrs(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("populate_users")
+        call_command("populate_data", "-s 100")
+
+    def test_uri_keeps_the_requested_authority(self):
+        # EPSG:4326 is lat/lon and CRS84 is lon/lat, so the two must not be conflated
+        self.assertEqual(CRS("OGC", 4326).uri(), crs84)
+        self.assertEqual(CRS("EPSG", 4326).uri(), "http://www.opengis.net/def/crs/EPSG/0/4326")
+        self.assertEqual(CRS("EPSG", 2056).uri(), crs_2056)
+
+    def test_extent_takes_no_reprojection_of_every_geometry(self):
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get(f"{collections_url}/tests.point_2056_10fields")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(any("ST_Extent(ST_Transform(" in query["sql"] for query in queries.captured_queries))
+
+    def test_extent_covers_the_bulge_of_its_reprojected_edges(self):
+        # the top edge of a box across Switzerland bulges north by over a kilometre once reprojected, so a
+        # point in the middle of it would lie outside an extent made of the reprojected corners alone
+        for x, y in ((2485000, 1075000), (2834000, 1296000), (2659500, 1296000)):
+            Point_2056_Empty.objects.create(geom=f"SRID=2056;POINT({x} {y})")
+
+        response = self.client.get(f"{collections_url}/tests.point_2056_empty")
+
+        self.assertEqual(response.status_code, 200)
+        xmin, ymin, xmax, ymax = response.json()["extent"]["spatial"]["bbox"][0]
+        exact = Point_2056_Empty.objects.aggregate(extent=Extent(Transform("geom", 4326)))["extent"]
+        self.assertLessEqual(xmin, exact[0])
+        self.assertLessEqual(ymin, exact[1])
+        self.assertGreaterEqual(xmax, exact[2])
+        self.assertGreaterEqual(ymax, exact[3])
+
+    def test_advertised_crs_are_accepted(self):
+        collection_response = self.client.get(f"{collections_url}/tests.point_2056_10fields")
+
+        self.assertEqual(collection_response.status_code, 200)
+        advertised = collection_response.json()["crs"]
+        self.assertEqual(advertised, [crs84, crs_2056])
+        self.assertEqual(collection_response.json()["storageCrs"], crs_2056)
+        for crs in advertised:
+            with self.subTest(crs=crs):
+                url = f"{collections_url}/tests.point_2056_10fields/items?limit=1&crs={crs}"
+                items_response = self.client.get(url)
+
+                self.assertEqual(items_response.status_code, 200)
+                self.assertEqual(items_response.headers["Content-Crs"], f"<{crs}>")
+
+    def test_unadvertised_crs_is_rejected(self):
+        # EPSG:4326 is not the same as CRS84 and the collection does not offer it
+        for crs in (f"{crs_base}/EPSG/0/4326", f"{crs_base}/EPSG/0/3857"):
+            with self.subTest(crs=crs):
+                items = self.client.get(f"{collections_url}/tests.point_2056_10fields/items?crs={crs}")
+                self.assertEqual(items.status_code, 400)
+
+                item_id = self.client.get(f"{collections_url}/tests.point_2056_10fields/items?limit=1").json()[
+                    "features"
+                ][0]["id"]
+                item = self.client.get(f"{collections_url}/tests.point_2056_10fields/items/{item_id}?crs={crs}")
+                self.assertEqual(item.status_code, 400)
+
+    def test_writes_take_only_an_advertised_content_crs(self):
+        # coordinates are always read as x/y: a client sending EPSG:4326 latitude first would have its
+        # features stored with swapped coordinates, so a CRS the collection does not offer is refused
+        self.client.force_login(User.objects.get(username="demo_editor"))
+        url = f"{collections_url}/tests.point_2056_10fields/items"
+        item_url = f"{url}/{Point_2056_10fields.objects.first().pk}"
+        for crs, coordinates, status in (
+            (crs84, [7.44, 46.95], 201),
+            (crs_2056, [2600000.0, 1200000.0], 201),
+            (f"{crs_base}/EPSG/0/4326", [46.95, 7.44], 400),
+            (f"{crs_base}/EPSG/0/3857", [828000.0, 5933000.0], 400),
+        ):
+            with self.subTest(crs=crs):
+                feature = {
+                    "type": "Feature",
+                    "geometry": {"type": "Point", "coordinates": coordinates},
+                    "properties": {},
+                }
+                crs_header = {"Content-Crs": crs}
+                post = self.client.post(url, feature, content_type="application/json", headers=crs_header)
+                self.assertEqual(post.status_code, status)
+                if status == 400:
+                    for method in (self.client.put, self.client.patch):
+                        response = method(item_url, feature, content_type="application/json", headers=crs_header)
+                        self.assertEqual(response.status_code, 400)
+
+    def test_content_crs_of_a_response_is_taken_by_writes(self):
+        # the header has the URI in angle brackets: a client that sent it back as it came used to be refused
+        self.client.force_login(User.objects.get(username="demo_editor"))
+        url = f"{collections_url}/tests.point_2056_10fields/items"
+        content_crs = self.client.get(f"{url}?limit=1&crs={crs_2056}").headers["Content-Crs"]
+        feature = {
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [2600000.0, 1200000.0]},
+            "properties": {},
+        }
+
+        post = self.client.post(url, feature, content_type="application/json", headers={"Content-Crs": content_crs})
+
+        self.assertEqual(content_crs, f"<{crs_2056}>")
+        self.assertEqual(post.status_code, 201)
+        # and read in the CRS it names
+        self.assertEqual(Point_2056_10fields.objects.get(pk=post.json()["id"]).geom.coords, (2600000.0, 1200000.0))
+
+    def test_unadvertised_bbox_crs_is_rejected(self):
+        url = f"{collections_url}/tests.point_2056_10fields/items?bbox=0,0,1,1&bbox-crs={crs_base}/EPSG/0/3857"
+
+        self.assertEqual(self.client.get(url).status_code, 400)
+
+    def test_geometry_less_collection_ignores_crs(self):
+        collection_response = self.client.get(f"{collections_url}/tests.nogeom_10fields")
+
+        self.assertEqual(collection_response.status_code, 200)
+        self.assertIsNone(collection_response.json().get("crs"))
+        items = self.client.get(f"{collections_url}/tests.nogeom_10fields/items?limit=1&crs={crs_base}/EPSG/0/3857")
+        self.assertEqual(items.status_code, 200)
+
+
+class TestCircularString(TestCase):
+    """A CircularString is a sequence of arcs, so any odd number of at least 3 points is valid."""
+
+    POINT_COUNTS = (3, 5, 13, 27)
+
+    @staticmethod
+    def arc_wkt(point_count: int) -> str:
+        points = ", ".join(f"{2508500 + i * 10} {1152000 + (i % 2) * 10}" for i in range(point_count))
+        return f"CIRCULARSTRING({points})"
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("populate_users")
+        # The GEOS version used by geodjango does not support curves, so insert the WKT as is
+        table_name = connection.ops.quote_name(Arc_2056_10fields._meta.db_table)
+        cls.ids = {count: uuid.uuid4() for count in cls.POINT_COUNTS}
+        with connection.cursor() as cursor:
+            cursor.executemany(
+                f"INSERT INTO {table_name} (id, geom) VALUES (%s, ST_GeomFromText(%s, 2056))",
+                [(cls.ids[count], cls.arc_wkt(count)) for count in cls.POINT_COUNTS],
+            )
+
+    def test_arc_of_any_odd_length_is_served(self):
+        for count in self.POINT_COUNTS:
+            with self.subTest(points=count):
+                response = self.client.get(f"{collections_url}/tests.arc_2056_10fields/items/{self.ids[count]}")
+
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(len(arc_points(response.json()["geometry"])), count)
+
+    def test_long_arc_is_served_in_parts(self):
+        # JSON-FG allows 11 points in a CircularString, so a longer one is the CompoundCurve of its arcs
+        for count, sizes in ((5, None), (13, [11, 3]), (27, [11, 11, 7])):
+            with self.subTest(points=count):
+                response = self.client.get(f"{collections_url}/tests.arc_2056_10fields/items/{self.ids[count]}")
+
+                geometry = response.json()["geometry"]
+                if sizes is None:
+                    self.assertEqual(geometry["type"], "CircularString")
+                else:
+                    self.assertEqual(geometry["type"], "CompoundCurve")
+                    self.assertEqual([len(part["coordinates"]) for part in geometry["geometries"]], sizes)
+
+    def test_long_arc_in_a_compound_curve_is_flattened(self):
+        # a CompoundCurve cannot hold another, so the parts of the arc take its place
+        line = "(2508480 1152000, 2508500 1152000)"
+        arc = self.arc_wkt(13).removeprefix("CIRCULARSTRING")
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT ST_AsBinary(ST_GeomFromText(%s))", [f"COMPOUNDCURVE({line}, CIRCULARSTRING{arc})"])
+            geometry = jsonfg.loads(bytes(cursor.fetchone()[0]))
+
+        self.assertEqual(geometry["type"], "CompoundCurve")
+        self.assertEqual([part["type"] for part in geometry["geometries"]], ["LineString", *["CircularString"] * 2])
+
+    def test_disjoint_arc_parts_are_a_client_error(self):
+        # parts that do not follow one another cannot be joined back into a CircularString
+        self.client.force_login(User.objects.get(username="demo_editor"))
+        parts = [{"type": "CircularString", "coordinates": arc(x, 1152000.0)} for x in (2508500.0, 2508600.0)]
+
+        response = self.client.post(
+            f"{collections_url}/tests.arc_2056_10fields/items",
+            {"type": "Feature", "geometry": {"type": "CompoundCurve", "geometries": parts}, "properties": {}},
+            headers=headers,
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("last point of the previous", response.content.decode())
+
+    def test_bbox_follows_the_arcs(self):
+        # an arc can reach beyond its control points: this one goes up to 1200100, its points to 1200060
+        table_name = connection.ops.quote_name(Arc_2056_10fields._meta.db_table)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"INSERT INTO {table_name} (id, geom) VALUES (%s, ST_GeomFromText(%s, 2056))",
+                [uuid.uuid4(), "CIRCULARSTRING(2600000 1200000, 2600020 1200060, 2600200 1200000)"],
+            )
+
+        for crs_uri, geometry in ((None, Transform("geom", 4326)), (crs_2056, "geom")):
+            with self.subTest(crs=crs_uri or crs84):
+                url = f"{collections_url}/tests.arc_2056_10fields/items"
+                response = self.client.get(f"{url}?crs={crs_uri}" if crs_uri else url)
+
+                self.assertEqual(response.status_code, 200)
+                bbox = tuple(response.json()["bbox"])
+                self.assertEqual(bbox, extent(Arc_2056_10fields.objects, geometry))
+                if crs_uri:
+                    self.assertGreater(bbox[3], 1200099)
+
+    def test_arc_item_options(self):
+        response = self.client.options(f"{collections_url}/tests.arc_2056_10fields/items/{self.ids[3]}")
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_arc_can_be_deleted(self):
+        # fetching an item to act on used to load the geometry through GEOS, which has no curve support
+        self.client.force_login(User.objects.get(username="demo_editor"))
+        url = f"{collections_url}/tests.arc_2056_10fields/items/{self.ids[3]}"
+
+        self.assertEqual(self.client.delete(url).status_code, 200)
+        self.assertEqual(self.client.get(url).status_code, 404)
+
+    def test_arc_of_even_points_is_a_client_error(self):
+        # the validation error used to carry a ValueError, which could not be serialized: a 500
+        self.client.force_login(User.objects.get(username="demo_editor"))
+        arc = {"type": "CircularString", "coordinates": [[2508500.0, 1152000.0], [2508510.0, 1152010.0]]}
+
+        response = self.client.post(
+            f"{collections_url}/tests.arc_2056_10fields/items",
+            {"type": "Feature", "geometry": arc, "properties": {}},
+            headers=headers,
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("odd number", response.content.decode())
+
+    def test_other_geometry_type_is_a_client_error(self):
+        # a curve column validated against any geometry type, and the insert then failed in the database
+        self.client.force_login(User.objects.get(username="demo_editor"))
+        line = {"type": "LineString", "coordinates": [[2508500.0, 1152000.0], [2508520.0, 1152000.0]]}
+
+        response = self.client.post(
+            f"{collections_url}/tests.arc_2056_10fields/items",
+            {"type": "Feature", "geometry": line, "properties": {}},
+            headers=headers,
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 422)
+
+    def test_empty_arc_is_accepted(self):
+        arc = CircularString[Coordinate2D](type="CircularString", coordinates=[])
+
+        self.assertEqual(arc.coordinates, [])
+
+    def test_arc_of_even_or_too_few_points_is_rejected(self):
+        for count in (1, 2, 4, 12):
+            with self.subTest(points=count):
+                with self.assertRaises(PydanticValidationError):
+                    CircularString[Coordinate2D](
+                        type="CircularString",
+                        coordinates=[(float(i), 0.0) for i in range(count)],
+                    )
+
+    def test_arc_lengths_are_published(self):
+        # the validator does not show in the OpenAPI document, so the lengths of JSON-FG are listed there
+        schemas = self.client.get("/oapif/openapi.json").json()["components"]["schemas"]
+        lengths = schemas["CircularString_Coordinate_"]["properties"]["coordinates"]["oneOf"]
+
+        self.assertEqual([length.get("minItems", 0) for length in lengths], [0, 3, 5, 7, 9, 11])
+        self.assertEqual([length["maxItems"] for length in lengths], [0, 3, 5, 7, 9, 11])
+
+
+class TestOrdering(TestCase):
+    # inserted in reverse, so ordering by pk gives exactly the opposite of the model ordering
+    NAMES = ("delta", "charlie", "bravo", "alpha")
+
+    @classmethod
+    def setUpTestData(cls):
+        for name in cls.NAMES:
+            LayerWithOrdering.objects.create(name=name)
+
+    def test_model_ordering_is_kept(self):
+        response = self.client.get(f"{collections_url}/tests.layerwithordering/items")
+
+        self.assertEqual(response.status_code, 200)
+        names = [feature["properties"]["name"] for feature in response.json()["features"]]
+        self.assertEqual(names, sorted(self.NAMES))
+
+    def test_model_ordering_gets_the_pk_as_tie_breaker(self):
+        collection = oapif.collections["tests.layerwithordering"]
+
+        self.assertEqual(collection.get_ordering(None), ("name", "pk"))
+
+    def test_ordering_defaults_to_the_pk(self):
+        collection = oapif.collections["tests.point_2056_10fields"]
+
+        self.assertEqual(collection.get_ordering(None), ("pk",))
+
+    def test_collection_ordering_wins(self):
+        class ReversedCollection(AnonReadOnlyCollection):
+            ordering = ("-name",)
+
+        collection = ReversedCollection(LayerWithOrdering)
+
+        self.assertEqual(collection.get_ordering(None), ("-name",))
+
+
+def ring(x, y, size=10.0):
+    return [[x, y], [x + size, y], [x + size, y + size], [x, y]]
+
+
+def arc(x, y, size=10.0):
+    return [[x, y], [x + size, y + size], [x + 2 * size, y]]
+
+
+def arc_points(geometry):
+    """The points of a CircularString, joined back when it is served in parts."""
+    if geometry["type"] == "CircularString":
+        return geometry["coordinates"]
+    parts = [part["coordinates"] for part in geometry["geometries"]]
+    return parts[0] + [point for part in parts[1:] for point in part[1:]]
+
+
+class TestWriteGeometries(TestCase):
+    """Every geometry type goes to GEOS as WKB: GeoJSON ones everywhere, curves with GEOS 3.13 and a Django for them."""
+
+    GEOJSON = {
+        "point": {"type": "Point", "coordinates": [2508500.0, 1152000.0]},
+        "multipoint": {"type": "MultiPoint", "coordinates": [[2508500.0, 1152000.0], [2508600.0, 1152100.0]]},
+        "linestring": {"type": "LineString", "coordinates": [[2508500.0, 1152000.0], [2508600.0, 1152100.0]]},
+        "multilinestring": {
+            "type": "MultiLineString",
+            "coordinates": [[[2508500.0, 1152000.0], [2508600.0, 1152100.0]]],
+        },
+        "polygon": {"type": "Polygon", "coordinates": [ring(2508500.0, 1152000.0)]},
+        "multipolygon": {
+            "type": "MultiPolygon",
+            "coordinates": [[ring(2508500.0, 1152000.0)], [ring(2508600.0, 1152000.0)]],
+        },
+        "geometrycollection": {
+            "type": "GeometryCollection",
+            "geometries": [
+                {"type": "Point", "coordinates": [2508500.0, 1152000.0]},
+                {"type": "LineString", "coordinates": [[2508500.0, 1152000.0], [2508600.0, 1152100.0]]},
+            ],
+        },
+    }
+    CURVES = {
+        "circularstring": {"type": "CircularString", "coordinates": arc(2508500.0, 1152000.0)},
+        "compoundcurve": {
+            "type": "CompoundCurve",
+            "geometries": [
+                {"type": "LineString", "coordinates": [[2508480.0, 1152000.0], [2508500.0, 1152000.0]]},
+                {"type": "CircularString", "coordinates": arc(2508500.0, 1152000.0)},
+            ],
+        },
+        "curvepolygon": {
+            "type": "CurvePolygon",
+            "geometries": [
+                {
+                    "type": "CircularString",
+                    "coordinates": [
+                        [2508500.0, 1152000.0],
+                        [2508510.0, 1152010.0],
+                        [2508520.0, 1152000.0],
+                        [2508510.0, 1151990.0],
+                        [2508500.0, 1152000.0],
+                    ],
+                }
+            ],
+        },
+        "multicurve": {
+            "type": "MultiCurve",
+            "geometries": [
+                {"type": "LineString", "coordinates": [[2508500.0, 1152000.0], [2508600.0, 1152100.0]]},
+                {"type": "CircularString", "coordinates": arc(2508700.0, 1152000.0)},
+            ],
+        },
+        "multisurface": {
+            "type": "MultiSurface",
+            "geometries": [
+                {"type": "Polygon", "coordinates": [ring(2508500.0, 1152000.0)]},
+                {
+                    "type": "CurvePolygon",
+                    "geometries": [{"type": "LineString", "coordinates": ring(2508600.0, 1152000.0)}],
+                },
+            ],
+        },
+        "geometrycollection with a curve": {
+            "type": "GeometryCollection",
+            "geometries": [
+                {"type": "Point", "coordinates": [2508500.0, 1152000.0]},
+                {"type": "CircularString", "coordinates": arc(2508500.0, 1152000.0)},
+            ],
+        },
+    }
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("populate_users")
+        # an arc to replace and update, inserted as it is: GEOS may not know curves
+        table_name = connection.ops.quote_name(Arc_2056_10fields._meta.db_table)
+        cls.arc_id = uuid.uuid4()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"INSERT INTO {table_name} (id, geom) VALUES (%s, ST_GeomFromText(%s, 2056))",
+                [cls.arc_id, "CIRCULARSTRING(2508500 1152000, 2508510 1152010, 2508520 1152000)"],
+            )
+
+    def setUp(self):
+        self.client.force_login(User.objects.get(username="demo_editor"))
+
+    def post(self, collection, geometry, crs=crs_2056):
+        return self.client.post(
+            f"{collections_url}/{collection}/items",
+            {"type": "Feature", "geometry": geometry, "properties": {}},
+            headers={"Content-Crs": crs},
+            content_type="application/json",
+        )
+
+    def assert_round_trip(self, collection, geometries):
+        for name, geometry in geometries.items():
+            with self.subTest(geometry=name):
+                response = self.post(collection, geometry)
+
+                self.assertEqual(response.status_code, 201)
+                item = self.client.get(f"{collections_url}/{collection}/items/{response.json()['id']}?crs={crs_2056}")
+                self.assertEqual(item.json()["geometry"], geometry)
+
+    def test_geojson_geometries_round_trip(self):
+        self.assert_round_trip("tests.geometry_2056", self.GEOJSON)
+
+    def test_3d_geometry_round_trips(self):
+        line = {"type": "LineString", "coordinates": [[2508500.0, 1152000.0, 1.0], [2508600.0, 1152100.0, 2.0]]}
+
+        self.assert_round_trip("tests.geometryz_2056", {"linestring": line})
+
+    def test_invalid_geometry_is_a_client_error(self):
+        # GEOS refuses a ring that is not closed, which used to be a 500
+        unclosed = {"type": "Polygon", "coordinates": [ring(2508500.0, 1152000.0)[:-1] + [[2508505.0, 1152005.0]]]}
+
+        self.assertEqual(self.post("tests.geometry_2056", unclosed).status_code, 422)
+
+    def jsonfg_feature(self, fallback, place, **members):
+        return {
+            "type": "Feature",
+            "conformsTo": [
+                "http://www.opengis.net/spec/json-fg-1/1.0/conf/core",
+                "http://www.opengis.net/spec/json-fg-1/1.0/conf/circular-arcs",
+            ],
+            "coordRefSys": crs_2056,
+            "geometry": fallback,
+            "place": place,
+            "properties": {},
+            **members,
+        }
+
+    def test_place_is_the_geometry_written(self):
+        # JSON-FG writes the geometries GeoJSON cannot carry in "place", "geometry" being their fallback
+        url = f"{collections_url}/tests.geometry_2056/items"
+        fallback = {"type": "Point", "coordinates": [2508400.0, 1152000.0]}
+        post = self.client.post(
+            url,
+            self.jsonfg_feature(fallback, {"type": "Point", "coordinates": [2508500.0, 1152000.0]}),
+            headers=headers,
+            content_type="application/json",
+        )
+
+        self.assertEqual(post.status_code, 201)
+        item_url = f"{url}/{post.json()['id']}"
+        self.assertEqual(
+            self.client.get(f"{item_url}?crs={crs_2056}").json()["geometry"]["coordinates"], [2508500.0, 1152000.0]
+        )
+        for method, x in ((self.client.put, 2508600.0), (self.client.patch, 2508700.0)):
+            with self.subTest(method=method.__name__):
+                place = {"type": "Point", "coordinates": [x, 1152000.0]}
+
+                response = method(
+                    item_url, self.jsonfg_feature(fallback, place), headers=headers, content_type="application/json"
+                )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(self.client.get(f"{item_url}?crs={crs_2056}").json()["geometry"], place)
+
+    def test_arc_in_place_is_written(self):
+        # its linearized fallback used to be taken, which a column of arcs refuses
+        fallback = {"type": "LineString", "coordinates": [[2508500.0, 1152000.0], [2508520.0, 1152000.0]]}
+        place = {"type": "CircularString", "coordinates": arc(2508500.0, 1152000.0)}
+        item_url = f"{collections_url}/tests.arc_2056_10fields/items/{self.arc_id}"
+        status = 200 if writes_curves() else 501
+
+        post = self.client.post(
+            f"{collections_url}/tests.arc_2056_10fields/items",
+            self.jsonfg_feature(fallback, place),
+            headers=headers,
+            content_type="application/json",
+        )
+        patch = self.client.patch(
+            item_url, self.jsonfg_feature(fallback, place), headers=headers, content_type="application/json"
+        )
+
+        self.assertEqual(post.status_code, 201 if writes_curves() else 501)
+        self.assertEqual(patch.status_code, status)
+        if writes_curves():
+            self.assertEqual(self.client.get(f"{item_url}?crs={crs_2056}").json()["geometry"], place)
+
+    def test_coord_ref_sys_must_be_the_content_crs(self):
+        # the coordinates are read in the Content-Crs: another coordRefSys would be ignored
+        point = {"type": "Point", "coordinates": [2508500.0, 1152000.0]}
+
+        response = self.client.post(
+            f"{collections_url}/tests.geometry_2056/items",
+            self.jsonfg_feature(point, point),
+            headers={"Content-Crs": crs84},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("coordRefSys", response.json()["detail"])
+
+    @skipIf(writes_curves(), "this GEOS and Django can write curves")
+    def test_curves_are_not_implemented_without_support(self):
+        curve = self.CURVES["circularstring"]
+        feature = {"type": "Feature", "geometry": curve, "properties": {}}
+        item_url = f"{collections_url}/tests.arc_2056_10fields/items/{self.arc_id}"
+
+        self.assertEqual(self.post("tests.arc_2056_10fields", curve).status_code, 501)
+        for method in (self.client.put, self.client.patch):
+            response = method(item_url, feature, headers=headers, content_type="application/json")
+            self.assertEqual(response.status_code, 501)
+
+    @skipUnless(writes_curves(), "needs GEOS 3.13 or newer and a Django that supports curves")
+    def test_curves_round_trip(self):
+        self.assert_round_trip("tests.geometry_2056", self.CURVES)
+
+    @skipUnless(writes_curves(), "needs GEOS 3.13 or newer and a Django that supports curves")
+    def test_3d_curve_round_trips(self):
+        curve = {
+            "type": "CompoundCurve",
+            "geometries": [
+                {"type": "LineString", "coordinates": [[2508480.0, 1152000.0, 1.0], [2508500.0, 1152000.0, 2.0]]},
+                {
+                    "type": "CircularString",
+                    "coordinates": [
+                        [2508500.0, 1152000.0, 2.0],
+                        [2508510.0, 1152010.0, 3.0],
+                        [2508520.0, 1152000.0, 4.0],
+                    ],
+                },
+            ],
+        }
+
+        self.assert_round_trip("tests.geometryz_2056", {"compoundcurve": curve})
+
+    @skipUnless(writes_curves(), "needs GEOS 3.13 or newer and a Django that supports curves")
+    def test_arc_is_replaced_and_updated(self):
+        item_url = f"{collections_url}/tests.arc_2056_10fields/items/{self.arc_id}"
+        for method, x in ((self.client.put, 2508700.0), (self.client.patch, 2508900.0)):
+            with self.subTest(method=method.__name__):
+                curve = {"type": "CircularString", "coordinates": arc(x, 1152000.0)}
+                feature = {"type": "Feature", "geometry": curve, "properties": {}}
+
+                response = method(item_url, feature, headers=headers, content_type="application/json")
+
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(self.client.get(f"{item_url}?crs={crs_2056}").json()["geometry"], curve)
+
+    @skipUnless(writes_curves(), "needs GEOS 3.13 or newer and a Django that supports curves")
+    def test_long_arc_round_trips_in_parts(self):
+        # served as a CompoundCurve, it goes back into its column as the CircularString it was
+        wkt = TestCircularString.arc_wkt(13)
+        table_name = connection.ops.quote_name(Arc_2056_10fields._meta.db_table)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"UPDATE {table_name} SET geom = ST_GeomFromText(%s, 2056) WHERE id = %s", [wkt, self.arc_id]
+            )
+        item_url = f"{collections_url}/tests.arc_2056_10fields/items/{self.arc_id}"
+        served = self.client.get(f"{item_url}?crs={crs_2056}").json()
+
+        response = self.client.put(item_url, served, headers=headers, content_type="application/json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.client.get(f"{item_url}?crs={crs_2056}").json()["geometry"], served["geometry"])
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"SELECT ST_Equals(geom, ST_GeomFromText(%s, 2056)) FROM {table_name} WHERE id = %s", [wkt, self.arc_id]
+            )
+            self.assertTrue(cursor.fetchone()[0])
+
+    @skipUnless(writes_curves(), "needs GEOS 3.13 or newer and a Django that supports curves")
+    def test_arc_is_reprojected_on_the_way_in(self):
+        curve = {"type": "CircularString", "coordinates": [[7.44, 46.95], [7.4401, 46.9501], [7.4402, 46.95]]}
+
+        response = self.post("tests.arc_2056_10fields", curve, crs=crs84)
+
+        self.assertEqual(response.status_code, 201)
+        stored = self.client.get(f"{collections_url}/tests.arc_2056_10fields/items/{response.json()['id']}")
+        for position, expected in zip(stored.json()["geometry"]["coordinates"], curve["coordinates"], strict=True):
+            self.assertAlmostEqual(position[0], expected[0], places=7)
+            self.assertAlmostEqual(position[1], expected[1], places=7)
+
+
+class TestConformance(TestCase):
+    def test_openapi_class_matches_the_served_document(self):
+        # django-ninja serves OpenAPI 3.1: a 3.0 class would be a false claim, and only the 1.1 draft of
+        # Features Part 1 has one for 3.1
+        conforms_to = self.client.get("/oapif/conformance").json()["conformsTo"]
+        openapi = self.client.get("/oapif/openapi.json").json()["openapi"]
+
+        self.assertRegex(openapi, r"^3\.1\.")
+        self.assertIn("http://www.opengis.net/spec/ogcapi-features-1/1.1/conf/oas31", conforms_to)
+        self.assertEqual([uri for uri in conforms_to if uri.endswith("/conf/oas30")], [])
+
+    def test_openapi_crs_defaults_are_uris(self):
+        # they used to be documented as the fields of the CRS, which the interactive docs then sent
+        document = self.client.get("/oapif/openapi.json").json()
+        defaults = {
+            (method, path, parameter["name"]): parameter["schema"]["default"]
+            for path, operations in document["paths"].items()
+            for method, operation in operations.items()
+            for parameter in operation.get("parameters", [])
+            if parameter.get("name") in ("crs", "bbox-crs", "Content-Crs")
+        }
+
+        self.assertEqual(len(defaults), 6)
+        self.assertEqual(defaults, dict.fromkeys(defaults, crs84))
+
+    def test_openapi_publishes_the_limit_of_the_items(self):
+        # QGIS takes the page size from this component only: without it, it pages by 100 features
+        document = self.client.get("/oapif/openapi.json").json()
+        parameters = document["paths"]["/oapif/collections/{collection_id}/items"]["get"]["parameters"]
+
+        self.assertEqual(document["components"]["parameters"]["limit"]["schema"]["default"], 100)
+        self.assertIn({"$ref": "#/components/parameters/limit"}, parameters)
+        # and in its place: declared inline as well, the operation would have it twice
+        self.assertNotIn("limit", [parameter.get("name") for parameter in parameters])
+
+    def test_openapi_describes_the_jsonfg_members_of_writes_only(self):
+        # the requests used to be described with the schema of the responses, which do not have them
+        document = self.client.get("/oapif/openapi.json").json()
+        items = document["paths"]["/oapif/collections/{collection_id}/items"]
+        item = document["paths"]["/oapif/collections/{collection_id}/items/{item_id}"]
+
+        def members(schema: dict) -> set[str]:
+            return set(document["components"]["schemas"][schema["$ref"].rsplit("/", 1)[-1]]["properties"])
+
+        for method, operation in (("POST", items["post"]), ("PUT", item["put"]), ("PATCH", item["patch"])):
+            with self.subTest(method=method):
+                body = operation["requestBody"]["content"]["application/json"]["schema"]
+                response = next(iter(operation["responses"].values()))["content"]["application/json"]["schema"]
+
+                self.assertLessEqual({"place", "coordRefSys"}, members(body))
+                self.assertFalse({"place", "coordRefSys"} & members(response))

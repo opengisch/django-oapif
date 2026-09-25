@@ -1,47 +1,105 @@
-import math
+import json
+from datetime import date, datetime, time
 from functools import cache
-from typing import Literal, cast, overload
+from types import NoneType, UnionType, new_class
+from typing import Annotated, Any, Literal, Union, cast, get_args, get_origin, overload
+from uuid import UUID
 
 from django.contrib.auth import get_permission_codename
-from django.contrib.gis.db.models import GeometryField
-from django.contrib.gis.db.models.functions import AsGeoJSON, Transform
+from django.contrib.gis.db.models import Extent, GeometryField
+from django.contrib.gis.db.models.functions import AsWKB, Transform
 from django.contrib.gis.geos import Polygon as GEOSPolygon
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import (
+    DateTimeField,
+    DurationField,
     FileField,
     ForeignKey,
+    Func,
     GeneratedField,
-    JSONField,
     ManyToManyRel,
     ManyToOneRel,
     Model,
     QuerySet,
+    TextField,
+    TimeField,
 )
-from django.db.models.functions import Cast
 from django.http import HttpRequest
-from ninja import ModelSchema, Schema
+from ninja import Field, ModelSchema, Schema
 from ninja.errors import ValidationError
 from ninja.schema import NinjaGenerateJsonSchema
-from pydantic import ConfigDict
+from pydantic import ConfigDict, TypeAdapter, field_serializer
 from pydantic import ValidationError as PydanticValidationError
 from pydantic.config import ExtraValues
 
-from django_oapif.crs import CRS, BBox
+from django_oapif import jsonfg
+from django_oapif.crs import CRS, CRS84_SRID, BBox
 from django_oapif.geojson import (
+    CircularString,
+    CircularStringParts,
+    CompoundCurve,
     Coordinate2D,
     Coordinate3D,
+    CurvePolygon,
     Feature,
     FeatureCollection,
     FeaturePatch,
     Geometry,
     GeometryCollection,
     LineString,
+    MultiCurve,
     MultiLineString,
     MultiPoint,
     MultiPolygon,
+    MultiSurface,
     Point,
     Polygon,
 )
+from django_oapif.schema import OAPIFLink
 from django_oapif.utils import PatchSchema
+
+try:
+    import geoarrow.pyarrow as ga
+    import pyarrow as pa
+
+    ARROW_AVAILABLE = True
+
+    # A page carries its own schema, so it has to be derived from the property types rather than
+    # from the values: a column that happens to be all null on one page would otherwise come back
+    # null-typed and no longer concatenate with the other pages.
+    ARROW_TYPES = {
+        bool: pa.bool_(),
+        int: pa.int64(),
+        float: pa.float64(),
+        str: pa.string(),
+        UUID: pa.string(),  # serialized with str() below
+        date: pa.date32(),
+        datetime: pa.timestamp("us", tz="UTC"),
+        time: pa.time64("us"),
+        bytes: pa.binary(),
+    }
+    # The other properties are written as in the JSON of the GeoJSON, to the type of their JSON schema:
+    # decimals, durations and IP addresses as strings, for instance
+    JSON_SCHEMA_ARROW_TYPES = {
+        "boolean": pa.bool_(),
+        "integer": pa.int64(),
+        "number": pa.float64(),
+        "string": pa.string(),
+    }
+    # Objects, arrays, and any value of no single JSON type, as JSON text: GDAL reads the canonical
+    # JSON extension back as JSON, and QGIS as the same object or list fields as from GeoJSON
+    JSON_TEXT_METADATA = {"ARROW:extension:name": "arrow.json"}
+except ImportError:
+    ARROW_AVAILABLE = False
+
+
+def json_schema_type(annotation: Any) -> str | None:
+    """The JSON type a property of this annotation is serialized to, if it has a single one."""
+    try:
+        return TypeAdapter(annotation).json_schema(mode="serialization").get("type")
+    except Exception:
+        return None
+
 
 model_config = {
     "from_attributes": True,
@@ -49,6 +107,44 @@ model_config = {
     "serialize_by_alias": False,
     "loc_by_alias": False,
 }
+
+
+def parse_box2d(value: str) -> tuple[float, float, float, float]:
+    """Read a PostGIS box, which comes as 'BOX(xmin ymin,xmax ymax)'."""
+    xmin, ymin, xmax, ymax = map(float, value.removeprefix("BOX(").removesuffix(")").replace(",", " ").split())
+    return xmin, ymin, xmax, ymax
+
+
+class ReprojectedExtent(Func):
+    """
+    The extent of a geometry column in another CRS, as a PostGIS box. Reprojecting every geometry to get it
+    would be slow, so the extent is computed where they are stored, and only its outline is reprojected:
+    densified first, as the edges of a box curve once reprojected, and its corners alone would miss the
+    bulge, over a kilometre across Switzerland.
+    """
+
+    output_field = TextField()
+
+    def __init__(self, geometry, source_srid: int, target_srid: int):
+        super().__init__(Extent(geometry))
+        self.source_srid = int(source_srid)
+        self.target_srid = int(target_srid)
+
+    def as_sql(self, compiler, connection, **extra_context):
+        extent, params = compiler.compile(self.source_expressions[0])
+        box = f"ST_SetSRID({extent}::geometry, {self.source_srid})"
+        sql = f"Box2D(ST_Transform(ST_Segmentize({box}, ST_Perimeter({box}) / 128), {self.target_srid}))"
+        return sql, (*params, *params)
+
+
+def without(fields: tuple[str, ...], *excluded: tuple[str, ...]) -> tuple[str, ...]:
+    """
+    The fields minus the excluded ones, in their declared order. A set difference would do, but its
+    order changes from one process to the next, and so would the columns of GeoArrow pages served by
+    different workers, which then no longer concatenate.
+    """
+    removed = set().union(*excluded)
+    return tuple(field for field in fields if field not in removed)
 
 
 class OapifCollection[M: Model]:
@@ -72,7 +168,8 @@ class OapifCollection[M: Model]:
         exclude:
             The list of fields to be excluded from the feature properties.exclude:
         ordering:
-            The field used to sort the queryset.
+            The fields used to sort the queryset. Defaults to the model ordering, completed by the
+            primary key so that pagination is stable.
     """
 
     id: str
@@ -83,7 +180,7 @@ class OapifCollection[M: Model]:
     fields: tuple[str, ...]
     readonly_fields: tuple[str, ...] = ()
     exclude: tuple[str, ...] = ()
-    ordering = ()
+    ordering: tuple = ()
 
     def __init__(self, model: type[M]) -> None:
         cls = type(self)
@@ -119,13 +216,34 @@ class OapifCollection[M: Model]:
             tuple(
                 field.name
                 for field in model_fields
-                if not isinstance(field, (ManyToOneRel, ManyToManyRel)) and not field.name == self.geometry_field
+                if not isinstance(field, (ManyToOneRel, ManyToManyRel)) and field.name != self.geometry_field
             ),
         )
 
         self.foreign_key_fields = {
             field.name: field.remote_field.model for field in model_fields if isinstance(field, ForeignKey)
         }
+
+    def storage_crs(self) -> CRS | None:
+        """The CRS the geometries are stored in, or None for a collection without geometry."""
+        if self.srid is None:
+            return None
+        return CRS("OGC", CRS84_SRID) if self.srid == CRS84_SRID else CRS("EPSG", self.srid)
+
+    def supported_crs(self) -> tuple[CRS, ...]:
+        """
+        Hook for specifying which CRS the collection can be queried in.
+        """
+        storage_crs = self.storage_crs()
+        if storage_crs is None:
+            return ()
+        if storage_crs.srid == CRS84_SRID:
+            return (storage_crs,)
+        return (CRS("OGC", CRS84_SRID), storage_crs)
+
+    def _geometry_in(self, crs: CRS):
+        """The geometry field, reprojected when the crs is not the storage one."""
+        return self.geometry_field if crs.srid == self.srid else Transform(self.geometry_field, crs.srid)
 
     @overload
     def query(self, request: HttpRequest, crs: CRS): ...
@@ -139,8 +257,7 @@ class OapifCollection[M: Model]:
         qs = self.get_queryset(request)
         qs = qs.only("pk", *self.get_fields(request))
         if geom_field := self.geometry_field:
-            geometry_query = geom_field if crs.srid == self.srid else Transform(geom_field, crs.srid)
-            qs = qs.annotate(_oapif_geometry=Cast(AsGeoJSON(geometry_query, bbox=True), JSONField()))
+            qs = qs.annotate(_oapif_geometry=AsWKB(self._geometry_in(crs)))
             if bbox is not None:
                 assert bbox_crs is not None
                 bbox_geom = GEOSPolygon.from_bbox((bbox.xmin, bbox.ymin, bbox.xmax, bbox.ymax))
@@ -160,8 +277,11 @@ class OapifCollection[M: Model]:
     def get_ordering(self, request) -> tuple:
         """
         Hook for specifying field ordering.
+
+        The model ordering is kept, with the primary key appended as a tie breaker: without one,
+        rows that compare equal can move between pages and be returned twice or not at all.
         """
-        return self.ordering
+        return self.ordering or (*self.opts.ordering, "pk")
 
     def get_fields(self, request, obj=None) -> tuple[str, ...]:
         """
@@ -228,7 +348,8 @@ class OapifCollection[M: Model]:
             return None
 
         geom_field = cast("GeometryField", self.model._meta.get_field(self.geometry_field))
-        is_3d = geom_field.geom_type.endswith("Z") or geom_field.geom_type.endswith("ZM")
+        # dim covers the usual GeometryField(dim=3); the suffix covers custom geom_type subclasses
+        is_3d = geom_field.dim >= 3 or geom_field.geom_type.endswith(("Z", "ZM"))
         CoordType = Coordinate3D if is_3d else Coordinate2D
 
         if geom_field.geom_type.startswith("POINT"):
@@ -245,6 +366,19 @@ class OapifCollection[M: Model]:
             GeometryType = MultiPolygon[CoordType]
         elif geom_field.geom_type.startswith("GEOMETRYCOLLECTION"):
             GeometryType = GeometryCollection[CoordType]
+        elif geom_field.geom_type.startswith("CIRCULARSTRING"):
+            # a CircularString longer than JSON-FG allows is served in parts, and comes back that way
+            GeometryType = Annotated[
+                CircularString[CoordType] | CircularStringParts[CoordType], Field(discriminator="type")
+            ]
+        elif geom_field.geom_type.startswith("COMPOUNDCURVE"):
+            GeometryType = CompoundCurve[CoordType]
+        elif geom_field.geom_type.startswith("CURVEPOLYGON"):
+            GeometryType = CurvePolygon[CoordType]
+        elif geom_field.geom_type.startswith("MULTICURVE"):
+            GeometryType = MultiCurve[CoordType]
+        elif geom_field.geom_type.startswith("MULTISURFACE"):
+            GeometryType = MultiSurface[CoordType]
         else:
             GeometryType = Geometry[CoordType]
 
@@ -260,36 +394,57 @@ class OapifCollection[M: Model]:
         *,
         extra: ExtraValues = "forbid",
     ) -> type[Schema]:
-        class Properties(ModelSchema):
-            model_config = ConfigDict(**model_config, extra=extra)
+        # ninja caches model schemas by model, name and fields, but not by config: were the name the
+        # same for every extra behaviour, the output schema built by a GET would be handed to the next
+        # POST, which would then silently drop unknown properties instead of rejecting them
+        name = f"Properties{extra.capitalize()}"
 
-            class Meta:
-                model = self.model
-                fields = properties_fields
-                fields_optional = optional_fields
+        class Meta:
+            model = self.model
+            fields = properties_fields
+            fields_optional = optional_fields
 
-        return Properties
+        # qualified as nested in the schema, so that pydantic does not take it for a field
+        Meta.__qualname__ = f"{name}.Meta"
+        body = {
+            "__module__": __name__,
+            "__qualname__": name,
+            "model_config": ConfigDict(**model_config, extra=extra),
+            "Meta": Meta,
+        }
+        # the JSON of pydantic writes times to the microsecond, and durations its own way: they are written
+        # as Django does, whether ninja renders the features or the endpoints serialize them themselves. The
+        # fields are not there to check yet: ninja adds them to a subclass of the one the body makes
+        temporal = [
+            field.name
+            for field in self.model._meta.concrete_fields
+            if isinstance(field, (DateTimeField, TimeField, DurationField))
+            and (properties_fields == "__all__" or field.name in properties_fields)
+        ]
+        if temporal:
+            serialize = field_serializer(*temporal, when_used="json-unless-none", check_fields=False)
+            body["serialize_temporal"] = serialize(DjangoJSONEncoder().default)
+        return new_class(name, (ModelSchema,), exec_body=lambda namespace: namespace.update(body))
 
     def get_feature_input_schema(self, request: HttpRequest) -> type[Feature]:
-        fields = tuple(
-            set(self.get_fields(request)) - set(self.get_exclude(request)) - set(self.get_readonly_fields(request))
-        )
+        fields = without(self.get_fields(request), self.get_exclude(request), self.get_readonly_fields(request))
         PropertiesSchema = self.get_properties_schema(fields)
         GeometrySchema = self.get_geometry_schema()
         return Feature[GeometrySchema, PropertiesSchema]
 
     def get_feature_patch_schema(self, request: HttpRequest) -> type[FeaturePatch]:
-        fields = tuple(
-            set(self.get_fields(request)) - set(self.get_exclude(request)) - set(self.get_readonly_fields(request))
-        )
+        fields = without(self.get_fields(request), self.get_exclude(request), self.get_readonly_fields(request))
         PropertiesSchema = self.get_properties_schema(fields)
         GeometrySchema = self.get_geometry_schema()
         return FeaturePatch[GeometrySchema, PatchSchema[PropertiesSchema]]
 
-    def get_feature_output_schema(self, request: HttpRequest) -> type[Feature]:
-        fields = tuple(set(self.get_fields(request)) - set(self.get_exclude(request)))
+    def get_feature_properties_schema(self, request: HttpRequest) -> type[Schema]:
+        fields = without(self.get_fields(request), self.get_exclude(request))
         # extra="ignore" is required for the serialization to go through ninja DjangoGetter
-        PropertiesSchema = self.get_properties_schema(fields, extra="ignore")
+        return self.get_properties_schema(fields, extra="ignore")
+
+    def get_feature_output_schema(self, request: HttpRequest) -> type[Feature]:
+        PropertiesSchema = self.get_feature_properties_schema(request)
         GeometrySchema = self.get_geometry_schema()
         return Feature[GeometrySchema, PropertiesSchema]
 
@@ -314,10 +469,8 @@ class OapifCollection[M: Model]:
         if geom_field := self.geometry_field:
             geom_field = cast("GeometryField", self.model._meta.get_field(self.geometry_field))
             geom_type = geom_field.geom_type.lower()
-            if geom_type.endswith("m"):
-                geom_type = geom_type[:-1]
-            if geom_type.endswith("z"):
-                geom_type = geom_type[:-1]
+            geom_type = geom_type.removesuffix("m")
+            geom_type = geom_type.removesuffix("z")
             if geom_type == "geometry":
                 geom_type = "any"
             schema["properties"][geom_field.name] = {
@@ -329,41 +482,109 @@ class OapifCollection[M: Model]:
         schema["title"] = self.title
         return schema
 
-    def queryset_to_featurecollection(self, request: HttpRequest, qs: QuerySet) -> FeatureCollection:
-        features: list[Feature] = []
-        bbox = (math.inf, math.inf, -math.inf, -math.inf)
+    def queryset_to_featurecollection(
+        self,
+        request: HttpRequest,
+        qs: QuerySet,
+        *,
+        number_matched: int | None = None,
+        links: list[OAPIFLink] | None = None,
+    ) -> FeatureCollection:
+        """
+        Convert a queryset (as produced by `query()`) to a FeatureCollection. `number_matched` defaults
+        to the number of features returned, for a queryset that is not a page of a larger one.
+        """
         FeatureSchema = self.get_feature_output_schema(request)
         FeatureCollectionSchema = FeatureCollection[FeatureSchema]
+        features = []
+        # the boxes of the geometries, taken as they are read, so that the collection one takes no extra
+        # query, nor reprojecting them all again
+        boxes = []
         for obj in qs:
-            feature = self._model_to_feature(request, FeatureSchema, obj)
-            features.append(feature)
-            if geometry := feature.geometry:
-                bbox = (
-                    min(bbox[0], geometry.bbox[0]),
-                    min(bbox[1], geometry.bbox[1]),
-                    max(bbox[2], geometry.bbox[2]),
-                    max(bbox[3], geometry.bbox[3]),
-                )
-        if bbox == (math.inf, math.inf, -math.inf, -math.inf):
-            bbox = None
+            features.append(self._model_to_feature(FeatureSchema, obj, boxes))
+        bbox = None
+        if boxes:
+            xmins, ymins, xmaxs, ymaxs = zip(*boxes)
+            bbox = (min(xmins), min(ymins), max(xmaxs), max(ymaxs))
         return FeatureCollectionSchema.model_construct(
             type="FeatureCollection",
             features=features,
             bbox=bbox,
-            numberMatched=len(features),
             numberReturned=len(features),
-            links=[],
+            numberMatched=len(features) if number_matched is None else number_matched,
+            links=links or [],
         )
+
+    def get_arrow_properties_schema(self, properties_schema: type[Schema]) -> tuple["pa.Schema", dict[str, str]]:
+        """
+        Arrow schema of the feature properties, derived from their types so that every page of a collection
+        shares one, and where the values of each column come from: "python" for the types Arrow has, "json"
+        for the others, written as in the GeoJSON, and "json_text" for the ones written as JSON text.
+        """
+        fields = []
+        sources = {}
+        for name, field in properties_schema.model_fields.items():
+            annotation = field.annotation
+            # a nullable property is the union of its type and None
+            if get_origin(annotation) in (Union, UnionType):
+                if len(optional := [arg for arg in get_args(annotation) if arg is not NoneType]) == 1:
+                    annotation = optional[0]
+            if (arrow_type := ARROW_TYPES.get(annotation)) is not None:
+                fields.append(pa.field(name, arrow_type))
+                sources[name] = "python"
+            elif (arrow_type := JSON_SCHEMA_ARROW_TYPES.get(json_schema_type(annotation))) is not None:
+                fields.append(pa.field(name, arrow_type))
+                sources[name] = "json"
+            else:
+                fields.append(pa.field(name, pa.string(), metadata=JSON_TEXT_METADATA))
+                sources[name] = "json_text"
+        return pa.schema(fields), sources
+
+    def queryset_to_arrow_stream(self, request: HttpRequest, qs: QuerySet, crs: CRS):
+        """Convert a queryset (as produced by `query()`) to a pyarrow Table with a GeoArrow-WKB geometry column."""
+
+        PropertiesSchema = self.get_feature_properties_schema(request)
+        schema, sources = self.get_arrow_properties_schema(PropertiesSchema)
+        from_json = {name for name, source in sources.items() if source != "python"}
+        rows = list(qs)
+        properties = []
+        for row in rows:
+            instance = PropertiesSchema.from_orm(row)
+            values = {name: str(value) if isinstance(value, UUID) else value for name, value in instance.dict().items()}
+            if from_json:
+                for name, value in instance.model_dump(mode="json", include=from_json).items():
+                    as_text = sources[name] == "json_text" and value is not None
+                    values[name] = json.dumps(value, ensure_ascii=False) if as_text else value
+            properties.append(values)
+        table = pa.Table.from_pylist(properties, schema=schema)
+
+        if self.geometry_field:
+            # the type has to be spelled out: a page whose geometries are all null would infer as null
+            geometries = pa.array(
+                [bytes(wkb) if (wkb := getattr(row, "_oapif_geometry", None)) else None for row in rows],
+                type=pa.binary(),
+            )
+            table = table.append_column(
+                "geometry",
+                # query() has already reprojected the geometries, so tag the crs that was asked for
+                ga.with_crs(ga.as_wkb(geometries), crs.auth_code()),
+            )
+
+        stream = pa.BufferOutputStream()
+        with pa.ipc.new_stream(stream, table.schema) as writer:
+            writer.write_table(table)
+        return stream
 
     def model_to_feature(self, request: HttpRequest, obj: M) -> Feature:
         schema = self.get_feature_output_schema(request)
-        return self._model_to_feature(request, schema, obj)
+        return self._model_to_feature(schema, obj)
 
-    def _model_to_feature(self, request: HttpRequest, schema: type[Feature], obj: M) -> Feature:
+    def _model_to_feature(self, schema: type[Feature], obj: M, bounds: list | None = None) -> Feature:
+        geometry_wkb = getattr(obj, "_oapif_geometry", None)
         return schema(
             type="Feature",
             id=str(obj.pk),
-            geometry=getattr(obj, "_oapif_geometry", None),
+            geometry=jsonfg.loads(bytes(geometry_wkb), bounds) if geometry_wkb else None,
             properties=obj,
         )
 
@@ -386,6 +607,10 @@ class OapifCollection[M: Model]:
             errors = e.errors()
             for error in errors:
                 error["loc"] = ("body", "feature", *error["loc"])
+                # an exception raised by a validator is left in the context, where it would not serialize:
+                # ninja turns it into its message for its own errors, and so must this
+                if isinstance(error.get("ctx", {}).get("error"), Exception):
+                    error["ctx"]["error"] = str(error["ctx"]["error"])
             raise ValidationError(errors)  # type: ignore
 
 

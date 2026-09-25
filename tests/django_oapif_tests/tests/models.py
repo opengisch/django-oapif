@@ -152,6 +152,20 @@ class Geometry_2056(models.Model):
     geom = models.GeometryField(srid=2056, verbose_name=_("Geometry"))
 
 
+class GeometryZ_2056(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    geom = models.GeometryField(srid=2056, dim=3, verbose_name=_("Geometry"))
+
+
+class CircularStringField(models.GeometryField):
+    geom_type = "CIRCULARSTRING"
+
+
+class Arc_2056_10fields(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    geom = CircularStringField(srid=2056, verbose_name=_("Geometry"))
+
+
 class Point_2056_Empty(Point_2056_10fields): ...
 
 
@@ -163,3 +177,26 @@ class LayerWithForeignKey(models.Model):
 class LayerWithFile(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     file = models.FileField(upload_to="foo/")
+
+
+class LayerWithOrdering(models.Model):
+    # a sequential pk, so that inserting in reverse makes the pk order differ from the model ordering
+    class Meta:
+        ordering = ["name"]
+
+    name = models.CharField(max_length=255, verbose_name=_("Name"))
+
+
+class LayerWithDate(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    date = models.DateField()
+    time = models.DateTimeField()
+
+
+class LayerWithVariousTypes(models.Model):
+    # properties that Arrow has no type for, which the GeoArrow encoding writes as the GeoJSON does
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    data = models.JSONField(null=True)
+    ip = models.GenericIPAddressField(null=True)
+    amount = models.DecimalField(max_digits=6, decimal_places=2, null=True)
+    delay = models.DurationField(null=True)

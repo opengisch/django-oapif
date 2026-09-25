@@ -1,0 +1,125 @@
+name: Benchmark
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+    inputs:
+      size:
+        description: 'number of features to load per collection'
+        required: true
+        default: 1000
+        type: number
+      base:
+        description: 'the branch, tag or commit whose django_oapif to compare with'
+        required: true
+        default: main
+        type: string
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: write  # for the comment
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    env:
+      DOCKER_BUILDKIT: 1
+      COMPOSE_DOCKER_CLI_BUILD: 1
+      # django under gunicorn, with persistent connections and without debug mode, as it would be deployed
+      COMPOSE_FILE: tests/docker-compose.yml:tests/docker-compose.dev.yml:tests/docker-compose.benchmark.yml
+      # enough features for the largest limit the benchmark asks for, 500
+      SIZE: ${{ inputs.size || 1000 }}
+
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        # a pull request is checked out merged into its base branch, which is then the first parent
+        fetch-depth: 2
+
+    - name: Create env
+      run: cp .env.example .env
+
+    - uses: actions/setup-python@v6
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+
+    - name: Install deps
+      run: pip install -r requirements-bench.txt
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Download fixtures
+      run: scripts/download-fixtures.sh
+
+    - name: Start Django
+      run: |
+        docker compose up --build -d
+        docker compose exec django python manage.py migrate --no-input
+        docker compose exec django python manage.py populate_users
+        docker compose exec django python manage.py populate_data -s ${SIZE}
+        docker compose exec django python manage.py loaddata polygon_2056
+
+    # a second server, from the same image and on the same data, with the django_oapif of the base, as runners
+    # differ too much from one another for a comparison with the results of another run
+    - name: Start Django with the base library
+      id: base
+      env:
+        BASE_REF: ${{ inputs.base }}
+      run: |
+        if [ -n "$BASE_REF" ]; then
+          git fetch --no-tags --depth=1 origin "$BASE_REF"
+          BASE=FETCH_HEAD
+        else
+          BASE=HEAD^1
+          BASE_REF=$GITHUB_BASE_REF
+        fi
+        mkdir "$RUNNER_TEMP/base"
+        git archive "$BASE" django_oapif | tar -x -C "$RUNNER_TEMP/base"
+        docker compose run --detach --no-deps --name django_base --publish 7181:8000 \
+          --volume "$RUNNER_TEMP/base/django_oapif:/usr/src/django_oapif" django
+        echo "name=\`$BASE_REF\` at $(git rev-parse --short "$BASE")" >> "$GITHUB_OUTPUT"
+
+    - name: Run benchmark
+      env:
+        BASE_NAME: ${{ steps.base.outputs.name }}
+      run: python tests/benchmark/main.py --base-url http://localhost:7181/oapif/collections --base-name "$BASE_NAME"
+
+    - name: Logs of the base server
+      if: always()
+      run: docker logs django_base
+
+    - uses: actions/upload-artifact@v7
+      id: artifact
+      with:
+        name: benchmark
+        path: tests/benchmark/output/*
+        if-no-files-found: error
+
+    - name: 💬 Prepare comment
+      if: ${{ github.event_name == 'pull_request' }}
+      run: |
+        {
+          echo
+          echo "The chart and the raw numbers are in the [\`benchmark\` artifact](${{ steps.artifact.outputs.artifact-url }}) of [this run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})."
+        } >> tests/benchmark/output/result.md
+
+    - name: 💬 Create comment
+      uses: marocchino/sticky-pull-request-comment@v2
+      # the token of a pull request from a fork cannot comment
+      if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+      with:
+        # its own header, so that it does not replace the conformance comment
+        header: benchmark
+        path: tests/benchmark/output/result.md
+
+    - name: Failure logs
+      if: failure()
+      run: docker compose logs
