@@ -20,6 +20,7 @@ from django_oapif.geojson import (
     CircularStringParts,
     GenericFeature,
     GenericFeatureCollection,
+    GenericFeatureInput,
     GenericFeaturePatch,
 )
 from django_oapif.handler import ARROW_AVAILABLE, OapifCollection, ReprojectedExtent, parse_box2d
@@ -125,7 +126,7 @@ def validate_crs_or_raise(collection: OapifCollection, crs: CRS, parameter: str)
     )
 
 
-def take_jsonfg_members_or_raise(feature: GenericFeature | GenericFeaturePatch, crs: CRS) -> None:
+def take_jsonfg_members_or_raise(feature: GenericFeatureInput | GenericFeaturePatch, crs: CRS) -> None:
     """
     JSON-FG writes the geometries GeoJSON cannot carry, like the ones with arcs, in "place", its "geometry" being
     then their linearized fallback or null: a "place" is the geometry to store. Coordinates are read in the
@@ -409,7 +410,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         request: HttpRequest,
         response: HttpResponse,
         collection_id: str,
-        feature: GenericFeature,
+        feature: GenericFeatureInput,
         crs: CRS = Header(DEFAULT_CRS, alias="Content-Crs"),
     ):
         collection = get_collection_by_id(collection_id, request)
@@ -465,7 +466,7 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         response: HttpResponse,
         collection_id: str,
         item_id: str,
-        feature: GenericFeature,
+        feature: GenericFeatureInput,
         crs: CRS = Header(DEFAULT_CRS, alias="Content-Crs"),
     ):
         collection = get_collection_by_id(collection_id, request)
