@@ -1389,6 +1389,83 @@ class TestWriteGeometries(TestCase):
 
         self.assertEqual(self.post("tests.geometry_2056", unclosed).status_code, 422)
 
+    def jsonfg_feature(self, fallback, place, **members):
+        return {
+            "type": "Feature",
+            "conformsTo": [
+                "http://www.opengis.net/spec/json-fg-1/1.0/conf/core",
+                "http://www.opengis.net/spec/json-fg-1/1.0/conf/circular-arcs",
+            ],
+            "coordRefSys": crs_2056,
+            "geometry": fallback,
+            "place": place,
+            "properties": {},
+            **members,
+        }
+
+    def test_place_is_the_geometry_written(self):
+        # JSON-FG writes the geometries GeoJSON cannot carry in "place", "geometry" being their fallback
+        url = f"{collections_url}/tests.geometry_2056/items"
+        fallback = {"type": "Point", "coordinates": [2508400.0, 1152000.0]}
+        post = self.client.post(
+            url,
+            self.jsonfg_feature(fallback, {"type": "Point", "coordinates": [2508500.0, 1152000.0]}),
+            headers=headers,
+            content_type="application/json",
+        )
+
+        self.assertEqual(post.status_code, 201)
+        item_url = f"{url}/{post.json()['id']}"
+        self.assertEqual(
+            self.client.get(f"{item_url}?crs={crs_2056}").json()["geometry"]["coordinates"], [2508500.0, 1152000.0]
+        )
+        for method, x in ((self.client.put, 2508600.0), (self.client.patch, 2508700.0)):
+            with self.subTest(method=method.__name__):
+                place = {"type": "Point", "coordinates": [x, 1152000.0]}
+
+                response = method(
+                    item_url, self.jsonfg_feature(fallback, place), headers=headers, content_type="application/json"
+                )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(self.client.get(f"{item_url}?crs={crs_2056}").json()["geometry"], place)
+
+    def test_arc_in_place_is_written(self):
+        # its linearized fallback used to be taken, which a column of arcs refuses
+        fallback = {"type": "LineString", "coordinates": [[2508500.0, 1152000.0], [2508520.0, 1152000.0]]}
+        place = {"type": "CircularString", "coordinates": arc(2508500.0, 1152000.0)}
+        item_url = f"{collections_url}/tests.arc_2056_10fields/items/{self.arc_id}"
+        status = 200 if writes_curves() else 501
+
+        post = self.client.post(
+            f"{collections_url}/tests.arc_2056_10fields/items",
+            self.jsonfg_feature(fallback, place),
+            headers=headers,
+            content_type="application/json",
+        )
+        patch = self.client.patch(
+            item_url, self.jsonfg_feature(fallback, place), headers=headers, content_type="application/json"
+        )
+
+        self.assertEqual(post.status_code, 201 if writes_curves() else 501)
+        self.assertEqual(patch.status_code, status)
+        if writes_curves():
+            self.assertEqual(self.client.get(f"{item_url}?crs={crs_2056}").json()["geometry"], place)
+
+    def test_coord_ref_sys_must_be_the_content_crs(self):
+        # the coordinates are read in the Content-Crs: another coordRefSys would be ignored
+        point = {"type": "Point", "coordinates": [2508500.0, 1152000.0]}
+
+        response = self.client.post(
+            f"{collections_url}/tests.geometry_2056/items",
+            self.jsonfg_feature(point, point),
+            headers={"Content-Crs": crs84},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("coordRefSys", response.json()["detail"])
+
     @skipIf(writes_curves(), "this GEOS and Django can write curves")
     def test_curves_are_not_implemented_without_support(self):
         curve = self.CURVES["circularstring"]
