@@ -1439,3 +1439,13 @@ class TestConformance(TestCase):
         self.assertRegex(openapi, r"^3\.1\.")
         self.assertIn("http://www.opengis.net/spec/ogcapi-features-1/1.1/conf/oas31", conforms_to)
         self.assertEqual([uri for uri in conforms_to if uri.endswith("/conf/oas30")], [])
+
+    def test_openapi_publishes_the_limit_of_the_items(self):
+        # QGIS takes the page size from this component only: without it, it pages by 100 features
+        document = self.client.get("/oapif/openapi.json").json()
+        parameters = document["paths"]["/oapif/collections/{collection_id}/items"]["get"]["parameters"]
+
+        self.assertEqual(document["components"]["parameters"]["limit"]["schema"]["default"], 100)
+        self.assertIn({"$ref": "#/components/parameters/limit"}, parameters)
+        # and in its place: declared inline as well, the operation would have it twice
+        self.assertNotIn("limit", [parameter.get("name") for parameter in parameters])

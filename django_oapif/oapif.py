@@ -9,6 +9,7 @@ from django.urls import URLPattern, URLResolver
 from ninja import NinjaAPI
 from ninja.constants import NOT_SET, NOT_SET_TYPE
 from ninja.openapi.docs import DocsBase, Swagger
+from ninja.openapi.schema import OpenAPISchema
 from ninja.parser import Parser
 from ninja.renderers import BaseRenderer
 from ninja.router import Router
@@ -22,6 +23,29 @@ from django_oapif.collections import (
 from django_oapif.conformance import create_conformance_router
 from django_oapif.handler import OapifCollection
 from django_oapif.root import create_root_router
+
+
+class OAPIFNinjaAPI(NinjaAPI):
+    """
+    The Ninja API, with the limit of the items published under `components/parameters/limit` and referenced
+    from their operation, as the OpenAPI building blocks of OGC API - Features declare it: QGIS takes the page
+    size from there only, and ignores a parameter declared on the operation.
+    """
+
+    def get_openapi_schema(
+        self, *, path_prefix: str | None = None, path_params: DictStrAny | None = None
+    ) -> OpenAPISchema:
+        schema = super().get_openapi_schema(path_prefix=path_prefix, path_params=path_params)
+        for operations in schema["paths"].values():
+            for operation in operations.values():
+                if operation.get("operationId") != "get_collection_items":
+                    continue
+                parameters = operation["parameters"]
+                for index, parameter in enumerate(parameters):
+                    if parameter["name"] == "limit" and parameter["in"] == "query":
+                        schema["components"].setdefault("parameters", {})["limit"] = parameter
+                        parameters[index] = {"$ref": "#/components/parameters/limit"}
+        return schema
 
 
 class OAPIF:
@@ -57,7 +81,7 @@ class OAPIF:
         default_router: Router | None = None,
         openapi_extra: dict[str, Any] | None = None,
     ) -> None:
-        self.api = NinjaAPI(
+        self.api = OAPIFNinjaAPI(
             title=title,
             version=version,
             description=description,
