@@ -1440,6 +1440,20 @@ class TestConformance(TestCase):
         self.assertIn("http://www.opengis.net/spec/ogcapi-features-1/1.1/conf/oas31", conforms_to)
         self.assertEqual([uri for uri in conforms_to if uri.endswith("/conf/oas30")], [])
 
+    def test_openapi_crs_defaults_are_uris(self):
+        # they used to be documented as the fields of the CRS, which the interactive docs then sent
+        document = self.client.get("/oapif/openapi.json").json()
+        defaults = {
+            (method, path, parameter["name"]): parameter["schema"]["default"]
+            for path, operations in document["paths"].items()
+            for method, operation in operations.items()
+            for parameter in operation.get("parameters", [])
+            if parameter.get("name") in ("crs", "bbox-crs", "Content-Crs")
+        }
+
+        self.assertEqual(len(defaults), 6)
+        self.assertEqual(defaults, dict.fromkeys(defaults, crs84))
+
     def test_openapi_publishes_the_limit_of_the_items(self):
         # QGIS takes the page size from this component only: without it, it pages by 100 features
         document = self.client.get("/oapif/openapi.json").json()
