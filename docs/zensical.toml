@@ -18,6 +18,7 @@ nav = [
   {"API" = "api.md"},
   {"Usage" = [
     {"Permissions" = "usage/permissions.md"},
+    {"Coordinate reference systems" = "usage/crs.md"},
     {"Deployment" = "usage/deployment.md"},
   ]},
   {"Special Fields" = "special_fields.md"},
