@@ -16,7 +16,10 @@ nav = [
   {"Quick start" = "quick-start.md"},
   {"Demo" = "demo.md"},
   {"API" = "api.md"},
-  {"Permissions" = "permissions.md"},
+  {"Usage" = [
+    {"Permissions" = "usage/permissions.md"},
+    {"Deployment" = "usage/deployment.md"},
+  ]},
   {"Special Fields" = "special_fields.md"},
   {"GeoArrow" = "geoarrow.md"},
   {"Test and conformance" = "tests.md"},
@@ -59,6 +62,10 @@ toggle.name = "Switch to system preference"
 [project.extra]
 # Remove "Made with Material for MkDocs" from footer
 generator = false
+
+# The old addresses of the pages that moved
+[project.plugins.redirects.redirect_maps]
+"permissions.md" = "usage/permissions.md"
 
 [project.plugins.mkdocstrings.handlers.python]
 inventories = [
