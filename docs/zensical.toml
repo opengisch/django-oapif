@@ -28,7 +28,11 @@ nav = [
     {"Foreign keys" = "fields/foreign-keys.md"},
     {"Files" = "fields/files.md"},
   ]},
-  {"GeoArrow" = "geoarrow.md"},
+  {"Formats" = [
+    "formats/index.md",
+    {"GeoJSON" = "formats/geojson.md"},
+    {"GeoArrow" = "formats/geoarrow.md"},
+  ]},
   {"Test and conformance" = "tests.md"},
 ]
 
@@ -72,6 +76,7 @@ generator = false
 
 # The old addresses of the pages that moved
 [project.plugins.redirects.redirect_maps]
+"geoarrow.md" = "formats/geoarrow.md"
 "permissions.md" = "usage/permissions.md"
 "special_fields.md" = "fields/index.md"
 

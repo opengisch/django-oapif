@@ -29,7 +29,7 @@ recommends:
 pip install "psycopg[binary]"
 ```
 
-To serve [GeoArrow](geoarrow.md) as well, install the `arrow` extra:
+To serve [GeoArrow](formats/geoarrow.md) as well, install the `arrow` extra:
 
 ```bash
 pip install "django-oapif[arrow]"

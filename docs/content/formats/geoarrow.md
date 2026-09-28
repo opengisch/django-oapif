@@ -41,11 +41,11 @@ The column types come from the property types rather than from the values, so th
 | time          | `time64[us]`         |
 | binary        | `binary`             |
 
-Foreign keys hold the primary key of the referenced object and files their URL, as in GeoJSON (see [foreign keys](fields/foreign-keys.md) and [files](fields/files.md)).
+Foreign keys hold the primary key of the referenced object and files their URL, as in GeoJSON (see [foreign keys](../fields/foreign-keys.md) and [files](../fields/files.md)).
 
 The other properties are written as in GeoJSON. Those serialized to a single JSON type get the matching column type: decimals, durations and IP addresses, for instance, are `string` columns holding the same text as the GeoJSON. Objects, arrays, and properties of more than one type, like JSON fields, are `string` columns of JSON text, tagged with the canonical `arrow.json` extension, which GDAL, and so QGIS, read back as JSON.
 
-The geometry column is GeoArrow WKB (`geoarrow.wkb`), tagged with the CRS its coordinates are in: `OGC:CRS84` by default, or `EPSG:<srid>` when the storage CRS is requested with `crs=`. The same CRS is given in the `Content-Crs` response header. Only the CRS a collection advertises can be requested; any other is rejected with a `400`.
+The geometry column is GeoArrow WKB (`geoarrow.wkb`), tagged with the CRS its coordinates are in: `OGC:CRS84` by default, or `EPSG:<srid>` when the storage CRS is requested with `crs=`. The same CRS is given in the `Content-Crs` response header. Only the [CRS a collection offers](../usage/crs.md) can be requested; any other is rejected with a `400`.
 
 Import `geoarrow.pyarrow` for pyarrow to recognise the geometry column. Without it, the column reads as plain `binary`, with its GeoArrow type and CRS left in the field metadata.
 
