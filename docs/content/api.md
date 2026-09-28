@@ -1,5 +1,4 @@
-# API documentation
-
+# API reference
 
 ::: django_oapif
     options:
@@ -10,3 +9,14 @@
             - AuthenticatedCollection
             - AuthenticatedOrReadOnlyCollection
             - AnonReadOnlyCollection
+
+::: django_oapif.auth
+    options:
+        members:
+            - BasicAuth
+            - DjangoAuth
+
+::: django_oapif.crs
+    options:
+        members:
+            - CRS

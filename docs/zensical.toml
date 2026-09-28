@@ -11,14 +11,45 @@ edit_uri = "https://github.com/opengisch/django-oapif/tree/main/docs/content/"
 
 copyright = 'Copyright &copy; 2023-2026 <a href="https://OPENGIS.ch">OPENGIS.ch</a>'
 
+nav = [
+  {"Home" = "index.md"},
+  {"Quick start" = "quick-start.md"},
+  {"Demo" = "demo.md"},
+  {"Usage" = [
+    {"Collections" = "usage/collections.md"},
+    {"Authentication and permissions" = "usage/permissions.md"},
+    {"Coordinate reference systems" = "usage/crs.md"},
+    {"Deployment" = "usage/deployment.md"},
+  ]},
+  {"Fields" = [
+    "fields/index.md",
+    {"Geometries" = "fields/geometries.md"},
+    {"Foreign keys" = "fields/foreign-keys.md"},
+    {"Files" = "fields/files.md"},
+  ]},
+  {"Formats" = [
+    "formats/index.md",
+    {"GeoJSON" = "formats/geojson.md"},
+    {"GeoArrow" = "formats/geoarrow.md"},
+  ]},
+  {"Contributing" = [
+    "contributing/index.md",
+    {"OGC conformance" = "contributing/conformance.md"},
+    {"Benchmark" = "contributing/benchmark.md"},
+  ]},
+  {"Changelog" = "changelog.md"},
+  {"API reference" = "api.md"},
+]
+
 [project.theme]
 language = "en"
 features = [
+    "content.code.copy",
+    "navigation.footer",
+    "navigation.indexes",
     "navigation.instant",
     "navigation.instant.prefetch",
-    "navigation.tabs",
-    "navigation.tabs.sticky",
-    "navigation.sections",
+    "navigation.top",
     "navigation.tracking",
     "search.suggest",
     "search.highlight"
@@ -44,27 +75,23 @@ scheme = "slate"
 toggle.icon = "lucide/moon"
 toggle.name = "Switch to system preference"
 
-nav = [
-  {"Home" = "index.md"},
-  {"Quick start" = "quick-start.md"},
-  {"Demo" = "demo.md"},
-  {"API" = "api.md"},
-  {"Permissions" = "permissions.md"},
-  {"Special Fields" = "special_fields.md"},
-  {"GeoArrow" = "geoarrow.md"},
-  {"Test and conformance" = "tests.md"},
-]
-
 [project.extra]
 # Remove "Made with Material for MkDocs" from footer
 generator = false
+
+# The old addresses of the pages that moved
+[project.plugins.redirects.redirect_maps]
+"geoarrow.md" = "formats/geoarrow.md"
+"permissions.md" = "usage/permissions.md"
+"special_fields.md" = "fields/index.md"
+"tests.md" = "contributing/index.md"
 
 [project.plugins.mkdocstrings.handlers.python]
 inventories = [
   "https://docs.python.org/3/objects.inv",
   "https://docs.djangoproject.com/en/5.2/objects.inv"
 ]
-paths = ["src"]
+paths = [".."]
 
 [project.plugins.mkdocstrings.handlers.python.options]
 docstring_section_style = "list"

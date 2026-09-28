@@ -13,6 +13,8 @@ CRS_URI_PATTERN = re.compile(r"^https?://www.opengis\.net/def/crs/(?P<auth>EPSG|
 
 
 class CRS:
+    """A coordinate reference system, by authority and code: `CRS("EPSG", 2056)`, or `CRS("OGC", 4326)` for CRS84."""
+
     def __init__(self, auth: str, srid: int) -> None:
         self.auth = auth
         self.srid = srid
