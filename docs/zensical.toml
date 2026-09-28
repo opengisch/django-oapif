@@ -33,7 +33,11 @@ nav = [
     {"GeoJSON" = "formats/geojson.md"},
     {"GeoArrow" = "formats/geoarrow.md"},
   ]},
-  {"Test and conformance" = "tests.md"},
+  {"Contributing" = [
+    "contributing/index.md",
+    {"OGC conformance" = "contributing/conformance.md"},
+    {"Benchmark" = "contributing/benchmark.md"},
+  ]},
 ]
 
 [project.theme]
@@ -79,6 +83,7 @@ generator = false
 "geoarrow.md" = "formats/geoarrow.md"
 "permissions.md" = "usage/permissions.md"
 "special_fields.md" = "fields/index.md"
+"tests.md" = "contributing/index.md"
 
 [project.plugins.mkdocstrings.handlers.python]
 inventories = [

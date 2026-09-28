@@ -18,7 +18,8 @@ def create_conformance_router():
                 "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/core",
                 "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/geojson",
                 # django-ninja serves OpenAPI 3.1, which only the 1.1 draft of Features Part 1 has a class for:
-                # Common Part 1 and Features Part 1 1.0 know OpenAPI 3.0 alone (see docs/content/tests.md)
+                # Common Part 1 and Features Part 1 1.0 know OpenAPI 3.0 alone
+                # (see docs/content/contributing/conformance.md)
                 "http://www.opengis.net/spec/ogcapi-features-1/1.1/conf/oas31",
                 "http://www.opengis.net/spec/ogcapi-features-2/1.0/conf/crs",
                 "http://www.opengis.net/spec/ogcapi-features-4/1.0/conf/create-replace-delete",
