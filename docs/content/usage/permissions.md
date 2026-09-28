@@ -1,31 +1,60 @@
-# Custom authentication & permissions
+# Authentication and permissions
 
-By default the collection will be registered with [`OapifCollection`](../api.md#django_oapif.OapifCollection), which uses the same permissions logic as Django's `ModelAdmin`. Other utility classes are provided for common permissions patterns, such as [`AnonReadOnlyCollection`](../api.md#django_oapif.AnonReadOnlyCollection) which provides read-only access to the collection but protected create/update operations.
+## Authentication
 
-Example:
+By default, a request is authenticated as Django authenticates it: its user is the one logged in to the
+Django site in its session, and it is anonymous otherwise. Writes with a session need the CSRF token of Django,
+as Django forms do.
+
+Clients such as QGIS authenticate with HTTP Basic instead, which `BasicAuth` checks against the
+authentication backends of Django. Serve it over HTTPS only:
 
 ```python
-# models.py
+from django_oapif import OAPIF
+from django_oapif.auth import BasicAuth, DjangoAuth
 
-from django.contrib.gis.db import models
-
-class MyModel(models.Model):
-    ...
+oapif = OAPIF(auth=[BasicAuth(), DjangoAuth()])
 ```
 
+`auth` takes any authentication of Django Ninja: see its
+[documentation](https://django-ninja.dev/guides/authentication/).
+
+## Permissions
+
+The class a collection is registered with decides who may do what with its features, anonymous users
+included:
+
+| Class                                                                                                | Read                                                      | Write                                                    |
+|------------------------------------------------------------------------------------------------------|-----------------------------------------------------------|----------------------------------------------------------|
+| [`OapifCollection`](../api.md#django_oapif.OapifCollection), the default                             | users with the view or change permission of the model     | users with the add, change or delete permission          |
+| [`AnonReadOnlyCollection`](../api.md#django_oapif.AnonReadOnlyCollection)                            | everyone                                                  | users with the add, change or delete permission          |
+| [`AuthenticatedCollection`](../api.md#django_oapif.AuthenticatedCollection)                          | authenticated users                                       | authenticated users                                      |
+| [`AuthenticatedOrReadOnlyCollection`](../api.md#django_oapif.AuthenticatedOrReadOnlyCollection)      | everyone                                                  | authenticated users                                      |
+| [`AllowAnyCollection`](../api.md#django_oapif.AllowAnyCollection)                                    | everyone                                                  | everyone                                                 |
+
+The permissions of `OapifCollection` are the model permissions of Django, which the admin site checks too:
+`POST` takes the add permission, `PUT` and `PATCH` the change one, and `DELETE` the delete one.
 
 ```python
-# oapif.py
+from django_oapif import OAPIF, AnonReadOnlyCollection
 
 from .models import MyModel
-from django_oapif import OAPIF, AnonReadOnlyCollection
 
 oapif = OAPIF()
 
 oapif.register_collection(MyModel, AnonReadOnlyCollection)
 ```
 
-It is also possible to write your own collection handler to implement custom permission or queryset logic. `OapifCollection` implements most of django's `ModelAdmin` permission and query related functions, meaning that logic can be shared between the two easily with a mixin class. Put it first in the bases, so that its methods take precedence over those of `ModelAdmin` and `OapifCollection`:
+A collection that a user may not read is left out of the list of collections, and its other resources are
+answered with a `403 Forbidden`, as are the writes they may not do. An `OPTIONS` request on
+`/collections/{collectionId}/items`, or on one of its features, lists in its `Allow` header the methods that
+the user may use.
+
+## Custom permissions
+
+To implement other permissions, override the `has_*_permission` methods of a collection. They are those of
+Django's `ModelAdmin`, so the logic can be shared with the admin site in a mixin. Put it first in the bases,
+so that its methods take precedence over those of `ModelAdmin` and `OapifCollection`:
 
 ```python
 # permissions.py
