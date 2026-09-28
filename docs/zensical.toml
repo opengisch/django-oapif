@@ -15,7 +15,6 @@ nav = [
   {"Home" = "index.md"},
   {"Quick start" = "quick-start.md"},
   {"Demo" = "demo.md"},
-  {"API" = "api.md"},
   {"Usage" = [
     {"Collections" = "usage/collections.md"},
     {"Authentication and permissions" = "usage/permissions.md"},
@@ -39,6 +38,7 @@ nav = [
     {"Benchmark" = "contributing/benchmark.md"},
   ]},
   {"Changelog" = "changelog.md"},
+  {"API reference" = "api.md"},
 ]
 
 [project.theme]
