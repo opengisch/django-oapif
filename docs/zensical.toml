@@ -38,6 +38,7 @@ nav = [
     {"OGC conformance" = "contributing/conformance.md"},
     {"Benchmark" = "contributing/benchmark.md"},
   ]},
+  {"Changelog" = "changelog.md"},
 ]
 
 [project.theme]
