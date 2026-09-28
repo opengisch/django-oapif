@@ -160,13 +160,13 @@ class OapifCollection[M: Model]:
         description:
             The collection description.
         geometry_field:
-            The collection geometry field. If not defined, the geometry field will be infered from the model.
+            The collection geometry field. If not defined, the geometry field will be inferred from the model.
         fields:
             The list of fields that will be exposed as feature properties. If not defined, all fields will be used.
         readonly_fields:
             The list of fields that will be included in the feature properties, but won't be accepted in Create/Update operations.
         exclude:
-            The list of fields to be excluded from the feature properties.exclude:
+            The list of fields to be excluded from the feature properties.
         ordering:
             The fields used to sort the queryset. Defaults to the model ordering, completed by the
             primary key so that pagination is stable.
