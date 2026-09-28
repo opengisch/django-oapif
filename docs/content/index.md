@@ -1,4 +1,7 @@
-# Django-OAPIF
+<h1>
+  <img alt="Django-OAPIF" src="assets/logo-with-name.svg#only-light" width="400">
+  <img alt="Django-OAPIF" src="assets/logo-with-name-dark.svg#only-dark" width="400">
+</h1>
 
 *Django-OAPIF* serves Django models through an [OGC API - Features](https://ogcapi.ogc.org/features/)
 endpoint, built on [Django Ninja](https://django-ninja.dev/). Clients such as QGIS read and edit their features,
