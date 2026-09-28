@@ -23,6 +23,7 @@ nav = [
   ]},
   {"Fields" = [
     "fields/index.md",
+    {"Geometries" = "fields/geometries.md"},
     {"Foreign keys" = "fields/foreign-keys.md"},
     {"Files" = "fields/files.md"},
   ]},

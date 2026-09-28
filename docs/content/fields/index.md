@@ -1,7 +1,7 @@
 # Fields
 
 The fields of a model are the properties of its features, except its geometry field, whose value is their
-geometry.
+[geometry](geometries.md).
 
 ## Properties
 
