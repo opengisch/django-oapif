@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 173.21 200">
+  <title>django-oapif</title>
+  <!-- inside of the cube, seen through the hole: back wall and floor -->
+  <path fill="#2e5598" d="M151.55,137.5 151.55,87.5 108.25,112.5Z"/>
+  <path fill="#81abdd" d="M151.55,137.5 108.25,162.5 108.25,112.5Z"/>
+  <!-- faces -->
+  <path fill="#FFD43B" d="M86.6,0 173.21,50 86.6,100 0,50Z"/>
+  <path fill="#3776AB" d="M0,50 86.6,100 86.6,200 0,150Z"/>
+  <path fill="#1E3F5F" fill-rule="evenodd" d="M86.6,100 173.21,50 173.21,150 86.6,200ZM151.55,137.5 108.25,162.5 108.25,112.5 151.55,87.5Z"/>
+  <!-- edges between the faces -->
+  <path fill="none" stroke="#FFF" stroke-width="2.5" stroke-linejoin="round" d="M0,50 86.6,100 173.21,50M86.6,100 86.6,200"/>
+  <!-- eyes -->
+  <circle fill="#FFF" transform="matrix(86.6 50 -86.6 50 86.6 0)" cx=".25" cy=".83" r=".11"/>
+  <circle fill="#FFF" transform="matrix(86.6 50 0 100 0 50)" cx=".25" cy=".17" r=".11"/>
+</svg>
