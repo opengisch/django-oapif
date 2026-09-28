@@ -32,3 +32,21 @@ DATABASES["default"]["OPTIONS"] = {"pool": True}
 ```
 
 Django's development server opens a new connection for every request, whatever the settings.
+
+## Behind a reverse proxy
+
+The responses link to other resources with absolute URLs: the landing page to the collections, a page of
+items to the next one, a created feature to itself in its `Location` header. Django builds them from the
+request, so behind a reverse proxy that terminates HTTPS, it has to be told which requests came in over
+HTTPS, or the links point to `http://`. If the proxy sets `X-Forwarded-Proto`, and overwrites any that the
+client sent:
+
+```python
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+```
+
+If the proxy does not pass the original `Host` on either, but sets `X-Forwarded-Host`, set
+[`USE_X_FORWARDED_HOST`](https://docs.djangoproject.com/en/stable/ref/settings/#use-x-forwarded-host) too.
+Read the warnings of the Django documentation on
+[`SECURE_PROXY_SSL_HEADER`](https://docs.djangoproject.com/en/stable/ref/settings/#secure-proxy-ssl-header)
+before setting it.
