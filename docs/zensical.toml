@@ -17,6 +17,7 @@ nav = [
   {"Demo" = "demo.md"},
   {"API" = "api.md"},
   {"Usage" = [
+    {"Collections" = "usage/collections.md"},
     {"Permissions" = "usage/permissions.md"},
     {"Coordinate reference systems" = "usage/crs.md"},
     {"Deployment" = "usage/deployment.md"},

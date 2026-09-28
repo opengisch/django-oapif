@@ -3,9 +3,9 @@
 ## The geometry field
 
 A collection takes the geometry of its features from the geometry field of its model. A model with several
-geometry fields has to name the one to serve in `geometry_field`. A model without one is served as a
-collection of features without geometry, whose `geometry` is `null`, like the features whose geometry field
-is null.
+geometry fields has to name the one to serve in [`geometry_field`](../usage/collections.md#options). A model
+without one is served as a collection of features without geometry, whose `geometry` is `null`, like the
+features whose geometry field is null.
 
 ## Geometry types
 

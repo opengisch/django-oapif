@@ -5,8 +5,8 @@ The fields of a model are the properties of its features, except its geometry fi
 
 ## Properties
 
-Every field is served as a property, the primary key included, in the order the model declares them. The
-primary key is also the `id` of the feature, as a string. Reverse relations are not served.
+Every field is served as a property, the primary key included, in the order the model declares them,
+unless the [options](../usage/collections.md#options) of the collection choose others. The primary key is also the `id` of the feature, as a string. Reverse relations are not served.
 
 The values are written as JSON:
 
