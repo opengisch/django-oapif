@@ -25,6 +25,7 @@ nav = [
 [project.theme]
 language = "en"
 features = [
+    "content.code.copy",
     "navigation.footer",
     "navigation.indexes",
     "navigation.instant",
