@@ -41,7 +41,7 @@ The column types come from the property types rather than from the values, so th
 | time          | `time64[us]`         |
 | binary        | `binary`             |
 
-Foreign keys hold the primary key of the referenced object and files their URL, as in GeoJSON (see [Special fields](special_fields.md)).
+Foreign keys hold the primary key of the referenced object and files their URL, as in GeoJSON (see [foreign keys](fields/foreign-keys.md) and [files](fields/files.md)).
 
 The other properties are written as in GeoJSON. Those serialized to a single JSON type get the matching column type: decimals, durations and IP addresses, for instance, are `string` columns holding the same text as the GeoJSON. Objects, arrays, and properties of more than one type, like JSON fields, are `string` columns of JSON text, tagged with the canonical `arrow.json` extension, which GDAL, and so QGIS, read back as JSON.
 

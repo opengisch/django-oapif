@@ -21,7 +21,11 @@ nav = [
     {"Coordinate reference systems" = "usage/crs.md"},
     {"Deployment" = "usage/deployment.md"},
   ]},
-  {"Special Fields" = "special_fields.md"},
+  {"Fields" = [
+    "fields/index.md",
+    {"Foreign keys" = "fields/foreign-keys.md"},
+    {"Files" = "fields/files.md"},
+  ]},
   {"GeoArrow" = "geoarrow.md"},
   {"Test and conformance" = "tests.md"},
 ]
@@ -67,6 +71,7 @@ generator = false
 # The old addresses of the pages that moved
 [project.plugins.redirects.redirect_maps]
 "permissions.md" = "usage/permissions.md"
+"special_fields.md" = "fields/index.md"
 
 [project.plugins.mkdocstrings.handlers.python]
 inventories = [
