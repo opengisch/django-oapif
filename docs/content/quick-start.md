@@ -105,4 +105,28 @@ urlpatterns = [
 ]
 ```
 
+## Try it
+
+Once Django runs, the API serves:
+
+| Path                                                    | Resource                                                      |
+|---------------------------------------------------------|---------------------------------------------------------------|
+| `/oapif/`                                               | The landing page                                              |
+| `/oapif/conformance`                                    | The conformance classes the API implements                    |
+| `/oapif/collections`                                    | The collections                                               |
+| `/oapif/collections/{collectionId}`                     | A collection, `my_app.testmodel` for instance                 |
+| `/oapif/collections/{collectionId}/schema`              | The schema of its features                                    |
+| `/oapif/collections/{collectionId}/items`               | Its features: `GET`, and `POST` to create one                 |
+| `/oapif/collections/{collectionId}/items/{featureId}`   | A feature: `GET`, `PUT`, `PATCH` and `DELETE`                 |
+| `/oapif/openapi.json`                                   | The OpenAPI definition of the API                             |
+| `/oapif/docs`                                           | The same definition, in Swagger UI                            |
+
+By default, a collection is served only to the users with the view or change permission of its model, such as
+superusers: log in to the Django admin site first, or see [permissions](usage/permissions.md) to serve it to
+anonymous users too.
+
+In QGIS, add the API as a WFS / OGC API - Features connection, with the URL of its landing page and the
+`OGC API - Features` version, as in the [demo](demo.md#use-from-qgis). QGIS logs in with HTTP Basic, which the
+API takes once it has [`BasicAuth`](usage/permissions.md#authentication).
+
 Before going to production, read about [deployment](usage/deployment.md).
