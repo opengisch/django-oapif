@@ -1,8 +1,3 @@
----
-hide:
-  - navigation
----
-
 ## Run tests
 
 ```bash

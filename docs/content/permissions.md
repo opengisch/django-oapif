@@ -1,8 +1,3 @@
----
-hide:
-  - navigation
----
-
 # Custom authentication & permissions
 
 By default the collection will be registered with [`OapifCollection`](api/#django_oapif.OapifCollection), which uses the same permissions logic as Django's `ModelAdmin`. Other utility classes are provided for common permissions patterns, such as [`AnonReadOnlyCollection`](api/#django_oapif.AnonReadOnlyCollection) which provides read-only access to the collection but protected create/update operations.

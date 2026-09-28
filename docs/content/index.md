@@ -1,8 +1,3 @@
----
-hide:
-  - navigation
----
-
 # Django-OAPIF
 
 *Django-OAPIF* allows to easily expose your Django models through an OGC API Features endpoint.

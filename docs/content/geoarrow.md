@@ -1,8 +1,3 @@
----
-hide:
-  - navigation
----
-
 # GeoArrow
 
 Features can be read as an [Apache Arrow](https://arrow.apache.org/) stream instead of GeoJSON, with the geometries encoded as [GeoArrow](https://geoarrow.org/) WKB. It is faster to produce and to load than GeoJSON, and goes straight into Arrow-based tools.

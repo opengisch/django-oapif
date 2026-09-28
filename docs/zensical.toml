@@ -14,11 +14,11 @@ copyright = 'Copyright &copy; 2023-2026 <a href="https://OPENGIS.ch">OPENGIS.ch<
 [project.theme]
 language = "en"
 features = [
+    "navigation.footer",
+    "navigation.indexes",
     "navigation.instant",
     "navigation.instant.prefetch",
-    "navigation.tabs",
-    "navigation.tabs.sticky",
-    "navigation.sections",
+    "navigation.top",
     "navigation.tracking",
     "search.suggest",
     "search.highlight"
