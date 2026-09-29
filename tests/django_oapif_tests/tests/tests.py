@@ -1672,6 +1672,56 @@ class TestWriteGeometries(TestCase):
             self.assertAlmostEqual(position[1], expected[1], places=7)
 
 
+class TestQueryables(TestCase):
+    def test_queryables(self):
+        response = self.client.get(f"{collections_url}/tests.point_2056_10fields_subset/queryables")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["Content-Type"], "application/schema+json")
+        self.assertEqual(
+            response.json(),
+            {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "$id": "http://testserver/oapif/collections/tests.point_2056_10fields_subset/queryables",
+                "type": "object",
+                "title": "tests.Point_2056_10fields",
+                "properties": {
+                    "field_int": {"title": "Field Int", "type": "integer"},
+                    "field_str_0": {"title": "Field 0", "maxLength": 255, "type": "string"},
+                    # the reference to the GeoJSON schema is how QGIS recognizes a geometry
+                    "geom": {
+                        "title": "geometry",
+                        "x-ogc-role": "primary-geometry",
+                        "format": "geometry-point",
+                        "$ref": "https://geojson.org/schema/Point.json",
+                    },
+                },
+                "additionalProperties": False,
+            },
+        )
+
+    def test_queryables_of_any_geometry_or_none(self):
+        any_geometry = self.client.get(f"{collections_url}/tests.geometry_2056/queryables").json()
+        no_geometry = self.client.get(f"{collections_url}/tests.nogeom_10fields/queryables").json()
+
+        self.assertEqual(any_geometry["properties"]["geom"]["$ref"], "https://geojson.org/schema/Geometry.json")
+        self.assertNotIn("geom", no_geometry["properties"])
+        self.assertIn("field_str_0", no_geometry["properties"])
+
+    def test_collection_links_its_queryables(self):
+        collection = self.client.get(f"{collections_url}/tests.point_2056_10fields").json()
+
+        self.assertIn(
+            {
+                "rel": "http://www.opengis.net/def/rel/ogc/1.0/queryables",
+                "title": "Collection queryables",
+                "type": "application/schema+json",
+                "href": "http://testserver/oapif/collections/tests.point_2056_10fields/queryables",
+            },
+            collection["links"],
+        )
+
+
 class TestConformance(TestCase):
     def test_openapi_class_matches_the_served_document(self):
         # django-ninja serves OpenAPI 3.1: a 3.0 class would be a false claim, and only the 1.1 draft of

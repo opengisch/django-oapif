@@ -1,8 +1,7 @@
 import json
+from functools import cache
 from typing import Any
 from urllib.parse import quote
-
-from functools import cache
 
 from django.contrib.gis.db.models import Extent
 from django.contrib.gis.geos import GEOSException, GEOSGeometry
@@ -39,6 +38,7 @@ from django_oapif.utils import replace_query_param
 ARROW_STREAM_MEDIA_TYPE = "application/vnd.apache.arrow.stream"
 GEOJSON_MEDIA_TYPE = "application/geo+json"
 JSON_MEDIA_TYPE = "application/json"
+SCHEMA_MEDIA_TYPE = "application/schema+json"
 
 ACCEPTED_TYPES = [
     JSON_MEDIA_TYPE,
@@ -261,6 +261,12 @@ def get_collection_response(request: HttpRequest, collection: OapifCollection):
                 href=request.build_absolute_uri(f"{uri_prefix}{collection.id}/schema"),
             ),
             OAPIFLink(
+                rel="http://www.opengis.net/def/rel/ogc/1.0/queryables",
+                title="Collection queryables",
+                type=SCHEMA_MEDIA_TYPE,
+                href=request.build_absolute_uri(f"{uri_prefix}{collection.id}/queryables"),
+            ),
+            OAPIFLink(
                 rel="items",
                 title="Collection items",
                 type="application/geo+json",
@@ -356,6 +362,16 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
             context = {"collection": collection, "properties": properties}
             return html_response(request, "schema.html", context, title=title)
         return schema
+
+    @router.get(
+        "/{collection_id}/queryables",
+        operation_id="get_collection_queryables",
+    )
+    def get_queryables(request: HttpRequest, collection_id: str):
+        collection = get_collection_by_id(collection_id, request)
+        schema = collection.get_queryables_schema(request)
+        schema["$id"] = request.build_absolute_uri()
+        return HttpResponse(json.dumps(schema), content_type=SCHEMA_MEDIA_TYPE)
 
     @router.get(
         "/{collection_id}/items",
