@@ -112,6 +112,17 @@ except ImportError:
     ARROW_AVAILABLE = False
 
 
+# the GeoJSON schemas of the geometry formats, the curves having none but the generic one
+GEOJSON_SCHEMAS = {
+    "point": "Point",
+    "multipoint": "MultiPoint",
+    "linestring": "LineString",
+    "multilinestring": "MultiLineString",
+    "polygon": "Polygon",
+    "multipolygon": "MultiPolygon",
+    "geometrycollection": "GeometryCollection",
+}
+
 # the types of the columns that hold curves only, and the GeoJSON geometries PostGIS linearizes them to
 LINEARIZED = {
     "CIRCULARSTRING": LineString,
@@ -643,6 +654,37 @@ class OapifCollection[M: Model]:
         schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
         schema["title"] = self.title
         return schema
+
+    def get_queryables(self, request: HttpRequest) -> tuple[str, ...]:
+        """
+        Hook for specifying the properties the items can be filtered on, among the fields: the exposed ones and
+        the geometry by default.
+        """
+        fields = without(self.get_fields(request), self.get_exclude(request))
+        return (*fields, self.geometry_field) if self.geometry_field else fields
+
+    def get_queryables_schema(self, request: HttpRequest) -> dict:
+        """
+        The schema of the queryables, the one of the features restricted to them. The geometry also refers to its
+        GeoJSON schema: QGIS only recognizes a geometry queryable by it, and would filter them itself otherwise.
+        """
+        queryables = self.get_queryables(request)
+        schema = self.get_json_schema(request)
+        properties = {name: value for name, value in schema["properties"].items() if name in queryables}
+        if (geom_field := self.geometry_field) in properties:
+            geom_type = properties[geom_field]["format"].removeprefix("geometry-")
+            geojson_type = GEOJSON_SCHEMAS.get(geom_type, "Geometry")
+            properties[geom_field] = {
+                **properties[geom_field],
+                "$ref": f"https://geojson.org/schema/{geojson_type}.json",
+            }
+        return {
+            "$schema": schema["$schema"],
+            "type": "object",
+            "title": self.title,
+            "properties": properties,
+            "additionalProperties": False,
+        }
 
     def queryset_to_featurecollection(
         self,
