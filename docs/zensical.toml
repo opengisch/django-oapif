@@ -19,6 +19,7 @@ nav = [
     {"Collections" = "usage/collections.md"},
     {"Authentication and permissions" = "usage/permissions.md"},
     {"Coordinate reference systems" = "usage/crs.md"},
+    {"Filtering" = "usage/filtering.md"},
     {"Deployment" = "usage/deployment.md"},
   ]},
   {"Fields" = [
