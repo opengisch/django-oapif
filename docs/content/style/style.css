@@ -2,3 +2,19 @@
 .gp, .go {
     user-select: none;
 }
+
+/* The header shows the logo with the name in place of the site name, the drawer the cube */
+.md-header__button.md-logo img.logo-name {
+    height: 1.8rem;
+}
+.md-header__button.md-logo img.logo-cube,
+.md-nav .md-nav__title[for=__drawer] .md-logo img.logo-name,
+[data-md-color-scheme=default] .md-logo img[src$="#only-dark"],
+[data-md-color-scheme=slate] .md-logo img[src$="#only-light"] {
+    display: none;
+}
+@media screen and (min-width: 76.25em) {
+    .md-header__topic:first-child {
+        visibility: hidden;
+    }
+}

@@ -45,6 +45,7 @@ nav = [
 language = "en"
 logo = "assets/logo.svg"
 favicon = "assets/logo.svg"
+custom_dir = "overrides"
 features = [
     "content.code.copy",
     "navigation.footer",
