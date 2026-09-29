@@ -17,7 +17,8 @@ oapif.register_collection(Building)
 ## Features
 
 - Every registered model is a [collection](usage/collections.md) of features, which clients query by box,
-  page and [coordinate reference system](usage/crs.md), and create, replace, update and delete.
+  [filter](usage/filtering.md), page and [coordinate reference system](usage/crs.md), and create, replace,
+  update and delete.
 - Features are served as [GeoJSON](formats/geojson.md), with curves as JSON-FG geometries, or as
   [GeoArrow](formats/geoarrow.md).
 - Who may read and write each collection is decided by the model [permissions](usage/permissions.md) of
@@ -34,6 +35,8 @@ The API declares these conformance classes:
 | OGC API - Common - Part 2: Geospatial data                                                                               | Collections                                 |
 | [OGC API - Features - Part 1: Core](https://docs.ogc.org/is/17-069r4/17-069r4.html)                                      | Core, GeoJSON, OpenAPI 3.1                  |
 | [OGC API - Features - Part 2: Coordinate Reference Systems by Reference](https://docs.ogc.org/is/18-058r1/18-058r1.html) | Coordinate Reference Systems by Reference   |
+| [OGC API - Features - Part 3: Filtering](https://docs.ogc.org/is/19-079r2/19-079r2.html)                                | Queryables, Filter, Features Filter         |
+| [Common Query Language (CQL2)](https://docs.ogc.org/is/21-065r2/21-065r2.html)                                           | Basic CQL2, Advanced comparison operators, Case-insensitive comparison, Basic spatial functions, CQL2 Text |
 | [OGC API - Features - Part 4: Create, Replace, Update and Delete](https://docs.ogc.org/DRAFTS/20-002r1.html)             | Create/Replace/Delete, Update, Features     |
 | [OGC API - Features - Part 5: Schemas](https://docs.ogc.org/DRAFTS/23-058r1.html)                                        | Core roles for features, Schemas            |
 

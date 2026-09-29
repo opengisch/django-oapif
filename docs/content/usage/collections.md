@@ -69,6 +69,7 @@ Django's `ModelAdmin` are:
 | `get_exclude(request, obj=None)`                                                | The fields not served, `exclude` by default.                                        |
 | `get_readonly_fields(request, obj=None)`                                        | The fields not accepted in writes: `readonly_fields`, generated fields and files.   |
 | `get_ordering(request)`                                                         | The order of the features.                                                          |
+| `get_queryables(request)`                                                       | The fields the features can be [filtered](filtering.md#queryables) on.              |
 | `save_model(request, obj, change)`                                              | Saves a created or changed row.                                                     |
 | `delete_model(request, obj)`                                                    | Deletes a row.                                                                      |
 | `has_view_permission(request, obj=None)`, and the add, change and delete ones   | See [permissions](permissions.md).                                                  |
