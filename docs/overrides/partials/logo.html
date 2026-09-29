@@ -1,0 +1,7 @@
+{#-
+  The header shows the logo with the name, in the colours of the palette; the
+  drawer shows the cube, next to the site name. See style/style.css.
+-#}
+<img class="logo-name" src="{{ 'assets/logo-with-name.svg' | url }}#only-light" alt="{{ config.site_name }}">
+<img class="logo-name" src="{{ 'assets/logo-with-name-dark.svg' | url }}#only-dark" alt="{{ config.site_name }}">
+<img class="logo-cube" src="{{ config.theme.logo | url }}" alt="{{ config.site_name }}">
