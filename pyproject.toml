@@ -30,6 +30,9 @@ tracker = "https://github.com/opengisch/django-oapif/issues"
 [tool.setuptools]
 packages = ["django_oapif"]
 
+[tool.setuptools.package-data]
+django_oapif = ["templates/django_oapif/*.html"]
+
 [tool.setuptools-git-versioning]
 enabled = true
 starting_version = "0.0.0.dev"

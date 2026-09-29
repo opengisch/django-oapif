@@ -1,0 +1,59 @@
+{% extends "django_oapif/base.html" %}
+
+{% block title %}{{ collection.title }} - {{ api_title }}{% endblock %}
+
+{% block head %}{% if collection.extent %}{% include "django_oapif/map.html" %}{% endif %}{% endblock %}
+
+{% block breadcrumbs %}<a href="{{ root_url }}collections">Collections</a><span>{{ collection.title }}</span>{% endblock %}
+
+{% block content %}
+<h1>{{ collection.title }}</h1>
+<div class="id">{{ collection.id }}</div>
+{% if collection.description %}<p class="description">{{ collection.description }}</p>{% endif %}
+
+<div class="buttons">
+  <a class="button" href="{{ root_url }}collections/{{ collection.id|urlencode:"" }}/items">Browse the items</a>
+  <a class="button secondary" href="{{ root_url }}collections/{{ collection.id|urlencode:"" }}/schema">Schema</a>
+</div>
+
+{% if collection.extent %}<div id="map"></div>{% endif %}
+
+<div class="panel">
+  <dl class="meta">
+    <dt>Item type</dt><dd>{{ collection.itemType }}</dd>
+    {% if collection.extent %}
+    <dt>Extent</dt><dd>{{ collection.extent.spatial.bbox.0|join:", " }} <span class="muted">(CRS84)</span></dd>
+    {% endif %}
+    {% if collection.storageCrs %}<dt>Storage CRS</dt><dd><a href="{{ collection.storageCrs }}">{{ collection.storageCrs }}</a></dd>{% endif %}
+    {% if collection.crs %}
+    <dt>CRS</dt>
+    <dd>{% for crs in collection.crs %}<a href="{{ crs }}">{{ crs }}</a>{% if not forloop.last %}<br>{% endif %}{% endfor %}</dd>
+    {% endif %}
+  </dl>
+</div>
+
+<h2>Links</h2>
+<div class="table">
+  <table>
+    <thead><tr><th>Relation</th><th>Title</th><th>Type</th></tr></thead>
+    <tbody>
+      {% for link in collection.links %}
+      <tr><td class="id">{{ link.rel }}</td><td><a href="{{ link.href }}">{{ link.title }}</a></td><td class="id">{{ link.type }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if collection.extent %}
+{{ collection.extent.spatial.bbox.0|json_script:"extent" }}
+<script>
+  const [xmin, ymin, xmax, ymax] = JSON.parse(document.getElementById("extent").textContent);
+  oapifMap("map", {
+    type: "Feature",
+    geometry: {type: "Polygon", coordinates: [[[xmin, ymin], [xmax, ymin], [xmax, ymax], [xmin, ymax], [xmin, ymin]]]},
+  });
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ api_title }}{% endblock %}</title>
+  <link rel="alternate" type="application/json" href="{{ json_url }}">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f5f7fa;
+      --surface: #ffffff;
+      --text: #1d2733;
+      --muted: #5b6878;
+      --border: #dce2e9;
+      --row: #f1f4f8;
+      --link: #2f69a0;
+      --button: #3776ab;
+      --button-text: #ffffff;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #10151b;
+        --surface: #18202a;
+        --text: #e2e8ee;
+        --muted: #95a3b2;
+        --border: #2b3643;
+        --row: #1e2834;
+        --link: #81abdd;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    a { color: var(--link); }
+    .container { max-width: 1200px; margin: 0 auto; padding: 0 1rem; }
+    header { background: var(--surface); border-bottom: 1px solid var(--border); }
+    header .container { display: flex; align-items: center; gap: 1rem; min-height: 3.5rem; }
+    header .brand { display: flex; align-items: center; gap: .6rem; color: inherit; text-decoration: none; min-width: 0; }
+    header .brand svg { height: 2rem; flex: none; }
+    header .brand strong { font-size: 1.1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    header .brand span { color: var(--muted); font-size: .85rem; white-space: nowrap; }
+    header .format { margin-left: auto; font: .8rem var(--mono); color: var(--muted); text-decoration: none;
+                     border: 1px solid var(--border); border-radius: 4px; padding: .15rem .55rem; }
+    header .format:hover { color: var(--text); border-color: var(--muted); }
+    nav.breadcrumbs { padding-top: .9rem; font-size: .9rem; color: var(--muted); }
+    nav.breadcrumbs a { color: var(--muted); }
+    nav.breadcrumbs a + a::before, nav.breadcrumbs a + span::before { content: "/"; margin: 0 .45rem; color: var(--border); }
+    main { padding-bottom: 2rem; }
+    h1 { font-size: 1.6rem; line-height: 1.25; margin: .6rem 0 .2rem; overflow-wrap: anywhere; }
+    h2 { font-size: 1.15rem; margin: 1.75rem 0 .6rem; }
+    .id, code { font-family: var(--mono); font-size: .85em; }
+    .muted, .id { color: var(--muted); }
+    .description { max-width: 70ch; }
+    .buttons { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1rem 0; }
+    .button { background: var(--button); color: var(--button-text); text-decoration: none; border-radius: 4px; padding: .35rem .9rem; }
+    .button.secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: .9rem 1.1rem; }
+    .table { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+    table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+    th, td { text-align: left; vertical-align: top; padding: .45rem .75rem; border-bottom: 1px solid var(--border); }
+    th { background: var(--row); font-weight: 600; white-space: nowrap; }
+    td { max-width: 36em; overflow-wrap: break-word; }
+    td.nowrap { white-space: nowrap; }
+    tbody tr:last-child td { border-bottom: 0; }
+    tbody tr:hover { background: var(--row); }
+    dl.meta { display: grid; grid-template-columns: max-content 1fr; gap: .35rem 1.5rem; margin: 0; }
+    dl.meta dt { color: var(--muted); }
+    dl.meta dd { margin: 0; overflow-wrap: anywhere; }
+    ul.plain { list-style: none; padding: 0; margin: 0; }
+    ul.plain li { padding: .4rem 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+    ul.plain li:last-child { border-bottom: 0; }
+    .pager { display: flex; align-items: center; gap: 1rem; margin: .75rem 0; }
+    .pager .next { margin-left: auto; }
+    #map { height: 420px; margin: 1rem 0; border: 1px solid var(--border); border-radius: 6px; }
+    footer { padding: 1.5rem 1rem; color: var(--muted); font-size: .85rem; border-top: 1px solid var(--border); }
+    footer a { color: var(--muted); }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header>
+    <div class="container">
+      <a class="brand" href="{{ root_url }}">
+        <svg viewBox="0 0 173.21 200" aria-hidden="true">
+          <path fill="#2e5598" d="M151.55,137.5 151.55,87.5 108.25,112.5Z"/>
+          <path fill="#81abdd" d="M151.55,137.5 108.25,162.5 108.25,112.5Z"/>
+          <path fill="#FFD43B" d="M86.6,0 173.21,50 86.6,100 0,50Z"/>
+          <path fill="#3776AB" d="M0,50 86.6,100 86.6,200 0,150Z"/>
+          <path fill="#1E3F5F" fill-rule="evenodd" d="M86.6,100 173.21,50 173.21,150 86.6,200ZM151.55,137.5 108.25,162.5 108.25,112.5 151.55,87.5Z"/>
+          <path fill="none" stroke="#FFF" stroke-width="2.5" stroke-linejoin="round" d="M0,50 86.6,100 173.21,50M86.6,100 86.6,200"/>
+          <circle fill="#FFF" transform="matrix(86.6 50 -86.6 50 86.6 0)" cx=".25" cy=".83" r=".11"/>
+          <circle fill="#FFF" transform="matrix(86.6 50 0 100 0 50)" cx=".25" cy=".17" r=".11"/>
+        </svg>
+        <strong>{{ api_title }}</strong>
+        <span>OGC API - Features</span>
+      </a>
+      <a class="format" href="{{ json_url }}" title="This page as JSON">JSON</a>
+    </div>
+  </header>
+  <div class="container">
+    <nav class="breadcrumbs">
+      <a href="{{ root_url }}">Home</a>
+      {% block breadcrumbs %}{% endblock %}
+    </nav>
+    <main>
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  <footer>
+    <div class="container">
+      Served by <a href="https://github.com/opengisch/django-oapif">django-oapif</a> {{ version }}
+    </div>
+  </footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

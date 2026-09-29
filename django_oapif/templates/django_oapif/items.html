@@ -1,0 +1,49 @@
+{% extends "django_oapif/base.html" %}
+
+{% block title %}Items of {{ collection.title }} - {{ api_title }}{% endblock %}
+
+{% block head %}{% if geojson %}{% include "django_oapif/map.html" %}{% endif %}{% endblock %}
+
+{% block breadcrumbs %}<a href="{{ root_url }}collections">Collections</a><a href="{{ root_url }}collections/{{ collection.id|urlencode:"" }}">{{ collection.title }}</a><span>Items</span>{% endblock %}
+
+{% block content %}
+<h1>{{ collection.title }}</h1>
+{% if features %}
+<p class="muted">Features {{ first }} to {{ last }} of {{ number_matched }}</p>
+{% if geojson %}<div id="map"></div>{% endif %}
+<div class="table">
+  <table>
+    <thead><tr><th>{{ id_column }}</th>{% for column in columns %}<th>{{ column }}</th>{% endfor %}</tr></thead>
+    <tbody>
+      {% for feature in features %}
+      <tr>
+        <td class="nowrap"><a href="{{ feature.href }}">{{ feature.id }}</a></td>
+        {% for value in feature.values %}<td>{{ value }}</td>{% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="muted">No feature{% if number_matched %} on this page, of the {{ number_matched }} there are{% endif %}.</p>
+{% endif %}
+{% if pages.prev or pages.next %}
+<div class="pager">
+  {% if pages.prev %}<a class="button secondary" href="{{ pages.prev }}">Previous</a>{% endif %}
+  {% if pages.next %}<a class="button secondary next" href="{{ pages.next }}">Next</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if geojson and features %}
+{{ geojson|json_script:"features" }}
+<script>
+  oapifMap(
+    "map",
+    JSON.parse(document.getElementById("features").textContent),
+    (feature) => `items/${encodeURIComponent(feature.id)}`,
+  );
+</script>
+{% endif %}
+{% endblock %}

@@ -5,7 +5,9 @@ from typing import (
 )
 
 from django.db.models import Model
+from django.http import HttpRequest, HttpResponse
 from django.urls import URLPattern, URLResolver
+from django.utils.cache import patch_vary_headers
 from ninja import NinjaAPI
 from ninja.constants import NOT_SET, NOT_SET_TYPE
 from ninja.openapi.docs import DocsBase, Swagger
@@ -30,7 +32,21 @@ class OAPIFNinjaAPI(NinjaAPI):
     The Ninja API, with the limit of the items published under `components/parameters/limit` and referenced
     from their operation, as the OpenAPI building blocks of OGC API - Features declare it: QGIS takes the page
     size from there only, and ignores a parameter declared on the operation.
+
+    Its JSON responses vary on Accept, as their URLs serve an HTML page to a browser.
     """
+
+    def create_response(
+        self,
+        request: HttpRequest,
+        data: Any,
+        *,
+        status: int | None = None,
+        temporal_response: HttpResponse | None = None,
+    ) -> HttpResponse:
+        response = super().create_response(request, data, status=status, temporal_response=temporal_response)
+        patch_vary_headers(response, ["Accept"])
+        return response
 
     def get_openapi_schema(
         self, *, path_prefix: str | None = None, path_params: DictStrAny | None = None
@@ -98,9 +114,9 @@ class OAPIF:
             openapi_extra=openapi_extra,
         )
         self.collections: dict[str, OapifCollection] = {}
-        self.api.add_router("/", create_root_router(title=title, description=description))
-        self.api.add_router("/conformance", create_conformance_router())
-        self.api.add_router("/collections", create_collections_router(self.collections))
+        self.api.add_router("/", create_root_router(title=title, description=description, docs_url=docs_url))
+        self.api.add_router("/conformance", create_conformance_router(title=title))
+        self.api.add_router("/collections", create_collections_router(self.collections, title=title))
 
     def register_collection(
         self,

@@ -1,4 +1,6 @@
+import json
 from typing import Any
+from urllib.parse import quote
 
 from functools import cache
 
@@ -24,6 +26,7 @@ from django_oapif.geojson import (
     GenericFeaturePatch,
 )
 from django_oapif.handler import ARROW_AVAILABLE, OapifCollection, ReprojectedExtent, parse_box2d
+from django_oapif.html import HTML_MEDIA_TYPE, as_text, html_response, schema_type
 from django_oapif.schema import (
     OAPIFCollection,
     OAPIFCollections,
@@ -60,7 +63,8 @@ def get_page_links(
             title="items (self)",
             type=media_type,
             href=request.build_absolute_uri(),
-        )
+        ),
+        html_link(replace_query_param(request, f="html"), "items (as HTML)"),
     ]
     if offset > 0:
         links.append(
@@ -102,9 +106,24 @@ def arrow_response(stream, crs: CRS) -> HttpResponse:
     return response
 
 
+def html_link(href: str, title: str) -> OAPIFLink:
+    """The link to the HTML encoding of a resource, which asks for it with `f=html`, for any client to get it."""
+    return OAPIFLink(rel="alternate", title=title, type=HTML_MEDIA_TYPE, href=href)
+
+
 def link_header(links: list[OAPIFLink]) -> str:
     """Serialize links as a RFC 8288 Link header, for responses that cannot carry them in the payload."""
     return ", ".join(f'<{link.href}>; rel="{link.rel}"; type="{link.type}"' for link in links)
+
+
+def accepts_html(request: HttpRequest) -> bool:
+    """
+    Whether to answer with the HTML page of a resource, which a browser asks for: `f=html` or `f=json` choose,
+    and otherwise the Accept header, a request that accepts any type getting the JSON.
+    """
+    if f := request.GET.get("f"):
+        return f == "html"
+    return request.get_preferred_type([*ACCEPTED_TYPES, HTML_MEDIA_TYPE]) == HTML_MEDIA_TYPE
 
 
 def accepts_geoarrow(request: HttpRequest) -> bool:
@@ -234,6 +253,7 @@ def get_collection_response(request: HttpRequest, collection: OapifCollection):
                 type="application/json",
                 href=request.build_absolute_uri(f"{uri_prefix}{collection.id}"),
             ),
+            html_link(request.build_absolute_uri(f"{uri_prefix}{collection.id}?f=html"), "Collection as HTML"),
             OAPIFLink(
                 rel="http://www.opengis.net/def/rel/ogc/1.0/schema",
                 title="Collection schema",
@@ -274,7 +294,7 @@ def get_collection_response(request: HttpRequest, collection: OapifCollection):
     return response
 
 
-def create_collections_router(collections: dict[str, OapifCollection]):
+def create_collections_router(collections: dict[str, OapifCollection], *, title: str):
     router = Router()
 
     def get_collection_by_id(collection_id: str, request: HttpRequest):
@@ -287,14 +307,15 @@ def create_collections_router(collections: dict[str, OapifCollection]):
 
     @router.get("", response=OAPIFCollections, operation_id="get_collections")
     def list_collections(request: HttpRequest):
-        return OAPIFCollections(
+        response = OAPIFCollections(
             links=[
                 OAPIFLink(
                     href=request.build_absolute_uri(),
                     rel="self",
                     type="application/json",
                     title="this document",
-                )
+                ),
+                html_link(replace_query_param(request, f="html"), "this document as HTML"),
             ],
             collections=[
                 get_collection_response(request, collection)
@@ -302,6 +323,9 @@ def create_collections_router(collections: dict[str, OapifCollection]):
                 if collection.has_view_permission(request)
             ],
         )
+        if accepts_html(request):
+            return html_response(request, "collections.html", {"collections": response.collections}, title=title)
+        return response
 
     @router.get(
         "/{collection_id}",
@@ -310,7 +334,10 @@ def create_collections_router(collections: dict[str, OapifCollection]):
     )
     def get_collection(request, collection_id: str):
         collection = get_collection_by_id(collection_id, request)
-        return get_collection_response(request, collection)
+        response = get_collection_response(request, collection)
+        if accepts_html(request):
+            return html_response(request, "collection.html", {"collection": response}, title=title)
+        return response
 
     @router.get(
         "/{collection_id}/schema",
@@ -320,6 +347,14 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         collection = get_collection_by_id(collection_id, request)
         schema = collection.get_json_schema(request)
         schema["$id"] = request.build_absolute_uri()
+        if accepts_html(request):
+            required = set(schema.get("required", ()))
+            properties = [
+                {"name": name, "title": prop.get("title"), "type": schema_type(prop), "required": name in required}
+                for name, prop in schema["properties"].items()
+            ]
+            context = {"collection": collection, "properties": properties}
+            return html_response(request, "schema.html", context, title=title)
         return schema
 
     @router.get(
@@ -345,7 +380,8 @@ def create_collections_router(collections: dict[str, OapifCollection]):
 
         total_count = query.count()
 
-        if accepts_geoarrow(request):
+        html = accepts_html(request)
+        if not html and accepts_geoarrow(request):
             stream = collection.queryset_to_arrow_stream(request, paginated_query, crs)
             response = arrow_response(stream, crs)
             # an Arrow stream has nowhere to put them, and the row count is the only one a client
@@ -360,6 +396,33 @@ def create_collections_router(collections: dict[str, OapifCollection]):
             number_matched=total_count,
             links=get_page_links(request, limit, offset, total_count),
         )
+        if html:
+            geojson = json.loads(feature_collection.model_dump_json())
+            properties = list(geojson["features"][0]["properties"]) if geojson["features"] else []
+            # the primary key is the id of the features already
+            pk = collection.opts.pk.name
+            columns = [name for name in properties if name != pk]
+            features = [
+                {
+                    "href": request.build_absolute_uri(f"items/{quote(feature['id'], safe='')}"),
+                    "id": feature["id"],
+                    "values": [as_text(feature["properties"][column]) for column in columns],
+                }
+                for feature in geojson["features"]
+            ]
+            context = {
+                "collection": collection,
+                "id_column": pk if pk in properties else "id",
+                "columns": columns,
+                "features": features,
+                "first": offset + 1,
+                "last": offset + len(features),
+                "number_matched": total_count,
+                "pages": {link.rel: link.href for link in feature_collection.links},
+                # the map has its coordinates in CRS84 only
+                "geojson": geojson if collection.geometry_field and crs == DEFAULT_CRS else None,
+            }
+            return html_response(request, "items.html", context, title=title)
         return geojson_response(feature_collection, crs)
 
     @router.api_operation(
@@ -396,10 +459,21 @@ def create_collections_router(collections: dict[str, OapifCollection]):
         item = get_object_or_404(query, pk=item_id)
         if not collection.has_view_permission(request, item):
             raise AuthorizationError()
-        if accepts_geoarrow(request):
+        html = accepts_html(request)
+        if not html and accepts_geoarrow(request):
             stream = collection.queryset_to_arrow_stream(request, query.filter(pk=item_id), crs)
             return arrow_response(stream, crs)
-        return geojson_response(collection.model_to_feature(request, item), crs)
+        feature = collection.model_to_feature(request, item)
+        if html:
+            geojson = json.loads(feature.model_dump_json())
+            context = {
+                "collection": collection,
+                "feature": geojson,
+                "properties": [(name, as_text(value)) for name, value in geojson["properties"].items()],
+                "geojson": geojson if collection.geometry_field and crs == DEFAULT_CRS else None,
+            }
+            return html_response(request, "item.html", context, title=title)
+        return geojson_response(feature, crs)
 
     @router.post(
         "/{collection_id}/items",
