@@ -67,6 +67,9 @@
     const map = L.map(element);
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
+      // the OpenStreetMap servers refuse tiles without a Referer, which the same-origin policy Django sends by
+      // default leaves out: the origin of the page is sent, not its path
+      referrerPolicy: "strict-origin-when-cross-origin",
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
     const style = {color: "#3776ab", weight: 2, fillOpacity: 0.25};

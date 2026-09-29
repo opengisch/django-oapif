@@ -22,7 +22,9 @@ As the same URL serves both, the responses carry a `Vary: Accept` header.
 ## Maps
 
 The maps are drawn with [Leaflet](https://leafletjs.com), over [OpenStreetMap](https://www.openstreetmap.org)
-tiles, which the browser loads from jsDelivr and from the OpenStreetMap tile servers. Curves are drawn as
+tiles, which the browser loads from jsDelivr and from the OpenStreetMap tile servers. As their
+[tile usage policy](https://operations.osmfoundation.org/policies/tiles/) asks, the tiles are requested with
+the origin of the page as `Referer`, whatever the `Referrer-Policy` of the site. Curves are drawn as
 lines. The coordinates of a map are in CRS84: a page asked for in another CRS, with `crs`, has none.
 
 ## Changing the pages
