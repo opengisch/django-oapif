@@ -2,7 +2,11 @@ import requests
 from qgis.core import (
     QgsDataSourceUri,
     QgsEditError,
+    QgsExpression,
+    QgsExpressionContext,
+    QgsExpressionContextUtils,
     QgsFeature,
+    QgsNetworkAccessManager,
     QgsPoint,
     QgsProject,
     QgsVectorDataProvider,
@@ -10,6 +14,7 @@ from qgis.core import (
     QgsWkbTypes,
     edit,
 )
+from qgis.PyQt.QtCore import QCoreApplication
 from qgis.testing import start_app, unittest
 
 start_app()
@@ -174,3 +179,50 @@ class TestStack(unittest.TestCase):
         self.assertIsNotNone(layer)
         self.assertEqual(layer.featureCount(), 0)
         self.assertEqual(layer.geometryType(), QgsWkbTypes.PointGeometry)
+
+    def test_layer_filters_are_applied_by_the_server(self):
+        # with the filtering classes of Part 3, QGIS sends the filter of a layer to the server instead of
+        # filtering every feature itself: the features it gets back have to be the ones it would have picked
+        requested = []
+
+        def record(reply):
+            requested.append(reply.request().url().toString())
+
+        # the main thread instance relays the replies of every thread, unlike the requests about to be created
+        manager = QgsNetworkAccessManager.instance()
+        manager.finished.connect(record)
+        self.addCleanup(manager.finished.disconnect, record)
+
+        uri = QgsDataSourceUri()
+        uri.setParam("service", "wfs")
+        uri.setParam("typename", "tests.point_2056_10fields")
+        uri.setParam("url", ROOT_URL)
+        for expression in (
+            '"field_int" >= 500',
+            """"field_int" >= 500 AND "field_str_0" LIKE 'a%'""",
+            """"field_str_0" ILIKE 'A%'""",
+            'NOT ("field_int" < 500)',
+            '"field_int" IN (1, 2, 3) OR "field_int" BETWEEN 100 AND 110',
+            '"field_str_1" IS NULL',
+            # in the CRS of the layer, which QGIS sends as the filter-crs
+            "intersects_bbox($geometry, geom_from_wkt('POLYGON((2508500 1152000, 2510000 1152000, "
+            "2510000 1153500, 2508500 1153500, 2508500 1152000))'))",
+        ):
+            with self.subTest(expression=expression):
+                layer = QgsVectorLayer(uri.uri(), "point", "OAPIF")
+                self.assertTrue(layer.isValid())
+                picked = QgsExpression(expression)
+                context = QgsExpressionContext(QgsExpressionContextUtils.globalProjectLayerScopes(layer))
+                expected = set()
+                for feature in layer.getFeatures():
+                    context.setFeature(feature)
+                    if picked.evaluate(context):
+                        expected.add(feature["id"])
+
+                requested.clear()
+                self.assertTrue(layer.setSubsetString(expression))
+                filtered = {feature["id"] for feature in layer.getFeatures()}
+                QCoreApplication.processEvents()
+
+                self.assertEqual(filtered, expected)
+                self.assertTrue(any("filter=" in url for url in requested), requested)

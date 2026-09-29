@@ -28,6 +28,7 @@ from django_oapif_tests.tests.models import (
     GeometryZ_2056,
     LayerWithDate,
     LayerWithFile,
+    LayerWithForeignKey,
     LayerWithOrdering,
     LayerWithVariousTypes,
     Point_2056_10fields,
@@ -1722,6 +1723,197 @@ class TestQueryables(TestCase):
         )
 
 
+class TestFilter(TestCase):
+    """CQL2 filters, in the shapes QGIS sends them: it applies none of them itself once the server takes them."""
+
+    # label, field_int, field_str_0, field_str_1, field_bool, and the point, in Lausanne, Zurich, Geneva and Bern
+    POINTS = (
+        ("a", 1, "Route d'Oron", None, True, (2538000, 1152000)),
+        ("b", 2, "foo_bar", "x", False, (2683000, 1248000)),
+        ("c", None, "FOO%bar", None, True, (2500000, 1118000)),
+        ("d", 10, None, "y", True, (2600000, 1200000)),
+    )
+    ZURICH = "BBOX(8.4,47.3,8.7,47.5)"
+    GENEVA = "POLYGON((6 46.1,6.3 46.1,6.3 46.3,6 46.3,6 46.1))"
+
+    @classmethod
+    def setUpTestData(cls):
+        for label, field_int, field_str_0, field_str_1, field_bool, (x, y) in cls.POINTS:
+            Point_2056_10fields.objects.create(
+                field_str_9=label,
+                field_int=field_int,
+                field_str_0=field_str_0,
+                field_str_1=field_str_1,
+                field_bool=field_bool,
+                geom=f"SRID=2056;POINT({x} {y})",
+            )
+        LayerWithDate.objects.create(
+            date=datetime.date(2023, 4, 19), time=datetime.datetime(2023, 4, 19, 12, 34, 56, tzinfo=datetime.UTC)
+        )
+        LayerWithDate.objects.create(
+            date=datetime.date(2024, 1, 1), time=datetime.datetime(2024, 1, 1, tzinfo=datetime.UTC)
+        )
+
+    def get(self, filter_expr: str, collection: str = "tests.point_2056_10fields", **params):
+        return self.client.get(f"{collections_url}/{collection}/items", {"filter": filter_expr, **params})
+
+    def matches(self, filter_expr: str, collection: str = "tests.point_2056_10fields", label="field_str_9", **params):
+        response = self.get(filter_expr, collection, **params)
+        self.assertEqual(response.status_code, 200, response.content)
+        return sorted(feature["properties"][label] for feature in response.json()["features"])
+
+    def assert_matches(self, cases, **kwargs):
+        for filter_expr, expected in cases:
+            with self.subTest(filter=filter_expr):
+                self.assertEqual(self.matches(filter_expr, **kwargs), expected)
+
+    def test_comparisons(self):
+        self.assert_matches((
+            ("(field_int = 1)", ["a"]),
+            ("(field_int >= 2)", ["b", "d"]),
+            ("(field_int < 2)", ["a"]),
+            ("(field_int <= 2)", ["a", "b"]),
+            ("(field_int > 1)", ["b", "d"]),
+            ("2 < field_int", ["d"]),
+            ("(field_bool = FALSE)", ["b"]),
+            ('"field_int" = 2', ["b"]),
+            ("((field_int = 1) OR (field_int = 10))", ["a", "d"]),
+            ("((field_int >= 1) AND (field_str_1 = 'x'))", ["b"]),
+            ("field_int IN (1,10)", ["a", "d"]),
+            ("field_int BETWEEN 1 AND 2", ["a", "b"]),
+            ("(field_int IS NULL)", ["c"]),
+            ("(field_str_0 IS NOT NULL)", ["a", "b", "c"]),
+            ("field_int = field_int", ["a", "b", "d"]),
+        ))
+
+    def test_quotes_are_escaped_as_in_cql2(self):
+        # doubled by QGIS, and names with an apostrophe are common in Switzerland
+        self.assert_matches((
+            ("(field_str_0 = 'Route d''Oron')", ["a"]),
+            ("field_str_0 = 'Route d\\'Oron'", ["a"]),
+        ))
+
+    def test_negations_leave_out_null_values(self):
+        # a comparison with null is unknown, and so is its negation: QGIS would not match them, and Django would
+        self.assert_matches((
+            ("(field_int <> 1)", ["b", "d"]),
+            ("(NOT ((field_int = 1)))", ["b", "d"]),
+            ("NOT (field_int = 1 OR field_int = 2)", ["d"]),
+            ("NOT (field_str_1 = 'x' AND field_int = 2)", ["a", "d"]),
+            ("NOT NOT (field_int = 1)", ["a"]),
+            ("field_int NOT IN (1,2)", ["d"]),
+            ("field_int NOT BETWEEN 1 AND 2", ["d"]),
+            ("(field_str_0 NOT LIKE 'foo%')", ["a", "c"]),
+            ("NOT (field_int IS NULL)", ["a", "b", "d"]),
+            ("field_str_1 <> field_str_0", ["b"]),
+        ))
+
+    def test_like(self):
+        self.assert_matches((
+            ("(field_str_0 LIKE 'foo%')", ["b"]),
+            ("field_str_0 LIKE '%bar'", ["b", "c"]),
+            ("field_str_0 LIKE 'fo__bar'", ["b"]),
+            ("field_str_0 LIKE 'foo\\_%'", ["b"]),
+            ("field_str_0 LIKE 'FOO\\%%'", ["c"]),
+            ("field_str_0 LIKE '%d''O%'", ["a"]),
+            # the parts are matched in their order, and the other characters as they are
+            ("field_str_0 LIKE '%bar%foo%'", []),
+            ("field_str_0 LIKE 'Route d''O.on'", []),
+        ))
+
+    def test_case_insensitive_comparisons(self):
+        self.assert_matches((
+            ("(CASEI(field_str_0) LIKE CASEI('foo%'))", ["b", "c"]),
+            ("(CASEI(field_str_0) NOT LIKE CASEI('foo%'))", ["a"]),
+            ("CASEI(field_str_0) = CASEI('FOO_BAR')", ["b"]),
+            ("CASEI('FOO_BAR') = CASEI(field_str_0)", ["b"]),
+            ("CASEI(field_str_0) IN (CASEI('foo_bar'), CASEI('route d''oron'))", ["a", "b"]),
+        ))
+
+    def test_temporal_literals(self):
+        self.assert_matches(
+            (
+                ("(date = DATE('2023-04-19'))", ["2023-04-19"]),
+                ("(time = TIMESTAMP('2023-04-19T12:34:56.000Z'))", ["2023-04-19"]),
+                ("time > TIMESTAMP('2023-06-01T00:00:00Z')", ["2024-01-01"]),
+                # the timestamps of CQL2 are in UTC
+                ("time < TIMESTAMP('2023-04-19T12:34:57')", ["2023-04-19"]),
+            ),
+            collection="tests.layerwithdate",
+            label="date",
+        )
+
+    def test_spatial_functions(self):
+        # the literals are in CRS84 unless the filter-crs says otherwise, whatever the CRS of the geometries
+        self.assert_matches((
+            (f"S_INTERSECTS(geom,{self.ZURICH})", ["b"]),
+            (f"S_INTERSECTS(geom,{self.GENEVA})", ["c"]),
+            (f"S_CONTAINS({self.GENEVA},geom)", ["c"]),
+            (f"S_DISJOINT(geom,{self.ZURICH})", ["a", "c", "d"]),
+            (f"NOT S_INTERSECTS(geom,{self.ZURICH})", ["a", "c", "d"]),
+        ))
+        self.assert_matches(
+            (
+                ("S_INTERSECTS(geom,POINT(2600000 1200000))", ["d"]),
+                ("S_INTERSECTS(geom,BBOX(2590000,1190000,2610000,1210000))", ["d"]),
+            ),
+            **{"filter-crs": crs_2056},
+        )
+
+    def test_filter_and_bbox_both_apply(self):
+        self.assertEqual(self.matches("field_int >= 1", bbox="8.4,47.3,8.7,47.5"), ["b"])
+
+    def test_pages_keep_the_filter(self):
+        page = self.get("field_int >= 1", limit=1).json()
+        next_url = next(link["href"] for link in page["links"] if link["rel"] == "next")
+        next_page = self.client.get(next_url.removeprefix("http://testserver")).json()
+
+        self.assertEqual(page["numberMatched"], 3)
+        self.assertEqual(next_page["numberMatched"], 3)
+        self.assertEqual(len(next_page["features"]), 1)
+
+    def test_foreign_key(self):
+        point = Point_2056_10fields.objects.get(field_str_9="a")
+        LayerWithForeignKey.objects.create(point=point)
+
+        response = self.get(f"point = '{point.pk}'", "tests.layerwithforeignkey")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["numberMatched"], 1)
+
+    def test_invalid_filters_are_client_errors(self):
+        for filter_expr, collection, params in (
+            ("field_int >", "tests.point_2056_10fields", {}),
+            ("unknown = 1", "tests.point_2056_10fields", {}),
+            ("field_int = 'abc'", "tests.point_2056_10fields", {}),
+            ("id = 'not-a-uuid'", "tests.point_2056_10fields", {}),
+            ("field_int * 2 > 3", "tests.point_2056_10fields", {}),
+            ("ACCENTI(field_str_0) = 'x'", "tests.point_2056_10fields", {}),
+            ("CASEI(field_str_0) > CASEI('a')", "tests.point_2056_10fields", {}),
+            ("field_int = field_str_0", "tests.point_2056_10fields", {}),
+            ("geom = 1", "tests.point_2056_10fields", {}),
+            ("S_INTERSECTS(field_int,BBOX(0,0,1,1))", "tests.point_2056_10fields", {}),
+            ("S_INTERSECTS(geom,field_int)", "tests.point_2056_10fields", {}),
+            # coordinates of another CRS, sent without a filter-crs: PostGIS would fail to reproject them
+            ("S_INTERSECTS(geom,BBOX(2590000,1190000,2610000,1210000))", "tests.point_2056_10fields", {}),
+            ("field_int = 1", "tests.point_2056_10fields", {"filter-crs": f"{crs_base}/EPSG/0/3857"}),
+            # a field the collection does not expose, or one of a related model
+            ("field_str_1 = 'x'", "tests.point_2056_10fields_subset", {}),
+            ("point__field_str_0 = 'x'", "tests.layerwithforeignkey", {}),
+            ("point LIKE 'a%'", "tests.layerwithforeignkey", {}),
+            ("S_INTERSECTS(geom,BBOX(0,0,1,1))", "tests.nogeom_10fields", {}),
+        ):
+            with self.subTest(filter=filter_expr, collection=collection):
+                response = self.get(filter_expr, collection, **params)
+
+                self.assertEqual(response.status_code, 400, response.content)
+
+    def test_only_cql2_text_is_accepted(self):
+        response = self.get("field_int = 1", **{"filter-lang": "cql2-json"})
+
+        self.assertEqual(response.status_code, 422)
+
+
 class TestConformance(TestCase):
     def test_openapi_class_matches_the_served_document(self):
         # django-ninja serves OpenAPI 3.1: a 3.0 class would be a false claim, and only the 1.1 draft of
@@ -1733,6 +1925,18 @@ class TestConformance(TestCase):
         self.assertIn("http://www.opengis.net/spec/ogcapi-features-1/1.1/conf/oas31", conforms_to)
         self.assertEqual([uri for uri in conforms_to if uri.endswith("/conf/oas30")], [])
 
+    def test_filters_are_declared(self):
+        # without the classes of Part 3 and basic-cql2, QGIS filters the layers itself
+        conforms_to = self.client.get("/oapif/conformance").json()["conformsTo"]
+
+        for uri in (
+            "http://www.opengis.net/spec/ogcapi-features-3/1.0/conf/queryables",
+            "http://www.opengis.net/spec/ogcapi-features-3/1.0/conf/filter",
+            "http://www.opengis.net/spec/ogcapi-features-3/1.0/conf/features-filter",
+            "http://www.opengis.net/spec/cql2/1.0/conf/basic-cql2",
+        ):
+            self.assertIn(uri, conforms_to)
+
     def test_openapi_crs_defaults_are_uris(self):
         # they used to be documented as the fields of the CRS, which the interactive docs then sent
         document = self.client.get("/oapif/openapi.json").json()
@@ -1741,10 +1945,10 @@ class TestConformance(TestCase):
             for path, operations in document["paths"].items()
             for method, operation in operations.items()
             for parameter in operation.get("parameters", [])
-            if parameter.get("name") in ("crs", "bbox-crs", "Content-Crs")
+            if parameter.get("name") in ("crs", "bbox-crs", "filter-crs", "Content-Crs")
         }
 
-        self.assertEqual(len(defaults), 6)
+        self.assertEqual(len(defaults), 7)
         self.assertEqual(defaults, dict.fromkeys(defaults, crs84))
 
     def test_openapi_publishes_the_limit_of_the_items(self):

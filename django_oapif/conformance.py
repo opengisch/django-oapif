@@ -24,6 +24,16 @@ def create_conformance_router(*, title: str):
                 # (see docs/content/contributing/conformance.md)
                 "http://www.opengis.net/spec/ogcapi-features-1/1.1/conf/oas31",
                 "http://www.opengis.net/spec/ogcapi-features-2/1.0/conf/crs",
+                # QGIS only sends a layer filter to the server with the filter classes of Part 3 and basic-cql2,
+                # and each of the CQL2 classes below lets it send more of the filter
+                "http://www.opengis.net/spec/ogcapi-features-3/1.0/conf/queryables",
+                "http://www.opengis.net/spec/ogcapi-features-3/1.0/conf/filter",
+                "http://www.opengis.net/spec/ogcapi-features-3/1.0/conf/features-filter",
+                "http://www.opengis.net/spec/cql2/1.0/conf/cql2-text",
+                "http://www.opengis.net/spec/cql2/1.0/conf/basic-cql2",
+                "http://www.opengis.net/spec/cql2/1.0/conf/advanced-comparison-operators",
+                "http://www.opengis.net/spec/cql2/1.0/conf/case-insensitive-comparison",
+                "http://www.opengis.net/spec/cql2/1.0/conf/basic-spatial-functions",
                 "http://www.opengis.net/spec/ogcapi-features-4/1.0/conf/create-replace-delete",
                 "http://www.opengis.net/spec/ogcapi-features-4/1.0/conf/update",
                 "http://www.opengis.net/spec/ogcapi-features-4/1.0/conf/features",
