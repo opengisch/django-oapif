@@ -488,7 +488,12 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         collection = get_collection_by_id(collection_id, request)
         schema = collection.get_queryables_schema(request)
         schema["$id"] = request.build_absolute_uri(request.path)
-        return HttpResponse(json.dumps(schema, cls=DjangoJSONEncoder), content_type=SCHEMA_MEDIA_TYPE)
+        if accepts_html(request):
+            context = {"collection": collection, "properties": schema_properties(schema)}
+            return html_response(request, "queryables.html", context, title=title)
+        response = HttpResponse(json.dumps(schema, cls=DjangoJSONEncoder), content_type=SCHEMA_MEDIA_TYPE)
+        patch_vary_headers(response, ["Accept"])
+        return response
 
     @router.get(
         "/{collection_id}/items",

@@ -951,6 +951,7 @@ class TestHtml(TestCase):
             collections_url,
             f"{collections_url}/tests.point_2056_10fields",
             f"{collections_url}/tests.point_2056_10fields/schema",
+            f"{collections_url}/tests.point_2056_10fields/queryables",
             f"{collections_url}/tests.point_2056_10fields/items",
             f"{collections_url}/tests.point_2056_10fields/items/{point}",
             f"{collections_url}/tests.nogeom_10fields/items",
@@ -994,7 +995,7 @@ class TestHtml(TestCase):
 
     def test_json_links_the_page(self):
         collection_url = f"{collections_url}/tests.point_2056_10fields"
-        # the conformance declaration and the schema have no links
+        # the conformance declaration and the schemas have no links
         for url in ("/oapif/", collections_url, collection_url, f"{collection_url}/items"):
             with self.subTest(url=url):
                 links = self.client.get(url).json()["links"]
@@ -1045,6 +1046,12 @@ class TestHtml(TestCase):
 
         self.assertEqual(rows["score"]["Title"], "Score Out of ten")
         self.assertEqual(rows["score"]["Constraints"], "minimum 0 maximum 10 x-ogc-unit point")
+
+    def test_queryables_page_links_the_geometry_schema(self):
+        page = self.page(f"{collections_url}/tests.point_2056_10fields/queryables")
+
+        self.assertEqual(properties_table(page)["geom"]["Role"], "primary-geometry")
+        self.assertIn('href="https://geojson.org/schema/Point.json"', page)
 
     def test_landing_page_links_the_api_documentation(self):
         links = self.client.get("/oapif/").json()["links"]
