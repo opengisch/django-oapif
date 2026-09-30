@@ -163,6 +163,26 @@ def take_jsonfg_members_or_raise(feature: GenericFeatureInput | GenericFeaturePa
         feature.geometry = feature.place
 
 
+def add_references(
+    request: HttpRequest, collection: OapifCollection, collections: dict[str, OapifCollection], schema: dict
+) -> None:
+    """
+    Give a foreign key the reference role of Part 5, to the collections of the model it references that the user
+    may view: served as the primary key of a row, it is the id of a feature of theirs. A key to another field, or to
+    a model without a collection, references no feature, and the primary key keeps its role of id.
+    """
+    for name, model in collection.foreign_key_fields.items():
+        field = collection.opts.get_field(name)
+        if field.primary_key or not field.target_field.primary_key or name not in schema["properties"]:
+            continue
+        ids = [
+            other.id for other in collections.values() if other.model is model and other.has_view_permission(request)
+        ]
+        if ids:
+            schema["properties"][name]["x-ogc-role"] = "reference"
+            schema["properties"][name]["x-ogc-collectionId"] = ids[0] if len(ids) == 1 else ids
+
+
 def get_item_or_404(collection: OapifCollection, request: HttpRequest, item_id: str):
     """Fetch an item to act on, leaving the geometry in the database: GEOS cannot deserialize curves."""
     query = collection.get_queryset(request)
@@ -348,6 +368,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         collection = get_collection_by_id(collection_id, request)
         schema = collection.get_json_schema(request)
         schema["$id"] = request.build_absolute_uri(request.path)
+        add_references(request, collection, collections, schema)
         if accepts_html(request):
             required = set(schema.get("required", ()))
             properties = [

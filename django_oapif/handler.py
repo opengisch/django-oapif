@@ -538,6 +538,10 @@ class OapifCollection[M: Model]:
                 if len(patterns) == 1:
                     field_props["pattern"] = json_schema_pattern(patterns[0])
 
+        # the primary key identifies the features
+        if (pk_props := schema["properties"].get(self.opts.pk.name)) is not None:
+            pk_props["x-ogc-role"] = "id"
+
         # served but not written, which QGIS makes read-only fields of
         for field_name in self.get_readonly_fields(request):
             if field_name in schema["properties"]:

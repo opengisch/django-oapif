@@ -321,7 +321,7 @@ class TestSchema(TestCase):
         expected_schema = {
             "additionalProperties": False,
             "properties": {
-                "id": {"title": "Id", "format": "uuid", "type": "string", "x-ogc-propertySeq": 1},
+                "id": {"title": "Id", "format": "uuid", "type": "string", "x-ogc-role": "id", "x-ogc-propertySeq": 1},
                 "field_int": {
                     "title": "Field Int",
                     "type": "integer",
@@ -459,6 +459,29 @@ class TestSchema(TestCase):
         # an address of either version has no format in JSON Schema
         self.assertNotIn("format", properties("tests.layerwithvarioustypes")["ip"])
 
+    def test_schema_references(self):
+        url = f"{collections_url}/tests.layerwithforeignkey/schema"
+        point = self.client.get(url).json()["properties"]["point"]
+
+        # the model of the key has two collections
+        self.assertEqual(point["x-ogc-role"], "reference")
+        self.assertEqual(point["x-ogc-collectionId"], ["tests.point_2056_10fields", "tests.point_2056_10fields_subset"])
+
+    def test_schema_references_only_viewable_collections(self):
+        url = f"{collections_url}/tests.layerwithforeignkey/schema"
+        subset = oapif.collections["tests.point_2056_10fields_subset"]
+        with patch.object(subset, "has_view_permission", return_value=False):
+            point = self.client.get(url).json()["properties"]["point"]
+
+        self.assertEqual(point["x-ogc-collectionId"], "tests.point_2056_10fields")
+
+    def test_schema_primary_key_is_the_id(self):
+        # the key to the parent of a multi-table inheritance is the primary key, not a reference
+        properties = self.client.get(f"{collections_url}/tests.point_2056_empty/schema").json()["properties"]
+
+        self.assertEqual(properties["point_2056_10fields_ptr"]["x-ogc-role"], "id")
+        self.assertNotIn("x-ogc-role", properties["id"])
+
     def test_properties_schema_keeps_its_extra_behaviour(self):
         # ninja caches schemas by name and fields but not by config: the output schema, built first by
         # a read, used to be handed to writes too, which then silently dropped unknown properties
@@ -523,7 +546,7 @@ class TestSchema(TestCase):
         expected_schema = {
             "additionalProperties": False,
             "properties": {
-                "id": {"format": "uuid", "title": "Id", "type": "string", "x-ogc-propertySeq": 1},
+                "id": {"format": "uuid", "title": "Id", "type": "string", "x-ogc-role": "id", "x-ogc-propertySeq": 1},
                 "text_mandatory_field": {
                     "maxLength": 255,
                     "title": "Mandatory Field",
@@ -1840,6 +1863,7 @@ class TestConformance(TestCase):
         for uri in (
             "http://www.opengis.net/spec/ogcapi-features-5/1.0/conf/schemas",
             "http://www.opengis.net/spec/ogcapi-features-5/1.0/conf/returnables-and-receivables",
+            "http://www.opengis.net/spec/ogcapi-features-5/1.0/conf/feature-references",
         ):
             self.assertIn(uri, conforms_to)
 
