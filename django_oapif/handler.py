@@ -1,7 +1,7 @@
 import json
 import re
 from datetime import date, datetime, time
-from functools import cache
+from functools import cache, cached_property
 from types import NoneType, UnionType, new_class
 from typing import Annotated, Any, Literal, Union, cast, get_args, get_origin, overload
 from uuid import UUID
@@ -45,7 +45,7 @@ from pydantic import ValidationError as PydanticValidationError
 from pydantic.config import ExtraValues
 
 from django_oapif import jsonfg
-from django_oapif.crs import CRS, CRS84_SRID, BBox
+from django_oapif.crs import CRS, CRS84, CRS84_SRID, BBox
 from django_oapif.geojson import (
     CircularString,
     CircularStringParts,
@@ -58,6 +58,9 @@ from django_oapif.geojson import (
     FeaturePatch,
     Geometry,
     GeometryCollection,
+    JsonFgFeature,
+    JsonFgFeatureCollection,
+    JsonFgRootFeature,
     LineString,
     MultiCurve,
     MultiLineString,
@@ -103,6 +106,16 @@ try:
     JSON_TEXT_METADATA = {"ARROW:extension:name": "arrow.json"}
 except ImportError:
     ARROW_AVAILABLE = False
+
+
+# the types of the columns that hold curves only, and the GeoJSON geometries PostGIS linearizes them to
+LINEARIZED = {
+    "CIRCULARSTRING": LineString,
+    "COMPOUNDCURVE": LineString,
+    "CURVEPOLYGON": Polygon,
+    "MULTICURVE": MultiLineString,
+    "MULTISURFACE": MultiPolygon,
+}
 
 
 def json_schema_type(annotation: Any) -> str | None:
@@ -367,8 +380,20 @@ class OapifCollection[M: Model]:
         codename = get_permission_codename("delete", self.opts)
         return request.user.has_perm(f"{self.opts.app_label}.{codename}")
 
+    @cached_property
+    def curved(self) -> bool:
+        """Whether the geometry column holds curves only, like a CURVEPOLYGON one, rather than any geometry."""
+        if self.geometry_field is None:
+            return False
+        geom_field = cast("GeometryField", self.model._meta.get_field(self.geometry_field))
+        return geom_field.geom_type.startswith(tuple(LINEARIZED))
+
     @cache
-    def get_geometry_schema(self) -> type[Geometry] | None:
+    def get_geometry_schema(self, linearized: bool = False) -> type[Geometry] | None:
+        """
+        The schema of the geometries of the collection, or with `linearized` of the GeoJSON geometries that curves
+        are linearized to, for the readers that know no curves.
+        """
         if self.geometry_field is None:
             return None
 
@@ -377,7 +402,10 @@ class OapifCollection[M: Model]:
         is_3d = geom_field.dim >= 3 or geom_field.geom_type.endswith(("Z", "ZM"))
         CoordType = Coordinate3D if is_3d else Coordinate2D
 
-        if geom_field.geom_type.startswith("POINT"):
+        curve_type = next((name for name in LINEARIZED if geom_field.geom_type.startswith(name)), None)
+        if linearized and curve_type:
+            GeometryType = LINEARIZED[curve_type][CoordType]
+        elif geom_field.geom_type.startswith("POINT"):
             GeometryType = Point[CoordType]
         elif geom_field.geom_type.startswith("MULTIPOINT"):
             GeometryType = MultiPoint[CoordType]
@@ -472,6 +500,16 @@ class OapifCollection[M: Model]:
         PropertiesSchema = self.get_feature_properties_schema(request)
         GeometrySchema = self.get_geometry_schema()
         return Feature[GeometrySchema, PropertiesSchema]
+
+    def get_jsonfg_feature_output_schema(self, request: HttpRequest, *, root: bool = False) -> type[JsonFgFeature]:
+        """The schema of JSON-FG features, of the `root` of a document when served on their own."""
+        PropertiesSchema = self.get_feature_properties_schema(request)
+        FeatureSchema = JsonFgRootFeature if root else JsonFgFeature
+        if not self.geometry_field:
+            return FeatureSchema[None, None, PropertiesSchema]
+        # the geometry of a curve is null, or its linearization
+        GeometrySchema = self.get_geometry_schema(linearized=True) | None
+        return FeatureSchema[GeometrySchema, self.get_geometry_schema() | None, PropertiesSchema]
 
     def get_json_schema(self, request: HttpRequest) -> dict:
         properties_schema = self.get_properties_schema(without(self.get_fields(request), self.get_exclude(request)))
@@ -573,31 +611,40 @@ class OapifCollection[M: Model]:
         *,
         number_matched: int | None = None,
         links: list[OAPIFLink] | None = None,
+        crs: CRS = CRS84,
     ) -> FeatureCollection:
         """
-        Convert a queryset (as produced by `query()`) to a FeatureCollection. `number_matched` defaults
-        to the number of features returned, for a queryset that is not a page of a larger one.
+        Convert a queryset (as produced by `query()`, in `crs`) to a FeatureCollection, a JSON-FG one when it
+        has curves. `number_matched` defaults to the number of features returned, for a queryset that is not a
+        page of a larger one.
         """
-        FeatureSchema = self.get_feature_output_schema(request)
-        FeatureCollectionSchema = FeatureCollection[FeatureSchema]
-        features = []
+        rows = list(qs)
         # the boxes of the geometries, taken as they are read, so that the collection one takes no extra
         # query, nor reprojecting them all again
         boxes = []
-        for obj in qs:
-            features.append(self._model_to_feature(FeatureSchema, obj, boxes))
+        geometries = [self._geometry_of(row, boxes) for row in rows]
         bbox = None
         if boxes:
             xmins, ymins, xmaxs, ymaxs = zip(*boxes)
             bbox = (min(xmins), min(ymins), max(xmaxs), max(ymaxs))
-        return FeatureCollectionSchema.model_construct(
-            type="FeatureCollection",
-            features=features,
-            bbox=bbox,
-            numberReturned=len(features),
-            numberMatched=len(features) if number_matched is None else number_matched,
-            links=links or [],
-        )
+        members = {
+            "type": "FeatureCollection",
+            "bbox": bbox,
+            "numberReturned": len(rows),
+            "numberMatched": len(rows) if number_matched is None else number_matched,
+            "links": links or [],
+        }
+        if self._has_curves(geometries):
+            FeatureSchema = self.get_jsonfg_feature_output_schema(request)
+            features = [
+                self._jsonfg_feature(FeatureSchema, row, geometry, crs) for row, geometry in zip(rows, geometries)
+            ]
+            return JsonFgFeatureCollection[FeatureSchema].model_construct(
+                **members, **self._jsonfg_document(geometries, crs), features=features
+            )
+        FeatureSchema = self.get_feature_output_schema(request)
+        features = [self._feature(FeatureSchema, row, geometry) for row, geometry in zip(rows, geometries)]
+        return FeatureCollection[FeatureSchema].model_construct(**members, features=features)
 
     def get_arrow_properties_schema(self, properties_schema: type[Schema]) -> tuple["pa.Schema", dict[str, str]]:
         """
@@ -659,18 +706,45 @@ class OapifCollection[M: Model]:
             writer.write_table(table)
         return stream
 
-    def model_to_feature(self, request: HttpRequest, obj: M) -> Feature:
-        schema = self.get_feature_output_schema(request)
-        return self._model_to_feature(schema, obj)
+    def model_to_feature(self, request: HttpRequest, obj: M, *, crs: CRS = CRS84) -> Feature:
+        """Convert a row (as produced by `query()`, in `crs`) to a Feature, a JSON-FG one for a curve."""
+        geometry = self._geometry_of(obj)
+        if self._has_curves([geometry]):
+            schema = self.get_jsonfg_feature_output_schema(request, root=True)
+            return self._jsonfg_feature(schema, obj, geometry, crs, **self._jsonfg_document([geometry], crs))
+        return self._feature(self.get_feature_output_schema(request), obj, geometry)
 
-    def _model_to_feature(self, schema: type[Feature], obj: M, bounds: list | None = None) -> Feature:
-        geometry_wkb = getattr(obj, "_oapif_geometry", None)
-        return schema(
-            type="Feature",
-            id=str(obj.pk),
-            geometry=jsonfg.loads(bytes(geometry_wkb), bounds) if geometry_wkb else None,
-            properties=obj,
-        )
+    def _geometry_of(self, obj: M, bounds: list | None = None) -> dict | None:
+        wkb = getattr(obj, "_oapif_geometry", None)
+        return jsonfg.loads(bytes(wkb), bounds) if wkb else None
+
+    def _has_curves(self, geometries: list[dict | None]) -> bool:
+        """
+        Whether features have curves, which GeoJSON cannot carry: those of a column of curves, even the ones
+        without arcs, like a CurvePolygon of straight rings, do.
+        """
+        return self.curved or any(geometry is not None and not jsonfg.is_geojson(geometry) for geometry in geometries)
+
+    def _jsonfg_document(self, geometries: list[dict | None], crs: CRS) -> dict:
+        """The members of a JSON-FG document of features, which declares its classes and the CRS of "place"."""
+        conforms_to = [jsonfg.CORE, jsonfg.CIRCULAR_ARCS] if self._has_curves(geometries) else [jsonfg.CORE]
+        return {"conformsTo": conforms_to, "coordRefSys": crs.uri()}
+
+    def _feature(self, schema: type[Feature], obj: M, geometry: dict | None) -> Feature:
+        return schema(type="Feature", id=str(obj.pk), geometry=geometry, properties=obj)
+
+    def _jsonfg_feature(
+        self, schema: type[JsonFgFeature], obj: M, geometry: dict | None, crs: CRS, **members
+    ) -> JsonFgFeature:
+        """
+        A feature of JSON-FG, which gives a geometry that GeoJSON has, in CRS84, in "geometry", and any other in
+        "place", "geometry" being then null.
+        """
+        if geometry is None or (crs == CRS84 and jsonfg.is_geojson(geometry)):
+            geometry, place = geometry, None
+        else:
+            geometry, place = None, geometry
+        return schema(type="Feature", id=str(obj.pk), geometry=geometry, place=place, properties=obj, **members)
 
     def validate_feature_input_or_raise(self, request: HttpRequest, feature: Feature) -> Feature:
         schema = self.get_feature_input_schema(request)

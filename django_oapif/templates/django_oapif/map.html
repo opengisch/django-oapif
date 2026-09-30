@@ -86,7 +86,8 @@
     }).addTo(map);
     for (const feature of geojson.type === "FeatureCollection" ? geojson.features : [geojson]) {
       try {
-        layer.addData({...feature, geometry: oapifLinear(feature.geometry)});
+        // JSON-FG gives a curve in place
+        layer.addData({...feature, geometry: oapifLinear(feature.place ?? feature.geometry)});
       } catch (error) {
         // a geometry Leaflet cannot draw, which leaves the others on the map
       }

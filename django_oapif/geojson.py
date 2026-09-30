@@ -138,10 +138,27 @@ class Feature[G: Geometry | None, P: Schema](Schema):
     properties: P
 
 
+class JsonFgFeature[G: Geometry | None, L: Geometry | None, P: Schema](Feature[G, P]):
+    # the geometry GeoJSON cannot carry, a curve or one in another CRS than CRS84, "geometry" being then null
+    place: L
+
+
+class JsonFgDocument(Schema):
+    # the members of a JSON-FG document, after its type: readers like GDAL look for them at the start of it
+    # to tell JSON-FG from GeoJSON, and the fields of a base come before those of the class, but for its type
+    type: str
+    conformsTo: list[str]
+    coordRefSys: str
+
+
+class JsonFgRootFeature[G: Geometry | None, L: Geometry | None, P: Schema](JsonFgFeature[G, L, P], JsonFgDocument):
+    pass
+
+
 class FeatureInput[G: Geometry | None, P: Schema](Feature[G, P]):
-    # the JSON-FG members of a feature written, which are not served: the geometry GeoJSON cannot carry,
-    # "geometry" being then its fallback, and the CRS of its coordinates. A class of its own, as the
-    # OpenAPI document would describe the requests with the schema of the responses otherwise
+    # the JSON-FG members of a feature written: the geometry GeoJSON cannot carry, "geometry" being then
+    # its fallback, and the CRS of its coordinates. A class of its own, as the OpenAPI document would
+    # describe the requests with the schema of the responses otherwise
     place: G | None = None
     coordRefSys: Any = None
 
@@ -163,6 +180,10 @@ class FeatureCollection[F: Feature](Schema):
     links: list[OAPIFLink]
     numberReturned: int
     numberMatched: int
+
+
+class JsonFgFeatureCollection[F: Feature](FeatureCollection[F], JsonFgDocument):
+    pass
 
 
 GenericGeometry = Geometry[Coordinate] | None

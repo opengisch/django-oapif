@@ -2,14 +2,14 @@
 
 {% block title %}{{ feature.id }} - {{ collection.title }} - {{ api_title }}{% endblock %}
 
-{% block head %}{% if geojson.geometry %}{% include "django_oapif/map.html" %}{% endif %}{% endblock %}
+{% block head %}{% if geojson.geometry or geojson.place %}{% include "django_oapif/map.html" %}{% endif %}{% endblock %}
 
 {% block breadcrumbs %}<a href="{{ root_url }}collections">Collections</a><a href="{{ root_url }}collections/{{ collection.id|urlencode:"" }}">{{ collection.title }}</a><a href="{{ root_url }}collections/{{ collection.id|urlencode:"" }}/items">Items</a><span>{{ feature.id }}</span>{% endblock %}
 
 {% block content %}
 <h1>{{ feature.id }}</h1>
 <div class="id">{{ collection.title }}</div>
-{% if geojson.geometry %}<div id="map"></div>{% endif %}
+{% if geojson.geometry or geojson.place %}<div id="map"></div>{% endif %}
 <h2>Properties</h2>
 <div class="table">
   <table>
@@ -24,7 +24,7 @@
 {% endblock %}
 
 {% block scripts %}
-{% if geojson.geometry %}
+{% if geojson.geometry or geojson.place %}
 {{ geojson|json_script:"feature" }}
 <script>
   oapifMap("map", JSON.parse(document.getElementById("feature").textContent));

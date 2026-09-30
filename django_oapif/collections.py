@@ -202,24 +202,6 @@ def primary_keys(collection: OapifCollection) -> set[str]:
     return {name for key in keys for name in (key.name, key.attname)}
 
 
-# the geometry types of GeoJSON, the only ones GEOS knew before its 3.13
-GEOJSON_TYPES = {
-    "Point",
-    "MultiPoint",
-    "LineString",
-    "MultiLineString",
-    "Polygon",
-    "MultiPolygon",
-    "GeometryCollection",
-}
-
-
-def is_geojson(geometry) -> bool:
-    if geometry.type not in GEOJSON_TYPES:
-        return False
-    return geometry.type != "GeometryCollection" or all(is_geojson(member) for member in geometry.geometries)
-
-
 @cache
 def writes_curves() -> bool:
     """Whether curves can be written: it takes GEOS 3.13, and a Django whose GEOS bindings know them."""
@@ -237,10 +219,10 @@ def geometry_to_save(geometry, crs: CRS) -> GEOSGeometry | None:
     """
     if geometry is None:
         return None
-    if not is_geojson(geometry) and not writes_curves():
-        raise HttpError(501, "Curves can only be written with GEOS 3.13 or newer and a Django that supports them")
     # a CircularString served in parts goes back into its column as one
     data = geometry.circular_string() if isinstance(geometry, CircularStringParts) else geometry.model_dump()
+    if not jsonfg.is_geojson(data) and not writes_curves():
+        raise HttpError(501, "Curves can only be written with GEOS 3.13 or newer and a Django that supports them")
     try:
         return GEOSGeometry(memoryview(jsonfg.dumps(data)), srid=crs.srid)
     except GEOSException:
@@ -417,6 +399,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
             paginated_query,
             number_matched=total_count,
             links=get_page_links(request, limit, offset, total_count),
+            crs=crs,
         )
         if html:
             geojson = json.loads(feature_collection.model_dump_json())
@@ -485,7 +468,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         if not html and accepts_geoarrow(request):
             stream = collection.queryset_to_arrow_stream(request, query.filter(pk=item_id), crs)
             return arrow_response(stream, crs)
-        feature = collection.model_to_feature(request, item)
+        feature = collection.model_to_feature(request, item, crs=crs)
         if html:
             geojson = json.loads(feature.model_dump_json())
             context = {
@@ -504,7 +487,6 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
     )
     def create_item(
         request: HttpRequest,
-        response: HttpResponse,
         collection_id: str,
         feature: GenericFeatureInput,
         crs: CRS = Header(DEFAULT_CRS, alias="Content-Crs"),
@@ -524,10 +506,11 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
             raise AuthorizationError()
         collection.save_model(request, item, False)
         item = collection.query(request, DEFAULT_CRS).get(pk=item.pk)
-        response.headers["Location"] = request.build_absolute_uri(f"items/{item.pk}")  # type: ignore
-        response["Content-Crs"] = DEFAULT_CRS.uri_header()
-        response["Content-Type"] = GEOJSON_MEDIA_TYPE
-        return 201, collection.model_to_feature(request, item)
+        # rendered by ninja, a feature would lose its JSON-FG members
+        response = geojson_response(collection.model_to_feature(request, item), DEFAULT_CRS)
+        response.status_code = 201
+        response["Location"] = request.build_absolute_uri(f"items/{item.pk}")
+        return response
 
     @router.api_operation(
         ["OPTIONS"],
@@ -559,7 +542,6 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
     )
     def replace_item(
         request: HttpRequest,
-        response: HttpResponse,
         collection_id: str,
         item_id: str,
         feature: GenericFeatureInput,
@@ -582,9 +564,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
             setattr(item, geom_field, geometry_to_save(feature.geometry, crs))
         collection.save_model(request, item, True)
         item = collection.query(request, DEFAULT_CRS).get(pk=item_id)
-        response["Content-Crs"] = DEFAULT_CRS.uri_header()
-        response["Content-Type"] = GEOJSON_MEDIA_TYPE
-        return collection.model_to_feature(request, item)
+        return geojson_response(collection.model_to_feature(request, item), DEFAULT_CRS)
 
     @router.patch(
         "/{collection_id}/items/{item_id}",
@@ -593,7 +573,6 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
     )
     def update_item(
         request: HttpRequest,
-        response: HttpResponse,
         collection_id: str,
         item_id: str,
         feature: GenericFeaturePatch,
@@ -617,9 +596,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
             setattr(item, geom_field, geometry_to_save(feature.geometry, crs))
         collection.save_model(request, item, True)
         item = collection.query(request, DEFAULT_CRS).get(pk=item_id)
-        response["Content-Crs"] = DEFAULT_CRS.uri_header()
-        response["Content-Type"] = GEOJSON_MEDIA_TYPE
-        return collection.model_to_feature(request, item)
+        return geojson_response(collection.model_to_feature(request, item), DEFAULT_CRS)
 
     @router.delete("/{collection_id}/items/{item_id}", operation_id="delete_collection_item")
     def delete_item(
