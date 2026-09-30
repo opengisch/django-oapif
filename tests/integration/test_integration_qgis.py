@@ -187,3 +187,20 @@ class TestStack(unittest.TestCase):
     def test_curves_are_refused_in_geojson(self):
         # QGIS fails to load the layer, rather than giving it features without geometry
         self.assertFalse(self.curve_layer().isValid())
+
+    def test_curves_are_linearized_on_request(self):
+        # QGIS asks for it with the query of the URL of the connection, which it adds to every request
+        layer = self.curve_layer(f"{ROOT_URL}?linearize=true")
+
+        self.assertTrue(layer.isValid())
+        self.assertEqual(layer.crs().authid(), "EPSG:2056")
+        feature = next(layer.getFeatures())
+        # the points GeoJSON has, in the storage CRS
+        served = requests.get(
+            f"{COLLECTIONS_URL}/tests.curvepolygon_2056/items/{feature['id']}",
+            params={"crs": "http://www.opengis.net/def/crs/EPSG/0/2056", "linearize": "true"},
+        ).json()
+        ring = feature.geometry().constGet().exteriorRing()
+        self.assertEqual([[point.x(), point.y()] for point in ring.points()], served["geometry"]["coordinates"][0])
+        # the rounded corner, linearized
+        self.assertGreater(ring.numPoints(), 7)

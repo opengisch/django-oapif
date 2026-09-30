@@ -8,7 +8,7 @@ from uuid import UUID
 
 from django.contrib.auth import get_permission_codename
 from django.contrib.gis.db.models import Extent, GeometryField
-from django.contrib.gis.db.models.functions import AsWKB, Transform
+from django.contrib.gis.db.models.functions import AsWKB, GeomOutputGeoFunc, IsEmpty, Transform
 from django.contrib.gis.geos import Polygon as GEOSPolygon
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import (
@@ -20,6 +20,7 @@ from django.core.validators import (
     RegexValidator,
 )
 from django.db.models import (
+    Case,
     DateTimeField,
     DurationField,
     EmailField,
@@ -35,6 +36,8 @@ from django.db.models import (
     TextField,
     TimeField,
     URLField,
+    Value,
+    When,
 )
 from django.http import HttpRequest
 from ninja import Field, ModelSchema, Schema
@@ -109,8 +112,14 @@ except ImportError:
     ARROW_AVAILABLE = False
 
 
-# the types of the columns that hold curves only
-CURVE_TYPES = ("CIRCULARSTRING", "COMPOUNDCURVE", "CURVEPOLYGON", "MULTICURVE", "MULTISURFACE")
+# the types of the columns that hold curves only, and the GeoJSON geometries PostGIS linearizes them to
+LINEARIZED = {
+    "CIRCULARSTRING": LineString,
+    "COMPOUNDCURVE": LineString,
+    "CURVEPOLYGON": Polygon,
+    "MULTICURVE": MultiLineString,
+    "MULTISURFACE": MultiPolygon,
+}
 
 
 def json_schema_type(annotation: Any) -> str | None:
@@ -170,6 +179,21 @@ class ReprojectedExtent(Func):
         return sql, (*params, *params)
 
 
+class CurveToLine(GeomOutputGeoFunc):
+    """
+    A geometry with its arcs linearized by PostGIS, into segments at most `tolerance` from them, or by default 32 a
+    quarter of a circle. Symmetric, so that an arc two polygons share, like the boundary of two parcels, is made of
+    the same points whichever way round each of them runs along it.
+    """
+
+    function = "ST_CurveToLine"
+
+    def __init__(self, expression, tolerance: float | None = None, **extra):
+        tolerance, tolerance_type = (32.0, 0) if tolerance is None else (float(tolerance), 1)
+        symmetric = 1
+        super().__init__(expression, Value(tolerance), Value(tolerance_type), Value(symmetric), **extra)
+
+
 def without(fields: tuple[str, ...], *excluded: tuple[str, ...]) -> tuple[str, ...]:
     """
     The fields minus the excluded ones, in their declared order. A set difference would do, but its
@@ -203,6 +227,10 @@ class OapifCollection[M: Model]:
         ordering:
             The fields used to sort the queryset. Defaults to the model ordering, completed by the
             primary key so that pagination is stable.
+        linearization_tolerance:
+            The largest distance, in the unit of the storage CRS, between an arc and the segments that stand for it
+            when a client asks for the curves linearized. Defaults to None, which draws a quarter of a circle with 32
+            segments, as PostGIS does.
     """
 
     id: str
@@ -214,6 +242,7 @@ class OapifCollection[M: Model]:
     readonly_fields: tuple[str, ...] = ()
     exclude: tuple[str, ...] = ()
     ordering: tuple = ()
+    linearization_tolerance: float | None = None
 
     def __init__(self, model: type[M]) -> None:
         cls = type(self)
@@ -299,6 +328,21 @@ class OapifCollection[M: Model]:
                 qs = qs.filter(**{f"{geom_field}__intersects": bbox_expr})
         return qs
 
+    def linearize(self, qs: QuerySet[M], crs: CRS) -> QuerySet[M]:
+        """
+        Linearize the curves of a queryset (as produced by `query()`, in `crs`), for GeoJSON: in the storage CRS,
+        where the arcs are drawn, and then reprojected. PostGIS fails on an empty CurvePolygon, which has none.
+        """
+        geom_field = self.geometry_field and cast("GeometryField", self.model._meta.get_field(self.geometry_field))
+        # the other columns have no curves to linearize
+        if not geom_field or not geom_field.geom_type.startswith((*LINEARIZED, "GEOMETRY")):
+            return qs
+        linearized = CurveToLine(self.geometry_field, self.linearization_tolerance)
+        if crs.srid != self.srid:
+            linearized = Transform(linearized, crs.srid)
+        linearized = Case(When(IsEmpty(self.geometry_field), then=None), default=linearized)
+        return qs.annotate(_oapif_geometry=AsWKB(linearized))
+
     def get_queryset(self, request: HttpRequest) -> QuerySet[M]:
         """Return the model queryset."""
         qs = self.model._default_manager.get_queryset()
@@ -381,10 +425,14 @@ class OapifCollection[M: Model]:
         if self.geometry_field is None:
             return False
         geom_field = cast("GeometryField", self.model._meta.get_field(self.geometry_field))
-        return geom_field.geom_type.startswith(CURVE_TYPES)
+        return geom_field.geom_type.startswith(tuple(LINEARIZED))
 
     @cache
-    def get_geometry_schema(self) -> type[Geometry] | None:
+    def get_geometry_schema(self, linearized: bool = False) -> type[Geometry] | None:
+        """
+        The schema of the geometries of the collection, or with `linearized` of the GeoJSON geometries that curves
+        are linearized to.
+        """
         if self.geometry_field is None:
             return None
 
@@ -393,7 +441,10 @@ class OapifCollection[M: Model]:
         is_3d = geom_field.dim >= 3 or geom_field.geom_type.endswith(("Z", "ZM"))
         CoordType = Coordinate3D if is_3d else Coordinate2D
 
-        if geom_field.geom_type.startswith("POINT"):
+        curve_type = next((name for name in LINEARIZED if geom_field.geom_type.startswith(name)), None)
+        if linearized and curve_type:
+            GeometryType = LINEARIZED[curve_type][CoordType]
+        elif geom_field.geom_type.startswith("POINT"):
             GeometryType = Point[CoordType]
         elif geom_field.geom_type.startswith("MULTIPOINT"):
             GeometryType = MultiPoint[CoordType]
@@ -486,7 +537,8 @@ class OapifCollection[M: Model]:
 
     def get_feature_output_schema(self, request: HttpRequest) -> type[Feature]:
         PropertiesSchema = self.get_feature_properties_schema(request)
-        GeometrySchema = self.get_geometry_schema()
+        # GeoJSON has no curves, but linearized, and no geometry for an empty curve
+        GeometrySchema = self.get_geometry_schema(linearized=True) | None if self.geometry_field else None
         return Feature[GeometrySchema, PropertiesSchema]
 
     def get_jsonfg_feature_output_schema(self, request: HttpRequest, *, root: bool = False) -> type[JsonFgFeature]:
@@ -603,9 +655,10 @@ class OapifCollection[M: Model]:
         profile: Profile | None = None,
     ) -> FeatureCollection:
         """
-        Convert a queryset (as produced by `query()`, in `crs`) to a FeatureCollection, a JSON-FG one in its
-        `profile`, or when it has curves, which GeoJSON cannot carry. `number_matched` defaults to the number of
-        features returned, for a queryset that is not a page of a larger one.
+        Convert a queryset (as produced by `query()`, in `crs`) to a FeatureCollection in a GeoJSON `profile`, by
+        default a JSON-FG one when it has curves, which GeoJSON cannot carry: they are left out of GeoJSON, unless
+        `linearize()` made lines of them. `number_matched` defaults to the number of features returned, for a
+        queryset that is not a page of a larger one.
         """
         rows = list(qs)
         # the boxes of the geometries, taken as they are read, so that the collection one takes no extra
@@ -699,8 +752,8 @@ class OapifCollection[M: Model]:
         self, request: HttpRequest, obj: M, *, crs: CRS = CRS84, profile: Profile | None = None
     ) -> Feature:
         """
-        Convert a row (as produced by `query()`, in `crs`) to a Feature, a JSON-FG one in its `profile`, or for a
-        curve.
+        Convert a row (as produced by `query()`, in `crs`) to a Feature in a GeoJSON `profile`, by default a JSON-FG
+        one for a curve.
         """
         geometry = self._geometry_of(obj)
         if self._is_jsonfg([geometry], profile):
@@ -720,8 +773,8 @@ class OapifCollection[M: Model]:
         return self.curved or any(geometry is not None and not jsonfg.is_geojson(geometry) for geometry in geometries)
 
     def _is_jsonfg(self, geometries: list[dict | None], profile: Profile | None) -> bool:
-        """Whether features are served as JSON-FG: in its profile, and when they have curves."""
-        return profile is Profile.JSONFG or self._has_curves(geometries)
+        """Whether features are served as JSON-FG: in the profile asked for, and by default when they have curves."""
+        return profile is Profile.JSONFG if profile else self._has_curves(geometries)
 
     def _jsonfg_document(self, geometries: list[dict | None], crs: CRS) -> dict:
         """The members of a JSON-FG document of features, which declares its classes and the CRS of "place"."""
@@ -729,6 +782,9 @@ class OapifCollection[M: Model]:
         return {"conformsTo": conforms_to, "coordRefSys": crs.uri()}
 
     def _feature(self, schema: type[Feature], obj: M, geometry: dict | None) -> Feature:
+        # a GeoJSON reader gets no geometry rather than a curve it does not know
+        if geometry is not None and not jsonfg.is_geojson(geometry):
+            geometry = None
         return schema(type="Feature", id=str(obj.pk), geometry=geometry, properties=obj)
 
     def _jsonfg_feature(

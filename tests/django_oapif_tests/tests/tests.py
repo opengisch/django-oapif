@@ -1759,13 +1759,18 @@ class TestJsonFg(TestCase):
 
                     self.assertEqual(response.status_code, 406)
                     self.assertIn("Accept", [value.strip() for value in response["Vary"].split(",")])
-                    [link] = response.json()["links"]
-                    self.assertEqual(link["profile"], [self.JSONFG])
-                    jsonfg = self.client.get(link["href"])
+                    [jsonfg_link, linearized_link] = response.json()["links"]
+                    self.assertEqual(jsonfg_link["profile"], [self.JSONFG])
+                    self.assertNotIn("profile", linearized_link)
+                    jsonfg = self.client.get(jsonfg_link["href"])
+                    linearized = self.client.get(linearized_link["href"])
                     self.assertEqual(jsonfg.status_code, 200)
                     self.assertEqual(jsonfg.json()["conformsTo"], self.CONFORMS_TO)
+                    self.assertEqual(linearized.status_code, 200)
+                    self.assertNotIn("conformsTo", linearized.json())
                     # in the CRS asked for
                     self.assertEqual(jsonfg["Content-Crs"], f"<{crs_2056}>")
+                    self.assertEqual(linearized["Content-Crs"], f"<{crs_2056}>")
 
     def test_curve_column_refuses_geojson_on_every_page(self):
         # even without a feature
@@ -1814,11 +1819,130 @@ class TestJsonFg(TestCase):
                 self.assertIn("oapifMap(", page.content.decode())
                 self.assertIn("CircularString", page.content.decode())
 
+    def linearized(self, pk, crs: CRS, tolerance: float | None = None) -> list:
+        """The points PostGIS makes of the arcs of a row, in a CRS."""
+        tolerance, tolerance_type = (32.0, 0) if tolerance is None else (tolerance, 1)
+        table_name = connection.ops.quote_name(Arc_2056_10fields._meta.db_table)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"SELECT ST_AsBinary(ST_Transform(ST_CurveToLine(geom, %s, %s, 1), %s)) FROM {table_name} WHERE id = %s",
+                [tolerance, tolerance_type, crs.srid, str(pk)],
+            )
+            return jsonfg.loads(bytes(cursor.fetchone()[0]))["coordinates"]
+
+    def test_curves_are_linearized_on_request(self):
+        # in GeoJSON, in the CRS asked for: as PostGIS makes lines of them in the storage CRS, where the arcs are drawn
+        url = f"{collections_url}/tests.arc_2056_10fields/items"
+        for crs in (CRS("OGC", 4326), CRS("EPSG", 2056)):
+            for item_url in (url, f"{url}/{self.arc_id}"):
+                with self.subTest(url=item_url, crs=crs):
+                    response = self.client.get(item_url, {"crs": crs.uri(), "linearize": "true"})
+
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(response["Content-Crs"], crs.uri_header())
+                    document = response.json()
+                    self.assertFalse({"conformsTo", "coordRefSys"} & set(document))
+                    [feature] = document.get("features", [document])
+                    self.assertNotIn("place", feature)
+                    self.assertEqual(feature["geometry"]["type"], "LineString")
+                    self.assertEqual(feature["geometry"]["coordinates"], self.linearized(self.arc_id, crs))
+
+    def test_linearized_page_has_the_box_of_its_lines(self):
+        response = self.client.get(
+            f"{collections_url}/tests.arc_2056_10fields/items", {"crs": crs_2056, "linearize": "true"}
+        )
+
+        xs, ys = zip(*self.linearized(self.arc_id, CRS("EPSG", 2056)))
+        self.assertEqual(tuple(response.json()["bbox"]), (min(xs), min(ys), max(xs), max(ys)))
+
+    def test_linearization_takes_the_tolerance_of_the_collection(self):
+        # in the unit of the storage CRS, the metre, instead of 32 segments a quarter of a circle
+        collection = oapif.collections["tests.arc_2056_10fields"]
+        url = f"{collections_url}/tests.arc_2056_10fields/items/{self.arc_id}"
+        for tolerance in (0.001, 1.0):
+            with self.subTest(tolerance=tolerance), patch.object(collection, "linearization_tolerance", tolerance):
+                feature = self.client.get(url, {"crs": crs_2056, "linearize": "true"}).json()
+
+                coordinates = feature["geometry"]["coordinates"]
+                self.assertEqual(coordinates, self.linearized(self.arc_id, CRS("EPSG", 2056), tolerance))
+                self.assertNotEqual(len(coordinates), len(self.linearized(self.arc_id, CRS("EPSG", 2056))))
+
+    def test_arcs_shared_are_linearized_alike(self):
+        # the boundary two parcels share runs one way round the one, and the other way round the other: at a
+        # tolerance, PostGIS would make other segments of it the other way round
+        collection = oapif.collections["tests.arc_2056_10fields"]
+        table_name = connection.ops.quote_name(Arc_2056_10fields._meta.db_table)
+        reversed_id = uuid.uuid4()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"INSERT INTO {table_name} (id, geom) VALUES (%s, ST_Reverse(ST_GeomFromText(%s, 2056)))",
+                [str(reversed_id), self.ARC],
+            )
+        url = f"{collections_url}/tests.arc_2056_10fields/items"
+
+        with patch.object(collection, "linearization_tolerance", 0.001):
+            lines = [
+                self.client.get(f"{url}/{pk}", {"crs": crs_2056, "linearize": "true"}).json()["geometry"]["coordinates"]
+                for pk in (self.arc_id, reversed_id)
+            ]
+
+        self.assertEqual(lines[0], lines[1][::-1])
+
+    def test_page_with_a_curve_is_linearized_on_request(self):
+        # its other geometries as they are
+        response = self.client.get(
+            f"{collections_url}/tests.geometry_2056/items", {"crs": crs_2056, "linearize": "true"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        geometries = {feature["id"]: feature["geometry"] for feature in response.json()["features"]}
+        self.assertEqual(geometries[str(self.point_id)], {"type": "Point", "coordinates": [2508500.0, 1152000.0]})
+        self.assertEqual(geometries[str(self.curve_id)]["type"], "LineString")
+
+    def test_empty_curve_is_linearized_to_no_geometry(self):
+        # PostGIS fails to linearize an empty CurvePolygon, which used to fail the whole page
+        table_name = connection.ops.quote_name(Geometry_2056._meta.db_table)
+        empty_id = uuid.uuid4()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"INSERT INTO {table_name} (id, geom) VALUES (%s, ST_GeomFromText('CURVEPOLYGON EMPTY', 2056))",
+                [str(empty_id)],
+            )
+
+        response = self.client.get(f"{collections_url}/tests.geometry_2056/items", {"linearize": "true"})
+
+        self.assertEqual(response.status_code, 200)
+        [empty] = [feature for feature in response.json()["features"] if feature["id"] == str(empty_id)]
+        self.assertIsNone(empty["geometry"])
+
+    def test_linearization_leaves_the_other_columns_as_they_are(self):
+        # QGIS asks for it for every layer of a connection whose URL has it
+        url = f"{collections_url}/tests.point_2056_10fields/items"
+        for item_url in (url, f"{url}/{self.point.pk}"):
+            with self.subTest(url=item_url):
+                linearized = self.client.get(item_url, {"linearize": "true"}).json()
+                default = self.client.get(item_url).json()
+
+                for feature in (linearized, default):
+                    feature.pop("links", None)
+                self.assertEqual(linearized, default)
+
+    def test_jsonfg_is_not_linearized(self):
+        # it has the curves as they are
+        url = f"{collections_url}/tests.arc_2056_10fields/items"
+        for item_url in (url, f"{url}/{self.arc_id}"):
+            with self.subTest(url=item_url):
+                response = self.client.get(item_url, {"profile": "jsonfg", "linearize": "true"})
+
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("linearize", response.json()["detail"])
+
     @requires_arrow
     def test_geoarrow_has_the_curves(self):
-        # its WKB carries them
+        # its WKB carries them, whatever GeoJSON is asked for
         response = self.client.get(
             f"{collections_url}/tests.arc_2056_10fields/items",
+            {"linearize": "true"},
             headers={"Accept": "application/vnd.apache.arrow.stream"},
         )
 

@@ -52,6 +52,10 @@ ACCEPTED_TYPES = [
 
 DEFAULT_CRS = CRS("OGC", CRS84_SRID)
 PROFILE_DESCRIPTION = "GeoJSON profile: rfc7946 for GeoJSON, the default, or jsonfg for JSON-FG, which has the curves"
+LINEARIZE_DESCRIPTION = (
+    "Whether GeoJSON has the curves linearized, in the CRS asked for, instead of refusing them. Not with the "
+    "jsonfg profile, which has the curves as they are"
+)
 CRS_ADAPTER = TypeAdapter(CRS)
 
 
@@ -93,7 +97,10 @@ def get_page_links(
 
 
 def curves_not_acceptable(request: HttpRequest) -> HttpResponse:
-    """The answer to a request of curves in GeoJSON, which cannot carry them: a 406, linking them in JSON-FG."""
+    """
+    The answer to a request of curves in GeoJSON, which cannot carry them: a 406, linking them in JSON-FG, and in
+    GeoJSON linearized.
+    """
     links = [
         OAPIFLink(
             rel="alternate",
@@ -102,14 +109,33 @@ def curves_not_acceptable(request: HttpRequest) -> HttpResponse:
             href=replace_query_param(request, profile=Profile.JSONFG),
             profile=[Profile.JSONFG.uri],
         ),
+        OAPIFLink(
+            rel="alternate",
+            title="This document as GeoJSON, the curves linearized",
+            type=GEOJSON_MEDIA_TYPE,
+            href=replace_query_param(request, linearize="true"),
+        ),
     ]
     body = {
-        "detail": "GeoJSON cannot carry curves: ask for them in JSON-FG, with profile=jsonfg",
+        "detail": "GeoJSON cannot carry curves: ask for them in JSON-FG, with profile=jsonfg, or linearized, with "
+        "linearize=true",
         "links": [link.model_dump() for link in links],
     }
     response = HttpResponse(json.dumps(body), status=406, content_type=JSON_MEDIA_TYPE)
     patch_vary_headers(response, ["Accept"])
     return response
+
+
+def encoding_of(profile: Profile | None, linearize: bool) -> Profile | None:
+    """
+    The GeoJSON profile features are encoded in: JSON-FG as asked for, GeoJSON when their curves are linearized,
+    and otherwise JSON-FG with curves, which a request of GeoJSON is then refused.
+    """
+    if profile is Profile.JSONFG and linearize:
+        raise HttpError(400, "linearize=true asks for GeoJSON: JSON-FG has the curves as they are")
+    if profile is Profile.JSONFG:
+        return profile
+    return Profile.RFC7946 if linearize else None
 
 
 def geojson_response(geojson: Schema, crs: CRS) -> HttpResponse:
@@ -426,6 +452,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         bbox_crs: CRS = Query(DEFAULT_CRS, alias="bbox-crs"),
         bbox: BBox | None = Query(None, alias="bbox", description="BBOX in the format: minx,miny,maxx,maxy"),
         profile: str | None = Query(None, description=PROFILE_DESCRIPTION),
+        linearize: bool = Query(False, description=LINEARIZE_DESCRIPTION),
     ):
         collection = get_collection_by_id(collection_id, request)
         validate_crs_or_raise(collection, crs, "crs")
@@ -436,11 +463,14 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         # a page draws the curves itself, and GeoArrow has them as they are
         profile = None if html or arrow else requested_profile(request, profile)
         asks_geojson = not html and not arrow and profile is not Profile.JSONFG
+        encoding = None if html or arrow else encoding_of(profile, linearize)
         # whatever the page, even without a feature
-        if asks_geojson and collection.curved:
+        if asks_geojson and not linearize and collection.curved:
             return curves_not_acceptable(request)
 
         query = collection.query(request, crs, bbox, bbox_crs)
+        if asks_geojson and linearize:
+            query = collection.linearize(query, crs)
         paginated_query = query[offset : offset + limit]
 
         total_count = query.count()
@@ -460,7 +490,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
             number_matched=total_count,
             links=get_page_links(request, limit, offset, total_count),
             crs=crs,
-            profile=profile,
+            profile=encoding,
         )
         if html:
             geojson = json.loads(feature_collection.model_dump_json())
@@ -522,6 +552,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         item_id: str,
         crs: CRS = DEFAULT_CRS,
         profile: str | None = Query(None, description=PROFILE_DESCRIPTION),
+        linearize: bool = Query(False, description=LINEARIZE_DESCRIPTION),
     ):
         collection = get_collection_by_id(collection_id, request)
         validate_crs_or_raise(collection, crs, "crs")
@@ -529,14 +560,17 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         arrow = not html and accepts_geoarrow(request)
         profile = None if html or arrow else requested_profile(request, profile)
         asks_geojson = not html and not arrow and profile is not Profile.JSONFG
+        encoding = None if html or arrow else encoding_of(profile, linearize)
         query = collection.query(request, crs)
+        if asks_geojson and linearize:
+            query = collection.linearize(query, crs)
         item = get_object_or_404(query, pk=item_id)
         if not collection.has_view_permission(request, item):
             raise AuthorizationError()
         if arrow:
             stream = collection.queryset_to_arrow_stream(request, query.filter(pk=item_id), crs)
             return arrow_response(stream, crs)
-        feature = collection.model_to_feature(request, item, crs=crs, profile=profile)
+        feature = collection.model_to_feature(request, item, crs=crs, profile=encoding)
         if html:
             geojson = json.loads(feature.model_dump_json())
             context = {
