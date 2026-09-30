@@ -21,7 +21,7 @@ from django_oapif import jsonfg
 from django_oapif.collections import writes_curves
 from django_oapif.crs import CRS
 from django_oapif.geojson import CircularString, Coordinate2D
-from django_oapif.handler import ARROW_AVAILABLE, AnonReadOnlyCollection
+from django_oapif.handler import ARROW_AVAILABLE, AnonReadOnlyCollection, json_schema_pattern
 from django_oapif_tests.tests.oapif import oapif
 from django_oapif_tests.tests.models import (
     Arc_2056_10fields,
@@ -432,6 +432,22 @@ class TestSchema(TestCase):
         self.assertEqual((properties["score"]["minimum"], properties["score"]["maximum"]), (0, 10))
         self.assertEqual((properties["level"]["minimum"], properties["level"]["maximum"]), (-2147483648, 2147483647))
         self.assertNotIn("minimum", properties["kind"])
+
+    def test_schema_string_constraints(self):
+        url = f"{collections_url}/tests.layerwithconstraints/schema"
+        properties = self.client.get(url).json()["properties"]
+
+        self.assertEqual(properties["code"]["minLength"], 2)
+        self.assertEqual(properties["code"]["maxLength"], 5)
+        self.assertEqual(properties["code"]["pattern"], "^[A-Z]+$")
+        # ninja leaves out the length of URLs, and their validator ignores case, which a pattern cannot say
+        self.assertEqual(properties["website"]["maxLength"], 200)
+        self.assertNotIn("pattern", properties["website"])
+
+    def test_schema_patterns_are_anchored_as_in_json_schema(self):
+        self.assertEqual(json_schema_pattern(r"^[-a-zA-Z0-9_]+\Z"), "^[-a-zA-Z0-9_]+$")
+        # an escaped backslash followed by a letter is no anchor
+        self.assertEqual(json_schema_pattern(r"\A\\Z\\\Z"), r"^\\Z\\$")
 
     def test_properties_schema_keeps_its_extra_behaviour(self):
         # ninja caches schemas by name and fields but not by config: the output schema, built first by

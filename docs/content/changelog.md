@@ -53,7 +53,7 @@ Please report anything that breaks in the [issues](https://github.com/opengisch/
 - CRS URIs are accepted with `https://`, and a `Content-Crs` is accepted in angle brackets, the way the responses send it.
 - The items `limit` is published under `components/parameters` in the OpenAPI document, which is where QGIS reads the page size from.
 - Feature collections carry the `bbox` of the page.
-- The schema gives the choices of a field as the `enum` of its property, and the bounds of a number, from its validators and the range of its column, as its `minimum` and `maximum`.
+- The schema gives the choices of a field as the `enum` of its property, and the bounds of a number, from its validators and the range of its column, as its `minimum` and `maximum`. The validators of a string give its `minLength`, `maxLength` and `pattern`.
 
 ### Fixes
 
