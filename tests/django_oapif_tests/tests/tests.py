@@ -2260,6 +2260,28 @@ class TestWriteGeometries(TestCase):
         if writes_curves():
             self.assertEqual(self.client.get(f"{item_url}?crs={crs_2056}&profile=jsonfg").json()["place"], place)
 
+    def test_linearized_curve_is_refused_for_its_curve(self):
+        # a GeoJSON client writes back the linearization of a curve it read, like QGIS with linearize=true
+        line = {
+            "type": "LineString",
+            "coordinates": [[2508500.0, 1152000.0], [2508510.0, 1152007.0], [2508520.0, 1152000.0]],
+        }
+        url = f"{collections_url}/tests.arc_2056_10fields/items"
+        item_url = f"{url}/{self.arc_id}"
+        for method, method_url in ((self.client.post, url), (self.client.put, item_url), (self.client.patch, item_url)):
+            with self.subTest(method=method.__name__):
+                response = method(
+                    method_url,
+                    {"type": "Feature", "geometry": line, "properties": {}},
+                    headers=headers,
+                    content_type="application/json",
+                )
+
+                self.assertEqual(response.status_code, 422)
+                [error] = response.json()["detail"]
+                self.assertEqual(error["loc"], ["body", "feature", "geometry"])
+                self.assertIn('send the curve in "place"', error["msg"])
+
     def test_coord_ref_sys_must_be_the_content_crs(self):
         # the coordinates are read in the Content-Crs: another coordRefSys would be ignored
         point = {"type": "Point", "coordinates": [2508500.0, 1152000.0]}
