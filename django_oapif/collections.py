@@ -7,6 +7,7 @@ from functools import cache
 from django.contrib.gis.db.models import Extent
 from django.contrib.gis.geos import GEOSException, GEOSGeometry
 from django.contrib.gis.geos.libgeos import geos_version_tuple
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import Model
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404
@@ -377,7 +378,8 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
             ]
             context = {"collection": collection, "properties": properties}
             return html_response(request, "schema.html", context, title=title)
-        response = HttpResponse(json.dumps(schema), content_type=SCHEMA_MEDIA_TYPE)
+        # the titles are the verbose names of the fields, which ninja leaves lazy when they are translated
+        response = HttpResponse(json.dumps(schema, cls=DjangoJSONEncoder), content_type=SCHEMA_MEDIA_TYPE)
         # the same URL serves an HTML page to a browser
         patch_vary_headers(response, ["Accept"])
         return response

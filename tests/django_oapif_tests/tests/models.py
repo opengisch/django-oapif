@@ -3,7 +3,9 @@ import uuid
 
 from django.contrib.gis.db import models
 from django.core.validators import MaxValueValidator, MinLengthValidator, MinValueValidator, RegexValidator
-from django.utils.translation import gettext as _
+
+# lazy, as in real models: the verbose names become the titles of the schema, which has to render them
+from django.utils.translation import gettext_lazy as _
 
 logger = logging.getLogger(__name__)
 
