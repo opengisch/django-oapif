@@ -361,6 +361,23 @@ class TestSchema(TestCase):
             collection["links"],
         )
 
+    def test_every_property_has_a_type(self):
+        # Part 5 requires one of every property but the geometry, and QGIS makes no field of a property without
+        for collection_id, collection in oapif.collections.items():
+            schema = collection.get_json_schema(RequestFactory().get("/"))
+            for name, prop in schema["properties"].items():
+                if name != collection.geometry_field:
+                    with self.subTest(collection=collection_id, property=name):
+                        self.assertIsInstance(prop.get("type"), str)
+
+    def test_schema_decimal_is_a_string(self):
+        # a decimal is served as a string, while it is written as a number or a string
+        url = f"{collections_url}/tests.layerwithvarioustypes/schema"
+        amount = self.client.get(url).json()["properties"]["amount"]
+
+        self.assertEqual(amount["type"], "string")
+        self.assertNotIn("anyOf", amount)
+
     def test_properties_schema_keeps_its_extra_behaviour(self):
         # ninja caches schemas by name and fields but not by config: the output schema, built first by
         # a read, used to be handed to writes too, which then silently dropped unknown properties

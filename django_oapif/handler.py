@@ -468,15 +468,23 @@ class OapifCollection[M: Model]:
         )
 
         required_fields = set(schema.get("required", []))
-        # Optional fields are represented as a AnyOf union of their actual type and None
-        # We patch this as it is unnecessary considering optional fields are already infered
-        # from the list of required ones
         for field_name, field_props in schema["properties"].items():
+            if not (types := field_props.get("anyOf")):
+                continue
+            # Optional fields are represented as a AnyOf union of their actual type and None
+            # We patch this as it is unnecessary considering optional fields are already infered
+            # from the list of required ones
             if field_name not in required_fields:
-                types = field_props.get("anyOf")
-                if types and len(types) == 2 and types[1] == {"type": "null"}:
-                    del field_props["anyOf"]
-                    field_props.update(types[0])
+                types = [member for member in types if member != {"type": "null"}]
+            # A property taking several types, like a decimal a number or a string, is described as it is
+            # served: Part 5 wants a type for every property, and QGIS makes no field of one without
+            if len(types) > 1:
+                annotation = properties_schema.model_fields[field_name].annotation
+                served = TypeAdapter(annotation).json_schema(mode="serialization")
+                types = [member for member in served.get("anyOf", [served]) if member != {"type": "null"}]
+            if len(types) == 1:
+                del field_props["anyOf"]
+                field_props.update(types[0])
 
         if geom_field := self.geometry_field:
             geom_field = cast("GeometryField", self.model._meta.get_field(self.geometry_field))
