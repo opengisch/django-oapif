@@ -833,6 +833,18 @@ class OapifCollection[M: Model]:
             return validated
         except PydanticValidationError as e:
             errors = e.errors()
+            geometry = getattr(feature, "geometry", None)
+            if self.curved and geometry is not None and geometry.type in jsonfg.GEOJSON_TYPES:
+                # the linearization of a curve, as a GeoJSON client writes back what it read, which would replace
+                # the arcs with segments: said once, instead of as the fields of the curve it lacks
+                errors = [error for error in errors if error["loc"][:1] != ("geometry",)]
+                errors.append({
+                    "type": "curve_expected",
+                    "loc": ("geometry",),
+                    "msg": f'This collection stores curves, not a {geometry.type}: send the curve in "place", as '
+                    "JSON-FG does",
+                    "input": geometry.model_dump(),
+                })
             for error in errors:
                 error["loc"] = ("body", "feature", *error["loc"])
                 # an exception raised by a validator is left in the context, where it would not serialize:
