@@ -9,6 +9,11 @@ the same data, serves the `django_oapif` of the base branch, and the requests go
 Only the library differs: changes to the dependencies or to the test app are not compared, nor are the
 cases that the library of the base branch does not serve, or not in the same format.
 
+Runs of the same library differ by less than 4%, but for about one case in a few hundred, so the comment
+only gives the changes of more than 6%. A case that changes by more is timed again, with 60 requests, as a
+slow spell of the runner could make it look so: the comment gives that second timing, and the benchmark
+fails if the case is still slower.
+
 To run it locally, on the same stack:
 
 ```bash
