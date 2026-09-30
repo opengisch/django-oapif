@@ -181,7 +181,7 @@ def write_markdown(summary_df: pl.DataFrame, features: dict[str, int], base_name
             "",
             f"Compared with the `django_oapif` of {base_name}, served on the same runner and data, a request to each"
             f" in turn: 🟢 faster and 🔴 slower by more than {THRESHOLD:.0%}, as timed again with"
-            f" {RETIME_ITERATIONS} requests; the others are within {THRESHOLD:.0%}.",
+            f" {RETIME_ITERATIONS} requests. The rows where every case is within {THRESHOLD:.0%} are left out.",
         ]
         if len(compared) < (summary_df["server"] == "head").sum():
             lines[-1] += " The cases it does not serve, or not in the same format, are not compared."
@@ -189,19 +189,31 @@ def write_markdown(summary_df: pl.DataFrame, features: dict[str, int], base_name
             lines += ["", f"**{slower} {'case is' if slower == 1 else 'cases are'} slower: the benchmark fails.**"]
     elif base_name:
         lines += ["", f"The `django_oapif` of {base_name} could not serve the collections, so there is no comparison."]
-    lines += [
-        "",
-        f"| Collection | Features | Limit | {' | '.join(f'{LABELS[accept]}, {crs}' for accept, crs in columns)} |",
-        f"|---|---:|---:|{'---:|' * len(columns)}",
-    ]
+    table = []
     for layer in COLLECTIONS:
-        for index, limit in enumerate(LIMITS):
+        shown = 0
+        for limit in LIMITS:
+            cases = [(layer, limit, accept, crs) for accept, crs in columns]
+            # noise only, which the artifact has
+            if all(case in compared and abs(compared[case]) <= THRESHOLD for case in cases):
+                continue
             times = [
                 format_time(medians["head", accept, crs, layer, limit], compared.get((layer, limit, accept, crs)))
                 for accept, crs in columns
             ]
-            collection, count = (f"`{layer}`", str(features[layer])) if index == 0 else ("", "")
-            lines.append(f"| {collection} | {count} | {limit} | {' | '.join(times)} |")
+            # the collection on the first of its rows that is shown
+            collection, count = (f"`{layer}`", str(features[layer])) if not shown else ("", "")
+            shown += 1
+            table.append(f"| {collection} | {count} | {limit} | {' | '.join(times)} |")
+    if table:
+        lines += [
+            "",
+            f"| Collection | Features | Limit | {' | '.join(f'{LABELS[accept]}, {crs}' for accept, crs in columns)} |",
+            f"|---|---:|---:|{'---:|' * len(columns)}",
+            *table,
+        ]
+    else:
+        lines += ["", f"No case changes by more than {THRESHOLD:.0%}."]
     (OUTPUT_PATH / "result.md").write_text("\n".join(lines) + "\n")
 
 
