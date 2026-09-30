@@ -45,7 +45,7 @@ from pydantic import ValidationError as PydanticValidationError
 from pydantic.config import ExtraValues
 
 from django_oapif import jsonfg
-from django_oapif.crs import CRS, CRS84_SRID, BBox
+from django_oapif.crs import CRS, CRS84, CRS84_SRID, BBox
 from django_oapif.geojson import (
     CircularString,
     CircularStringParts,
@@ -58,6 +58,9 @@ from django_oapif.geojson import (
     FeaturePatch,
     Geometry,
     GeometryCollection,
+    JsonFgFeature,
+    JsonFgFeatureCollection,
+    JsonFgRootFeature,
     LineString,
     MultiCurve,
     MultiLineString,
@@ -67,6 +70,7 @@ from django_oapif.geojson import (
     Point,
     Polygon,
 )
+from django_oapif.jsonfg import Profile
 from django_oapif.schema import OAPIFLink
 from django_oapif.utils import PatchSchema
 
@@ -473,6 +477,16 @@ class OapifCollection[M: Model]:
         GeometrySchema = self.get_geometry_schema()
         return Feature[GeometrySchema, PropertiesSchema]
 
+    def get_jsonfg_feature_output_schema(self, request: HttpRequest, *, root: bool = False) -> type[JsonFgFeature]:
+        """The schema of JSON-FG features, of the `root` of a document when served on their own."""
+        PropertiesSchema = self.get_feature_properties_schema(request)
+        FeatureSchema = JsonFgRootFeature if root else JsonFgFeature
+        if not self.geometry_field:
+            return FeatureSchema[None, None, PropertiesSchema]
+        # a geometry is in the one or the other
+        GeometrySchema = self.get_geometry_schema() | None
+        return FeatureSchema[GeometrySchema, GeometrySchema, PropertiesSchema]
+
     def get_json_schema(self, request: HttpRequest) -> dict:
         properties_schema = self.get_properties_schema(without(self.get_fields(request), self.get_exclude(request)))
         schema = properties_schema.model_json_schema(
@@ -573,31 +587,41 @@ class OapifCollection[M: Model]:
         *,
         number_matched: int | None = None,
         links: list[OAPIFLink] | None = None,
+        crs: CRS = CRS84,
+        profile: Profile | None = None,
     ) -> FeatureCollection:
         """
-        Convert a queryset (as produced by `query()`) to a FeatureCollection. `number_matched` defaults
-        to the number of features returned, for a queryset that is not a page of a larger one.
+        Convert a queryset (as produced by `query()`, in `crs`) to a FeatureCollection, a JSON-FG one in its
+        `profile`. `number_matched` defaults to the number of features returned, for a queryset that is not a
+        page of a larger one.
         """
-        FeatureSchema = self.get_feature_output_schema(request)
-        FeatureCollectionSchema = FeatureCollection[FeatureSchema]
-        features = []
+        rows = list(qs)
         # the boxes of the geometries, taken as they are read, so that the collection one takes no extra
         # query, nor reprojecting them all again
         boxes = []
-        for obj in qs:
-            features.append(self._model_to_feature(FeatureSchema, obj, boxes))
+        geometries = [self._geometry_of(row, boxes) for row in rows]
         bbox = None
         if boxes:
             xmins, ymins, xmaxs, ymaxs = zip(*boxes)
             bbox = (min(xmins), min(ymins), max(xmaxs), max(ymaxs))
-        return FeatureCollectionSchema.model_construct(
-            type="FeatureCollection",
-            features=features,
-            bbox=bbox,
-            numberReturned=len(features),
-            numberMatched=len(features) if number_matched is None else number_matched,
-            links=links or [],
-        )
+        members = {
+            "type": "FeatureCollection",
+            "bbox": bbox,
+            "numberReturned": len(rows),
+            "numberMatched": len(rows) if number_matched is None else number_matched,
+            "links": links or [],
+        }
+        if profile is Profile.JSONFG:
+            FeatureSchema = self.get_jsonfg_feature_output_schema(request)
+            features = [
+                self._jsonfg_feature(FeatureSchema, row, geometry, crs) for row, geometry in zip(rows, geometries)
+            ]
+            return JsonFgFeatureCollection[FeatureSchema].model_construct(
+                **members, **self._jsonfg_document(geometries, crs), features=features
+            )
+        FeatureSchema = self.get_feature_output_schema(request)
+        features = [self._feature(FeatureSchema, row, geometry) for row, geometry in zip(rows, geometries)]
+        return FeatureCollection[FeatureSchema].model_construct(**members, features=features)
 
     def get_arrow_properties_schema(self, properties_schema: type[Schema]) -> tuple["pa.Schema", dict[str, str]]:
         """
@@ -659,18 +683,43 @@ class OapifCollection[M: Model]:
             writer.write_table(table)
         return stream
 
-    def model_to_feature(self, request: HttpRequest, obj: M) -> Feature:
-        schema = self.get_feature_output_schema(request)
-        return self._model_to_feature(schema, obj)
+    def model_to_feature(
+        self, request: HttpRequest, obj: M, *, crs: CRS = CRS84, profile: Profile | None = None
+    ) -> Feature:
+        """Convert a row (as produced by `query()`, in `crs`) to a Feature, a JSON-FG one in its `profile`."""
+        geometry = self._geometry_of(obj)
+        if profile is Profile.JSONFG:
+            schema = self.get_jsonfg_feature_output_schema(request, root=True)
+            return self._jsonfg_feature(schema, obj, geometry, crs, **self._jsonfg_document([geometry], crs))
+        return self._feature(self.get_feature_output_schema(request), obj, geometry)
 
-    def _model_to_feature(self, schema: type[Feature], obj: M, bounds: list | None = None) -> Feature:
-        geometry_wkb = getattr(obj, "_oapif_geometry", None)
-        return schema(
-            type="Feature",
-            id=str(obj.pk),
-            geometry=jsonfg.loads(bytes(geometry_wkb), bounds) if geometry_wkb else None,
-            properties=obj,
-        )
+    def _geometry_of(self, obj: M, bounds: list | None = None) -> dict | None:
+        wkb = getattr(obj, "_oapif_geometry", None)
+        return jsonfg.loads(bytes(wkb), bounds) if wkb else None
+
+    def _jsonfg_document(self, geometries: list[dict | None], crs: CRS) -> dict:
+        """The members of a JSON-FG document of features, which declares its classes and the CRS of "place"."""
+        curves = any(geometry is not None and not jsonfg.is_geojson(geometry) for geometry in geometries)
+        return {
+            "conformsTo": [jsonfg.CORE, jsonfg.CIRCULAR_ARCS] if curves else [jsonfg.CORE],
+            "coordRefSys": crs.uri(),
+        }
+
+    def _feature(self, schema: type[Feature], obj: M, geometry: dict | None) -> Feature:
+        return schema(type="Feature", id=str(obj.pk), geometry=geometry, properties=obj)
+
+    def _jsonfg_feature(
+        self, schema: type[JsonFgFeature], obj: M, geometry: dict | None, crs: CRS, **members
+    ) -> JsonFgFeature:
+        """
+        A feature of JSON-FG, which gives a geometry that GeoJSON has, in CRS84, in "geometry", and any other in
+        "place", "geometry" being then null.
+        """
+        if geometry is None or (crs == CRS84 and jsonfg.is_geojson(geometry)):
+            geometry, place = geometry, None
+        else:
+            geometry, place = None, geometry
+        return schema(type="Feature", id=str(obj.pk), geometry=geometry, place=place, properties=obj, **members)
 
     def validate_feature_input_or_raise(self, request: HttpRequest, feature: Feature) -> Feature:
         schema = self.get_feature_input_schema(request)

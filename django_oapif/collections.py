@@ -28,6 +28,7 @@ from django_oapif.geojson import (
 )
 from django_oapif.handler import ARROW_AVAILABLE, OapifCollection, ReprojectedExtent, parse_box2d
 from django_oapif.html import HTML_MEDIA_TYPE, as_text, html_response, schema_properties
+from django_oapif.jsonfg import Profile
 from django_oapif.schema import (
     OAPIFCollection,
     OAPIFCollections,
@@ -49,6 +50,7 @@ ACCEPTED_TYPES = [
 ]
 
 DEFAULT_CRS = CRS("OGC", CRS84_SRID)
+PROFILE_DESCRIPTION = "GeoJSON profile: rfc7946 for GeoJSON, the default, or jsonfg for JSON-FG, which has the curves"
 CRS_ADAPTER = TypeAdapter(CRS)
 
 
@@ -118,6 +120,34 @@ def link_header(links: list[OAPIFLink]) -> str:
     return ", ".join(f'<{link.href}>; rel="{link.rel}"; type="{link.type}"' for link in links)
 
 
+def accepted_profiles(request: HttpRequest) -> list[str]:
+    """The profiles of the GeoJSON the Accept header of a request asks for, by preference."""
+    return [
+        media_type.params["profile"]
+        for media_type in request.accepted_types
+        if (media_type.main_type, media_type.sub_type) == ("application", "geo+json") and "profile" in media_type.params
+    ]
+
+
+def offered_types(request: HttpRequest, *media_types: str) -> list[str]:
+    """
+    The media types to negotiate between, and the profiled GeoJSON the request accepts: Django matches an accepted
+    type that has parameters only to an offered one with the same, and would prefer any other to it.
+    """
+    profiled = [f'{GEOJSON_MEDIA_TYPE}; profile="{profile}"' for profile in accepted_profiles(request)]
+    return [*media_types, *profiled]
+
+
+def requested_profile(request: HttpRequest, profile: str | None) -> Profile | None:
+    """
+    The GeoJSON profile a request asks for: in the profile query parameter of Part 5, a list of tokens or URIs, or
+    else as the parameter of the media type it accepts. Those of other formats are left out, as Part 5 recommends
+    that no profile fails a request.
+    """
+    requested = profile.split(",") if profile else accepted_profiles(request)
+    return next((known for value in requested if (known := Profile.parse(value))), None)
+
+
 def accepts_html(request: HttpRequest) -> bool:
     """
     Whether to answer with the HTML page of a resource, which a browser asks for: `f=html` or `f=json` choose,
@@ -125,11 +155,11 @@ def accepts_html(request: HttpRequest) -> bool:
     """
     if f := request.GET.get("f"):
         return f == "html"
-    return request.get_preferred_type([*ACCEPTED_TYPES, HTML_MEDIA_TYPE]) == HTML_MEDIA_TYPE
+    return request.get_preferred_type(offered_types(request, *ACCEPTED_TYPES, HTML_MEDIA_TYPE)) == HTML_MEDIA_TYPE
 
 
 def accepts_geoarrow(request: HttpRequest) -> bool:
-    if request.get_preferred_type(ACCEPTED_TYPES) == ARROW_STREAM_MEDIA_TYPE:
+    if request.get_preferred_type(offered_types(request, *ACCEPTED_TYPES)) == ARROW_STREAM_MEDIA_TYPE:
         if ARROW_AVAILABLE:
             return True
         raise HttpError(406, "Arrow content type not supported")
@@ -202,24 +232,6 @@ def primary_keys(collection: OapifCollection) -> set[str]:
     return {name for key in keys for name in (key.name, key.attname)}
 
 
-# the geometry types of GeoJSON, the only ones GEOS knew before its 3.13
-GEOJSON_TYPES = {
-    "Point",
-    "MultiPoint",
-    "LineString",
-    "MultiLineString",
-    "Polygon",
-    "MultiPolygon",
-    "GeometryCollection",
-}
-
-
-def is_geojson(geometry) -> bool:
-    if geometry.type not in GEOJSON_TYPES:
-        return False
-    return geometry.type != "GeometryCollection" or all(is_geojson(member) for member in geometry.geometries)
-
-
 @cache
 def writes_curves() -> bool:
     """Whether curves can be written: it takes GEOS 3.13, and a Django whose GEOS bindings know them."""
@@ -237,10 +249,10 @@ def geometry_to_save(geometry, crs: CRS) -> GEOSGeometry | None:
     """
     if geometry is None:
         return None
-    if not is_geojson(geometry) and not writes_curves():
-        raise HttpError(501, "Curves can only be written with GEOS 3.13 or newer and a Django that supports them")
     # a CircularString served in parts goes back into its column as one
     data = geometry.circular_string() if isinstance(geometry, CircularStringParts) else geometry.model_dump()
+    if not jsonfg.is_geojson(data) and not writes_curves():
+        raise HttpError(501, "Curves can only be written with GEOS 3.13 or newer and a Django that supports them")
     try:
         return GEOSGeometry(memoryview(jsonfg.dumps(data)), srid=crs.srid)
     except GEOSException:
@@ -392,6 +404,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         crs: CRS = DEFAULT_CRS,
         bbox_crs: CRS = Query(DEFAULT_CRS, alias="bbox-crs"),
         bbox: BBox | None = Query(None, alias="bbox", description="BBOX in the format: minx,miny,maxx,maxy"),
+        profile: str | None = Query(None, description=PROFILE_DESCRIPTION),
     ):
         collection = get_collection_by_id(collection_id, request)
         validate_crs_or_raise(collection, crs, "crs")
@@ -403,6 +416,8 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         total_count = query.count()
 
         html = accepts_html(request)
+        # a page draws the curves itself
+        profile = None if html else requested_profile(request, profile)
         if not html and accepts_geoarrow(request):
             stream = collection.queryset_to_arrow_stream(request, paginated_query, crs)
             response = arrow_response(stream, crs)
@@ -417,6 +432,8 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
             paginated_query,
             number_matched=total_count,
             links=get_page_links(request, limit, offset, total_count),
+            crs=crs,
+            profile=profile,
         )
         if html:
             geojson = json.loads(feature_collection.model_dump_json())
@@ -474,6 +491,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         collection_id: str,
         item_id: str,
         crs: CRS = DEFAULT_CRS,
+        profile: str | None = Query(None, description=PROFILE_DESCRIPTION),
     ):
         collection = get_collection_by_id(collection_id, request)
         validate_crs_or_raise(collection, crs, "crs")
@@ -485,7 +503,8 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         if not html and accepts_geoarrow(request):
             stream = collection.queryset_to_arrow_stream(request, query.filter(pk=item_id), crs)
             return arrow_response(stream, crs)
-        feature = collection.model_to_feature(request, item)
+        profile = None if html else requested_profile(request, profile)
+        feature = collection.model_to_feature(request, item, crs=crs, profile=profile)
         if html:
             geojson = json.loads(feature.model_dump_json())
             context = {

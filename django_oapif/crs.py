@@ -89,3 +89,7 @@ class BBox:
             validate_bbox,
             core_schema.str_schema(),
         )
+
+
+# the CRS of GeoJSON, the default one of the API
+CRS84 = CRS("OGC", CRS84_SRID)
