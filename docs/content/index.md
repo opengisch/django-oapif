@@ -35,7 +35,7 @@ The API declares these conformance classes:
 | [OGC API - Features - Part 1: Core](https://docs.ogc.org/is/17-069r4/17-069r4.html)                                      | Core, GeoJSON, OpenAPI 3.1                  |
 | [OGC API - Features - Part 2: Coordinate Reference Systems by Reference](https://docs.ogc.org/is/18-058r1/18-058r1.html) | Coordinate Reference Systems by Reference   |
 | [OGC API - Features - Part 4: Create, Replace, Update and Delete](https://docs.ogc.org/DRAFTS/20-002r1.html)             | Create/Replace/Delete, Update, Features     |
-| [OGC API - Features - Part 5: Schemas](https://docs.ogc.org/DRAFTS/23-058r1.html)                                        | Core roles for features, Returnables and receivables, Schemas |
+| [OGC API - Features - Part 5: Schemas](https://docs.ogc.org/DRAFTS/23-058r1.html)                                        | Core roles for features, Feature references, Returnables and receivables, Schemas |
 
 OpenAPI 3.1 is a class of the 1.1 draft of Part 1, as the published standards only have one for OpenAPI 3.0:
 see [conformance](contributing/conformance.md#openapi-31).
