@@ -322,7 +322,13 @@ class TestSchema(TestCase):
             "additionalProperties": False,
             "properties": {
                 "id": {"title": "Id", "format": "uuid", "type": "string", "x-ogc-propertySeq": 1},
-                "field_int": {"title": "Field Int", "type": "integer", "x-ogc-propertySeq": 3},
+                "field_int": {
+                    "title": "Field Int",
+                    "type": "integer",
+                    "minimum": -2147483648,
+                    "maximum": 2147483647,
+                    "x-ogc-propertySeq": 3,
+                },
                 "field_bool": {"default": True, "title": "Field Bool", "type": "boolean", "x-ogc-propertySeq": 2},
                 "field_str_0": {"title": "Field 0", "maxLength": 255, "type": "string", "x-ogc-propertySeq": 4},
                 "field_str_1": {"title": "Field 1", "maxLength": 255, "type": "string", "x-ogc-propertySeq": 5},
@@ -415,6 +421,15 @@ class TestSchema(TestCase):
         self.assertEqual(properties["level"]["enum"], [1, 2])
         self.assertNotIn("enum", properties["score"])
 
+    def test_schema_numeric_bounds(self):
+        url = f"{collections_url}/tests.layerwithconstraints/schema"
+        properties = self.client.get(url).json()["properties"]
+
+        # the strictest of the validators and of the range of the column
+        self.assertEqual((properties["score"]["minimum"], properties["score"]["maximum"]), (0, 10))
+        self.assertEqual((properties["level"]["minimum"], properties["level"]["maximum"]), (-2147483648, 2147483647))
+        self.assertNotIn("minimum", properties["kind"])
+
     def test_properties_schema_keeps_its_extra_behaviour(self):
         # ninja caches schemas by name and fields but not by config: the output schema, built first by
         # a read, used to be handed to writes too, which then silently dropped unknown properties
@@ -448,7 +463,13 @@ class TestSchema(TestCase):
         expected_schema = {
             "additionalProperties": False,
             "properties": {
-                "field_int": {"title": "Field Int", "type": "integer", "x-ogc-propertySeq": 1},
+                "field_int": {
+                    "title": "Field Int",
+                    "type": "integer",
+                    "minimum": -2147483648,
+                    "maximum": 2147483647,
+                    "x-ogc-propertySeq": 1,
+                },
                 "field_str_0": {"title": "Field 0", "maxLength": 255, "type": "string", "x-ogc-propertySeq": 2},
                 "geom": {
                     "title": "geometry",
