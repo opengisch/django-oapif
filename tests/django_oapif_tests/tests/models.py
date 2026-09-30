@@ -2,6 +2,7 @@ import logging
 import uuid
 
 from django.contrib.gis.db import models
+from django.core.validators import MaxValueValidator, MinLengthValidator, MinValueValidator, RegexValidator
 from django.utils.translation import gettext as _
 
 logger = logging.getLogger(__name__)
@@ -200,3 +201,16 @@ class LayerWithVariousTypes(models.Model):
     ip = models.GenericIPAddressField(null=True)
     amount = models.DecimalField(max_digits=6, decimal_places=2, null=True)
     delay = models.DurationField(null=True)
+
+
+class LayerWithConstraints(models.Model):
+    # what the schema can say of the values beyond their type
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    kind = models.CharField(max_length=10, choices=[("house", "House"), ("shed", "Shed")], default="house")
+    level = models.IntegerField(choices=[(1, "Low"), (2, "High")], null=True, blank=True)
+    score = models.IntegerField(validators=[MinValueValidator(0), MaxValueValidator(10)], default=0)
+    code = models.CharField(
+        max_length=5, validators=[MinLengthValidator(2), RegexValidator(r"^[A-Z]+$")], null=True, blank=True
+    )
+    website = models.URLField(null=True, blank=True)
+    email = models.EmailField(null=True, blank=True)

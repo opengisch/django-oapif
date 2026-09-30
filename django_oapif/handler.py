@@ -474,6 +474,12 @@ class OapifCollection[M: Model]:
                 del field_props["anyOf"]
                 field_props.update(types[0])
 
+        for field_name, field_props in schema["properties"].items():
+            # the values of the choices, as they are served: their labels have no keyword in Part 5
+            if choices := self.opts.get_field(field_name).flatchoices:
+                adapter = TypeAdapter(properties_schema.model_fields[field_name].annotation)
+                field_props["enum"] = [adapter.dump_python(value, mode="json") for value, _label in choices]
+
         # served but not written, which QGIS makes read-only fields of
         for field_name in self.get_readonly_fields(request):
             if field_name in schema["properties"]:
