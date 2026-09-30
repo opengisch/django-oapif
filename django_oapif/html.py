@@ -42,6 +42,57 @@ def as_text(value: Any) -> str:
 
 
 def schema_type(schema: dict) -> str:
-    """The type of a property of a JSON schema, its format when it has one, and the types of a union."""
+    """
+    The type of a property of a JSON schema with its format, a geometry having a format only, and the types of a
+    union.
+    """
     types = [member for member in schema.get("anyOf", [schema]) if member.get("type") != "null"]
-    return " | ".join(member.get("format") or member.get("type") or "any" for member in types)
+    return " | ".join(
+        f"{member['type']} ({member['format']})"
+        if "type" in member and "format" in member
+        else member.get("type") or member.get("format") or "any"
+        for member in types
+    )
+
+
+# the keywords of a property that the schema pages give a column of their own, the position being the order of rows
+COLUMN_KEYWORDS = {
+    "title",
+    "description",
+    "type",
+    "format",
+    "anyOf",
+    "$ref",
+    "x-ogc-role",
+    "x-ogc-collectionId",
+    "readOnly",
+    "default",
+    "x-ogc-propertySeq",
+}
+
+
+def schema_properties(schema: dict) -> list[dict[str, Any]]:
+    """
+    The properties of a JSON schema as the schema pages show them. The keywords without a column are listed as the
+    constraints of the property, whatever they are, so that a page leaves out nothing its schema says, even the
+    keywords a collection adds.
+    """
+    required = set(schema.get("required", ()))
+    properties = []
+    for name, prop in schema["properties"].items():
+        collections = prop.get("x-ogc-collectionId", [])
+        properties.append({
+            "name": name,
+            "title": prop.get("title"),
+            "description": prop.get("description"),
+            "type": schema_type(prop),
+            "ref": prop.get("$ref"),
+            "role": prop.get("x-ogc-role"),
+            "collections": [collections] if isinstance(collections, str) else collections,
+            "required": name in required,
+            "read_only": prop.get("readOnly", False),
+            # written as in the JSON, where an empty string still shows
+            "default": json.dumps(prop["default"], ensure_ascii=False) if "default" in prop else None,
+            "constraints": [(key, as_text(value)) for key, value in prop.items() if key not in COLUMN_KEYWORDS],
+        })
+    return properties

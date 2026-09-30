@@ -27,7 +27,7 @@ from django_oapif.geojson import (
     GenericFeaturePatch,
 )
 from django_oapif.handler import ARROW_AVAILABLE, OapifCollection, ReprojectedExtent, parse_box2d
-from django_oapif.html import HTML_MEDIA_TYPE, as_text, html_response, schema_type
+from django_oapif.html import HTML_MEDIA_TYPE, as_text, html_response, schema_properties
 from django_oapif.schema import (
     OAPIFCollection,
     OAPIFCollections,
@@ -371,12 +371,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         schema["$id"] = request.build_absolute_uri(request.path)
         add_references(request, collection, collections, schema)
         if accepts_html(request):
-            required = set(schema.get("required", ()))
-            properties = [
-                {"name": name, "title": prop.get("title"), "type": schema_type(prop), "required": name in required}
-                for name, prop in schema["properties"].items()
-            ]
-            context = {"collection": collection, "properties": properties}
+            context = {"collection": collection, "properties": schema_properties(schema)}
             return html_response(request, "schema.html", context, title=title)
         # the titles are the verbose names of the fields, which ninja leaves lazy when they are translated
         response = HttpResponse(json.dumps(schema, cls=DjangoJSONEncoder), content_type=SCHEMA_MEDIA_TYPE)

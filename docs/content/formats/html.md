@@ -19,6 +19,14 @@ for the JSON. The JSON links its page this way, with the `alternate` relation, a
 
 As the same URL serves both, the responses carry a `Vary: Accept` header.
 
+## Schemas
+
+The page of the schema of a collection has a row for each property, with all that its JSON Schema says of it:
+its title and description, its type and format, its role, whether it is required or read-only, its default,
+and its constraints, such as its bounds, length, pattern and choices. A foreign key links the collections it
+references. A keyword without a column of its own is listed with the constraints, including one that a
+collection adds to its schema.
+
 ## Maps
 
 The maps are drawn with [Leaflet](https://leafletjs.com), over [OpenStreetMap](https://www.openstreetmap.org)
@@ -41,6 +49,7 @@ before those of django-oapif, such as in a directory of its `TEMPLATES` `DIRS`:
 | `django_oapif/collections.html` | `/collections`                                         |
 | `django_oapif/collection.html`  | `/collections/{collectionId}`                          |
 | `django_oapif/schema.html`      | `/collections/{collectionId}/schema`                   |
+| `django_oapif/properties.html`  | the table of the properties, included by the schema    |
 | `django_oapif/items.html`       | `/collections/{collectionId}/items`                    |
 | `django_oapif/item.html`        | `/collections/{collectionId}/items/{featureId}`        |
 

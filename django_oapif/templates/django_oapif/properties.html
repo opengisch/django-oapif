@@ -1,0 +1,19 @@
+<div class="table">
+  <table>
+    <thead><tr><th>Property</th><th>Title</th><th>Type</th><th>Role</th><th>Required</th><th>Read-only</th><th>Default</th><th>Constraints</th></tr></thead>
+    <tbody>
+      {% for property in properties %}
+      <tr>
+        <td class="id">{{ property.name }}</td>
+        <td>{{ property.title|default:"" }}{% if property.description %}<div class="muted">{{ property.description }}</div>{% endif %}</td>
+        <td class="id">{% if property.ref %}<a href="{{ property.ref }}">{{ property.type }}</a>{% else %}{{ property.type }}{% endif %}</td>
+        <td>{% if property.role %}<span class="id">{{ property.role }}</span>{% endif %}{% for id in property.collections %}<br><code><a href="{{ root_url }}collections/{{ id|urlencode:"" }}">{{ id }}</a></code>{% endfor %}</td>
+        <td>{% if property.required %}yes{% endif %}</td>
+        <td>{% if property.read_only %}yes{% endif %}</td>
+        <td>{% if property.default is not None %}<code>{{ property.default }}</code>{% endif %}</td>
+        <td>{% for keyword, value in property.constraints %}<div><span class="muted">{{ keyword }}</span> <code>{{ value }}</code></div>{% endfor %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
