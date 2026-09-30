@@ -44,9 +44,9 @@ The primary key of a `POST` is the one of the feature created, and defaults as t
 ## Schema
 
 `/collections/{collectionId}/schema` returns the [JSON Schema](https://json-schema.org/) of the features of a
-collection, as defined by [OGC API - Features - Part 5](https://docs.ogc.org/DRAFTS/23-058r1.html): the type of
-each property, its bounds, length, pattern and choices, its position, the required and read-only ones, and the
-geometry, with the `primary-geometry` role and its type as `format`:
+collection, as defined by [OGC API - Features - Part 5](https://docs.ogc.org/DRAFTS/23-058r1.html): the type and
+format of each property, its bounds, length, pattern and choices, its position, the required and read-only ones,
+and the geometry, with the `primary-geometry` role and its type as `format`:
 
 ```json
 {
