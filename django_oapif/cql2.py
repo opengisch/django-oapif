@@ -1,22 +1,26 @@
 """
 CQL2 filters of OGC API - Features Part 3, as QGIS sends them for the subset string of a layer.
 
-cql2-rs parses them to the JSON encoding of CQL2, which is translated here to Django lookups: the names of a filter
-are only taken among the queryables, never handed to the ORM as they are, which would reach the fields of related
-models, and the negations do not match the null values, which neither CQL2 nor QGIS do.
+pygeofilter parses them, but they are not translated with its Django backend: it hands a name it does not know to
+the ORM as it is, relations included, reads a BBOX in the CRS of the geometries, knows no CASEI, and its negations
+match the null values, which neither CQL2 nor QGIS do.
 """
 
+import os
 import re
 import struct
 from dataclasses import dataclass
-from datetime import date, datetime
-from functools import reduce
+from datetime import UTC, date, datetime
+from functools import cache, reduce
 from operator import and_, or_
 
-import cql2
 from django.contrib.gis.db.models import GeometryField
 from django.contrib.gis.geos import GEOSException, GEOSGeometry, Polygon
 from django.db.models import F, Field, Q
+from lark import Lark
+from lark.exceptions import LarkError
+from pygeofilter import ast, values
+from pygeofilter.parsers.cql2_text import parser as cql2_text
 
 from django_oapif import jsonfg
 from django_oapif.crs import CRS84_SRID
@@ -26,58 +30,66 @@ class FilterError(ValueError):
     """A filter that cannot be applied, for a reason the client can fix."""
 
 
+# what the grammar of pygeofilter gets wrong of CQL2, as patterns to replace and their replacements
+GRAMMAR_FIXES = (
+    # NOT only took a predicate, where QGIS sends NOT ((intfield = 0)), and CQL2 allows NOT (a OR b)
+    (
+        r'\|\s*"NOT"i predicate\s*-> not_\s*\|\s*"NOT"i "\(" predicate "\)"\s*-> not_',
+        '| "NOT"i condition_1 -> not_',
+    ),
+    # a string ended at its first quote: CQL2 escapes one as '' or \', and QGIS does the former
+    (re.escape('''SINGLE_QUOTED: "'" /.*?/ "'"'''), r"SINGLE_QUOTED: /'(?:[^'\\]|\\.|'')*'/"),
+)
+
 # the lookups of the comparisons, <> being the negation of =
-COMPARISONS = {"=": "exact", "<>": "exact", "<": "lt", "<=": "lte", ">": "gt", ">=": "gte"}
-SPATIAL = {
-    "s_intersects": "intersects",
-    "s_disjoint": "disjoint",
-    "s_contains": "contains",
-    "s_within": "within",
-    "s_touches": "touches",
-    "s_crosses": "crosses",
-    "s_overlaps": "overlaps",
-    "s_equals": "equals",
+COMPARISONS = {
+    ast.Equal: "exact",
+    ast.NotEqual: "exact",
+    ast.LessThan: "lt",
+    ast.LessEqual: "lte",
+    ast.GreaterThan: "gt",
+    ast.GreaterEqual: "gte",
 }
-ARITHMETIC = {"+", "-", "*", "/", "%", "^", "div"}
+SPATIAL = {
+    ast.GeometryIntersects: "intersects",
+    ast.GeometryDisjoint: "disjoint",
+    ast.GeometryContains: "contains",
+    ast.GeometryWithin: "within",
+    ast.GeometryTouches: "touches",
+    ast.GeometryCrosses: "crosses",
+    ast.GeometryOverlaps: "overlaps",
+    ast.GeometryEquals: "equals",
+}
 # the lookups that differ once their operands are swapped, for a literal on the left
 MIRRORED = {"lt": "gt", "lte": "gte", "gt": "lt", "gte": "lte", "contains": "within", "within": "contains"}
 # a bool is an int, and a datetime a date
 LITERALS = (str, int, float, date)
-# the numbers of cql2-rs are floats, which hold the integers exactly up to 2^53
-MAX_INTEGER = 2**53
-
-# cql2-rs recurses into each parenthesis and each NOT or minus sign in a row, and overflows its stack, which kills the
-# process, from about 2000 levels: the ones of QGIS take one per condition
-MAX_NESTING = 256
-TOKENS = re.compile(r"'(?:[^']|'')*'|\"[^\"]*\"|\s+|[()-]|\bNOT\b|[^\s()'\"-]+|.", re.IGNORECASE)
 
 
-def nesting(text: str) -> int:
-    """How deep a filter nests, counting its parentheses and its runs of NOT and minus signs, out of the strings."""
-    deepest = depth = run = 0
-    for token in TOKENS.findall(text):
-        if token == "(":
-            depth += 1
-        elif token == ")":
-            depth = max(depth - 1, 0)
-        elif token == "-" or token.upper() == "NOT":
-            run += 1
-        elif not token.isspace():
-            run = 0
-        deepest = max(deepest, depth + run)
-    return deepest
+class Transformer(cql2_text.CQLTransformer):
+    def SINGLE_QUOTED(self, token):
+        # the other backslashes are left for LIKE, where they escape the next character
+        return re.sub(r"''|\\(.)", lambda m: "'" if m[0] == "''" or m[1] == "'" else m[0], token[1:-1], flags=re.S)
+
+
+@cache
+def parser() -> Lark:
+    parsers = os.path.dirname(os.path.dirname(cql2_text.__file__))
+    with open(os.path.join(parsers, "cql2_text", "grammar.lark")) as file:
+        grammar = file.read()
+    for pattern, replacement in GRAMMAR_FIXES:
+        grammar, count = re.subn(pattern, lambda _: replacement, grammar)
+        if count != 1:
+            # a pygeofilter whose grammar changed would otherwise parse as it did before, unnoticed
+            raise RuntimeError(f"The CQL2 grammar of pygeofilter no longer has {pattern}")
+    return Lark(grammar, parser="lalr", maybe_placeholders=False, transformer=Transformer(), import_paths=[parsers])
 
 
 def parse(text: str):
-    """The JSON encoding of a CQL2 text filter."""
-    if nesting(text) > MAX_NESTING:
-        raise FilterError(f"The filter is nested deeper than {MAX_NESTING} levels")
     try:
-        return cql2.parse_text(text).to_json()
-    except cql2.ParseError as e:
-        # pest gives the position on its first line and what it expected there on its last one
-        lines = str(e).strip().splitlines()
-        raise FilterError(f"{lines[-1].strip().removeprefix('= ')} at {lines[0].strip().removeprefix('--> ')}") from e
+        return parser().parse(text)
+    except LarkError as e:
+        raise FilterError(str(e).splitlines()[0]) from e
 
 
 def like_regex(pattern: str) -> str:
@@ -113,13 +125,6 @@ class CaseInsensitive:
     value: Property | str
 
 
-def operation(node) -> tuple[str | None, list]:
-    """The operator of a node and its arguments, or None for an operand."""
-    if isinstance(node, dict) and "op" in node:
-        return node["op"], node.get("args", [])
-    return None, []
-
-
 def is_property(operand) -> bool:
     return isinstance(operand, Property) or isinstance(operand, CaseInsensitive) and isinstance(operand.value, Property)
 
@@ -147,44 +152,36 @@ class Translator:
         The lookups of a condition. A negation is taken down to the predicates, as NOT (a AND b) is NOT a OR NOT b:
         a comparison with a null value is unknown, and so is its negation, which is then not a match either.
         """
-        op, args = operation(node)
-        if op == "not":
-            (sub_node,) = args
-            return self.condition(sub_node, not negated)
-        if op in ("and", "or"):
-            conditions = [self.condition(arg, negated) for arg in args]
-            return reduce(or_ if (op == "or") != negated else and_, conditions)
-        if op == "isNull":
-            (operand,) = args
-            prop = self.property(self.operand(operand))
-            return Q(**{f"{prop.name}__isnull": not negated})
-        q, properties = self.predicate(op, args)
-        if negated == (op == "<>"):
+        if isinstance(node, ast.Not):
+            return self.condition(node.sub_node, not negated)
+        if isinstance(node, (ast.And, ast.Or)):
+            lhs, rhs = self.condition(node.lhs, negated), self.condition(node.rhs, negated)
+            return lhs | rhs if isinstance(node, ast.Or) != negated else lhs & rhs
+        if isinstance(node, ast.IsNull):
+            prop = self.property(self.operand(node.lhs))
+            return Q(**{f"{prop.name}__isnull": node.not_ == negated})
+        q, properties = self.predicate(node)
+        if negated == (getattr(node, "not_", False) or isinstance(node, ast.NotEqual)):
             return q
         # the negation of Django matches the null values, so they are left out
         not_null = [Q(**{f"{prop.name}__isnull": False}) for prop in properties if prop.field.null]
         return reduce(and_, not_null, ~q)
 
-    def predicate(self, op: str | None, args: list) -> tuple[Q, list[Property]]:
+    def predicate(self, node) -> tuple[Q, list[Property]]:
         """The lookup of a predicate, left un-negated, and the properties it takes."""
-        if (lookup := COMPARISONS.get(op)) is not None:
-            lhs, rhs = args
-            return self.comparison(lookup, self.operand(lhs), self.operand(rhs))
-        if op == "between":
-            lhs, low, high = args
-            prop = self.scalar_property(self.operand(lhs))
-            low, high = self.literal(self.operand(low)), self.literal(self.operand(high))
+        if (lookup := COMPARISONS.get(type(node))) is not None:
+            return self.comparison(lookup, self.operand(node.lhs), self.operand(node.rhs))
+        if isinstance(node, ast.Between):
+            prop = self.scalar_property(self.operand(node.lhs))
+            low, high = self.literal(self.operand(node.low)), self.literal(self.operand(node.high))
             return Q(**{f"{prop.name}__range": (low, high)}), [prop]
-        if op == "like":
-            lhs, pattern = args
-            return self.like(self.operand(lhs), self.operand(pattern))
-        if op == "in":
-            lhs, items = args
-            return self.in_(self.operand(lhs), [self.operand(item) for item in items])
-        if (lookup := SPATIAL.get(op)) is not None:
-            lhs, rhs = args
-            return self.spatial(lookup, self.operand(lhs), self.operand(rhs))
-        raise FilterError(f"Unsupported predicate {op}" if op else "Expected a predicate")
+        if isinstance(node, ast.Like):
+            return self.like(self.operand(node.lhs), self.operand(node.pattern))
+        if isinstance(node, ast.In):
+            return self.in_(self.operand(node.lhs), [self.operand(item) for item in node.sub_nodes])
+        if (lookup := SPATIAL.get(type(node))) is not None:
+            return self.spatial(lookup, self.operand(node.lhs), self.operand(node.rhs))
+        raise FilterError(f"Unsupported predicate {type(node).__name__}")
 
     def comparison(self, lookup: str, lhs, rhs) -> tuple[Q, list[Property]]:
         if not is_property(lhs):
@@ -227,66 +224,46 @@ class Translator:
         return Q(**{f"{lhs.name}__{lookup}": rhs}), [lhs]
 
     def operand(self, node):
-        if isinstance(node, dict):
-            if "property" in node:
-                if (field := self.fields.get(node["property"])) is None:
-                    raise FilterError(f"'{node['property']}' is not a queryable")
-                return Property(node["property"], field)
-            if "op" in node:
-                return self.function(*operation(node))
-            if "bbox" in node:
-                return self.bbox(node["bbox"])
-            if "type" in node:
-                return self.geometry(node)
-            if "timestamp" in node:
-                # cql2-rs gives them in UTC
-                return self.temporal(datetime, node["timestamp"])
-            if "date" in node:
-                return self.temporal(date, node["date"])
-            raise FilterError(f"Unsupported {', '.join(node)}")
-        if node is None:
-            raise FilterError("NULL is only compared with IS NULL")
-        if isinstance(node, bool | str):
+        if isinstance(node, ast.Attribute):
+            if (field := self.fields.get(node.name)) is None:
+                raise FilterError(f"'{node.name}' is not a queryable")
+            return Property(node.name, field)
+        if isinstance(node, ast.Function):
+            return self.function(node)
+        if isinstance(node, values.Geometry):
+            return self.geometry(node.geometry)
+        if isinstance(node, ast.Arithmetic):
+            raise FilterError("Arithmetic is not supported")
+        if isinstance(node, datetime) and node.tzinfo is None:
+            # the timestamps of CQL2 are in UTC
+            return node.replace(tzinfo=UTC)
+        if isinstance(node, LITERALS):
             return node
-        if isinstance(node, int | float):
-            return self.number(node)
         raise FilterError(f"Unsupported {type(node).__name__}")
 
-    def function(self, op: str, args: list):
-        if op == "casei":
-            (argument,) = [self.operand(arg) for arg in args]
-            if not isinstance(argument, (Property, str)):
+    def function(self, node: ast.Function):
+        arguments = [self.operand(argument) for argument in node.arguments]
+        # pygeofilter names CASEI lower
+        if node.name == "lower":
+            if len(arguments) != 1 or not isinstance(arguments[0], (Property, str)):
                 raise FilterError("CASEI takes a property or a string")
-            return CaseInsensitive(argument)
-        if op in ARITHMETIC:
-            raise FilterError("Arithmetic is not supported")
-        raise FilterError(f"Unsupported function {op}")
-
-    def number(self, number: int | float) -> int | float:
-        if abs(number) >= MAX_INTEGER:
-            raise FilterError(f"{number:g} is too large to be compared exactly")
-        # an integer compared with a string is written as one
-        return int(number) if number.is_integer() else number
-
-    def temporal(self, kind: type[date], value: str) -> date:
-        try:
-            return kind.fromisoformat(value)
-        except ValueError as e:
-            raise FilterError(f"Invalid {kind.__name__} '{value}'") from e
-
-    def bbox(self, coordinates: list) -> Polygon:
-        # in 3D, minx, miny, minz, maxx, maxy, maxz, whose elevations are left out
-        if len(coordinates) not in (4, 6):
-            raise FilterError("BBOX takes 4 or 6 numbers")
-        half = len(coordinates) // 2
-        box = Polygon.from_bbox((coordinates[0], coordinates[1], coordinates[half], coordinates[half + 1]))
-        box.srid = self.srid
-        return self.in_range(box)
+            return CaseInsensitive(arguments[0])
+        # and reads the BBOX of CQL2, 2D or 3D, as a function
+        if node.name == "bbox":
+            if len(arguments) not in (4, 6) or not all(isinstance(argument, (int, float)) for argument in arguments):
+                raise FilterError("BBOX takes 4 or 6 numbers")
+            half = len(arguments) // 2
+            box = Polygon.from_bbox((arguments[0], arguments[1], arguments[half], arguments[half + 1]))
+            box.srid = self.srid
+            return self.in_range(box)
+        raise FilterError(f"Unsupported function {node.name}")
 
     def geometry(self, geometry: dict) -> GEOSGeometry:
+        if "crs" in geometry:
+            raise FilterError("The geometries of a filter are in its filter-crs, and take no SRID")
         try:
             return self.in_range(GEOSGeometry(memoryview(jsonfg.dumps(geometry)), srid=self.srid))
-        except (GEOSException, struct.error, KeyError) as e:
+        except (GEOSException, struct.error) as e:
             raise FilterError("Invalid geometry") from e
 
     def in_range(self, geometry: GEOSGeometry) -> GEOSGeometry:
