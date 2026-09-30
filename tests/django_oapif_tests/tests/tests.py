@@ -378,6 +378,15 @@ class TestSchema(TestCase):
         self.assertEqual(amount["type"], "string")
         self.assertNotIn("anyOf", amount)
 
+    def test_schema_read_only_fields(self):
+        # QGIS makes their fields read-only, which a write would otherwise carry and have rejected
+        url = f"{collections_url}/tests.layerwithfile/schema"
+        properties = self.client.get(url).json()["properties"]
+
+        self.assertIs(properties["file"]["readOnly"], True)
+        # a POST takes the primary key
+        self.assertNotIn("readOnly", properties["id"])
+
     def test_properties_schema_keeps_its_extra_behaviour(self):
         # ninja caches schemas by name and fields but not by config: the output schema, built first by
         # a read, used to be handed to writes too, which then silently dropped unknown properties

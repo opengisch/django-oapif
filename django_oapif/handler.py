@@ -486,6 +486,11 @@ class OapifCollection[M: Model]:
                 del field_props["anyOf"]
                 field_props.update(types[0])
 
+        # served but not written, which QGIS makes read-only fields of
+        for field_name in self.get_readonly_fields(request):
+            if field_name in schema["properties"]:
+                schema["properties"][field_name]["readOnly"] = True
+
         if geom_field := self.geometry_field:
             geom_field = cast("GeometryField", self.model._meta.get_field(self.geometry_field))
             geom_type = geom_field.geom_type.lower()
