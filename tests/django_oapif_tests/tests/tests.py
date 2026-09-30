@@ -1972,6 +1972,45 @@ class TestJsonFg(TestCase):
         table = pa.ipc.open_stream(response.content).read_all()
         self.assertEqual(jsonfg.loads(table["geometry"][0].as_py())["type"], "CircularString")
 
+    def test_collection_may_require_jsonfg(self):
+        # asked for in GeoJSON, its curves would have no geometry: the answer links to them in JSON-FG
+        url = f"{collections_url}/tests.arc_2056_10fields/items"
+        profiles = [f"http://www.opengis.net/def/profile/ogc/0/{profile}" for profile in ("jsonfg", "jsonfg-plus")]
+        with patch.object(oapif.collections["tests.arc_2056_10fields"], "require_jsonfg", True):
+            for item_url in (url, f"{url}/{self.arc_id}"):
+                for params in ({}, {"profile": "rfc7946"}):
+                    with self.subTest(url=item_url, **params):
+                        response = self.client.get(item_url, {**params, "crs": crs_2056})
+
+                        self.assertEqual(response.status_code, 406)
+                        self.assertIn("Accept", [value.strip() for value in response["Vary"].split(",")])
+                        links = response.json()["links"]
+                        self.assertEqual([link["profile"] for link in links], [[profile] for profile in profiles])
+                        for link in links:
+                            jsonfg = self.client.get(link["href"])
+                            self.assertEqual(jsonfg.status_code, 200)
+                            self.assertEqual(self.profile_of(jsonfg), link["profile"][0])
+                            # and in the CRS asked for
+                            self.assertEqual(jsonfg["Content-Crs"], f"<{crs_2056}>")
+
+    def test_collection_requiring_jsonfg_has_its_other_encodings(self):
+        url = f"{collections_url}/tests.arc_2056_10fields/items"
+        encodings = [({"f": "html"}, {}), ({"profile": "jsonfg"}, {})]
+        if ARROW_AVAILABLE:
+            encodings.append(({}, {"Accept": "application/vnd.apache.arrow.stream"}))
+        with patch.object(oapif.collections["tests.arc_2056_10fields"], "require_jsonfg", True):
+            for params, accept in encodings:
+                for item_url in (url, f"{url}/{self.arc_id}"):
+                    with self.subTest(url=item_url, params=params, accept=accept):
+                        self.assertEqual(self.client.get(item_url, params, headers=accept).status_code, 200)
+
+    def test_column_of_any_geometry_serves_geojson_whatever_is_required(self):
+        # its curves are only known feature by feature
+        with patch.object(oapif.collections["tests.geometry_2056"], "require_jsonfg", True):
+            response = self.client.get(f"{collections_url}/tests.geometry_2056/items")
+
+        self.assertEqual(response.status_code, 200)
+
     def test_pages_draw_the_curves(self):
         url = f"{collections_url}/tests.arc_2056_10fields/items"
         for page_url in (url, f"{url}/{self.arc_id}"):

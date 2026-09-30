@@ -231,6 +231,9 @@ class OapifCollection[M: Model]:
             The largest distance, in the unit of the storage CRS, between an arc and the segments that stand for it
             in the linearized geometries of the jsonfg-plus profile. Defaults to None, which draws a quarter of a
             circle with 32 segments, as PostGIS does.
+        require_jsonfg:
+            Whether the items of a column of curves, like a CURVEPOLYGON one, are served in JSON-FG only: asked for
+            in GeoJSON, which would give them no geometry, they are answered with a 406. Defaults to False.
     """
 
     id: str
@@ -243,6 +246,7 @@ class OapifCollection[M: Model]:
     exclude: tuple[str, ...] = ()
     ordering: tuple = ()
     linearization_tolerance: float | None = None
+    require_jsonfg: bool = False
 
     def __init__(self, model: type[M]) -> None:
         cls = type(self)

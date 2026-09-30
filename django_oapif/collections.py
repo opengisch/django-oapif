@@ -1,4 +1,5 @@
 import json
+from collections.abc import Callable
 from typing import Any
 from urllib.parse import quote
 
@@ -111,18 +112,35 @@ JSONFG_TITLES = {
 }
 
 
-def jsonfg_links(items_url: str, rel: str, title: str) -> list[OAPIFLink]:
+def jsonfg_links(rel: str, title: str, href: Callable[[Profile], str]) -> list[OAPIFLink]:
     """The links to items in the JSON-FG profiles, which QGIS tells from GeoJSON by the profile of the link."""
     return [
         OAPIFLink(
             rel=rel,
             title=f"{title} {profile_title}",
             type=GEOJSON_MEDIA_TYPE,
-            href=f"{items_url}?profile={profile}",
+            href=href(profile),
             profile=[profile.uri],
         )
         for profile, profile_title in JSONFG_TITLES.items()
     ]
+
+
+def requires_jsonfg(collection: OapifCollection, profile: Profile | None) -> bool:
+    """Whether a request asks for GeoJSON curves that the collection only serves in JSON-FG."""
+    return collection.require_jsonfg and collection.curved and profile in (None, Profile.RFC7946)
+
+
+def jsonfg_required_response(request: HttpRequest) -> HttpResponse:
+    """The 406 of a collection that serves its curves in JSON-FG only, with the links to them in JSON-FG."""
+    links = jsonfg_links("alternate", "This document", lambda profile: replace_query_param(request, profile=profile))
+    body = {
+        "detail": "The items of this collection are curves, which GeoJSON cannot carry: ask for them in JSON-FG",
+        "links": [link.model_dump() for link in links],
+    }
+    response = HttpResponse(json.dumps(body), status=406, content_type=JSON_MEDIA_TYPE)
+    patch_vary_headers(response, ["Accept"])
+    return response
 
 
 def geojson_response(geojson: Schema, crs: CRS, profile: Profile | None = None) -> HttpResponse:
@@ -344,7 +362,7 @@ def get_collection_response(request: HttpRequest, collection: OapifCollection):
     items_url = request.build_absolute_uri(f"{uri_prefix}{collection.id}/items")
     if collection.geometry_field:
         # before the GeoJSON one: QGIS 4.0 takes the last link of a type, and knows no profiles
-        response.links += jsonfg_links(items_url, "items", "Collection items")
+        response.links += jsonfg_links("items", "Collection items", lambda profile: f"{items_url}?profile={profile}")
     response.links.append(
         OAPIFLink(rel="items", title="Collection items", type=GEOJSON_MEDIA_TYPE, href=items_url),
     )
@@ -455,6 +473,8 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         arrow = not html and accepts_geoarrow(request)
         # a page draws the curves itself, and GeoArrow has them as they are
         profile = None if html or arrow else requested_profile(request, profile)
+        if not html and not arrow and requires_jsonfg(collection, profile):
+            return jsonfg_required_response(request)
 
         query = collection.query(request, crs, bbox, bbox_crs)
         if profile is Profile.JSONFG_PLUS:
@@ -547,6 +567,8 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         html = accepts_html(request)
         arrow = not html and accepts_geoarrow(request)
         profile = None if html or arrow else requested_profile(request, profile)
+        if not html and not arrow and requires_jsonfg(collection, profile):
+            return jsonfg_required_response(request)
         query = collection.query(request, crs)
         if profile is Profile.JSONFG_PLUS:
             query = collection.linearize(query)
