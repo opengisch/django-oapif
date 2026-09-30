@@ -56,12 +56,13 @@ The properties that a filter can take are the queryables of the collection, desc
   "type": "object",
   "title": "my_app.Building",
   "properties": {
-    "name": {"title": "Name", "maxLength": 255, "type": "string"},
-    "floors": {"title": "Floors", "type": "integer"},
+    "name": {"title": "Name", "maxLength": 255, "type": "string", "x-ogc-propertySeq": 2},
+    "floors": {"title": "Floors", "type": "integer", "x-ogc-propertySeq": 3},
     "geom": {
       "title": "geometry",
       "x-ogc-role": "primary-geometry",
       "format": "geometry-polygon",
+      "x-ogc-propertySeq": 4,
       "$ref": "https://geojson.org/schema/Polygon.json"
     }
   },

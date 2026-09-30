@@ -46,8 +46,8 @@ The primary key of a `POST` is the one of the feature created, and defaults as t
 `/collections/{collectionId}/schema` returns the [JSON Schema](https://json-schema.org/) of the features of a
 collection, as defined by
 [OGC API - Features - Part 5](https://docs.ogc.org/DRAFTS/23-058r1.html): the type of each property, its
-maximum length, the required and read-only ones, and the geometry, with the `primary-geometry` role and its type as
-`format`:
+maximum length, its position, the required and read-only ones, and the geometry, with the `primary-geometry` role and
+its type as `format`:
 
 ```json
 {
@@ -56,9 +56,9 @@ maximum length, the required and read-only ones, and the geometry, with the `pri
   "title": "my_app.Building",
   "type": "object",
   "properties": {
-    "id": {"title": "ID", "type": "integer"},
-    "name": {"title": "Name", "type": "string", "maxLength": 100},
-    "geom": {"title": "geometry", "x-ogc-role": "primary-geometry", "format": "geometry-polygon"}
+    "id": {"title": "ID", "type": "integer", "x-ogc-propertySeq": 1},
+    "name": {"title": "Name", "type": "string", "maxLength": 100, "x-ogc-propertySeq": 2},
+    "geom": {"title": "geometry", "x-ogc-role": "primary-geometry", "format": "geometry-polygon", "x-ogc-propertySeq": 3}
   },
   "required": ["name"],
   "additionalProperties": false
