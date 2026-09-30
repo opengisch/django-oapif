@@ -1974,6 +1974,17 @@ class TestConformance(TestCase):
         self.assertIn("http://www.opengis.net/spec/ogcapi-features-1/1.1/conf/oas31", conforms_to)
         self.assertEqual([uri for uri in conforms_to if uri.endswith("/conf/oas30")], [])
 
+    def test_schemas_are_declared(self):
+        # QGIS only reads the schema of a collection with the schemas class, and the collections link it with
+        # the returnables and receivables one
+        conforms_to = self.client.get("/oapif/conformance").json()["conformsTo"]
+
+        for uri in (
+            "http://www.opengis.net/spec/ogcapi-features-5/1.0/conf/schemas",
+            "http://www.opengis.net/spec/ogcapi-features-5/1.0/conf/returnables-and-receivables",
+        ):
+            self.assertIn(uri, conforms_to)
+
     def test_filters_are_declared(self):
         # without the classes of Part 3 and basic-cql2, QGIS filters the layers itself
         conforms_to = self.client.get("/oapif/conformance").json()["conformsTo"]
