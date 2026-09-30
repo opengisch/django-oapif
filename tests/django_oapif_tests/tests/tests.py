@@ -815,7 +815,8 @@ class TestOutputFormat(TestCase):
         response = self.client.get(f"{collections_url}/tests.point_2056_10fields")
 
         self.assertEqual(response.status_code, 200)
-        items = [link for link in response.json()["links"] if link["rel"] == "items"]
+        # but for the profiles of JSON-FG
+        items = [link for link in response.json()["links"] if link["rel"] == "items" and "profile" not in link]
         encodings = {"application/geo+json", *({"application/vnd.apache.arrow.stream"} if ARROW_AVAILABLE else ())}
         self.assertEqual({link["type"] for link in items}, encodings)
         # a single URL, negotiated with the Accept header
@@ -1816,6 +1817,42 @@ class TestJsonFg(TestCase):
 
         self.assertNotIn("conformsTo", response.json())
 
+    def test_collection_links_its_items_in_jsonfg(self):
+        # as QGIS 4.2 tells them from GeoJSON: GeoJSON links with a single profile. The link without one comes
+        # last, as QGIS 4.0 takes the last link of a type
+        for collection in ("tests.point_2056_10fields", "tests.arc_2056_10fields"):
+            with self.subTest(collection=collection):
+                links = self.client.get(f"{collections_url}/{collection}").json()["links"]
+
+                items = [link for link in links if link["rel"] == "items" and link["type"] == "application/geo+json"]
+                profiles = [link.get("profile") for link in items]
+                self.assertEqual(profiles, [["http://www.opengis.net/def/profile/ogc/0/jsonfg"], None])
+                for link in items[:-1]:
+                    self.assertEqual(self.profile_of(self.client.get(link["href"])), link["profile"][0])
+
+    def test_collection_without_geometry_links_no_jsonfg(self):
+        links = self.client.get(f"{collections_url}/tests.nogeom_10fields").json()["links"]
+
+        self.assertFalse([link for link in links if "profile" in link])
+
+    def test_jsonfg_pages_are_linked_in_the_headers(self):
+        # QGIS reads the next page of JSON-FG, and the number of features, from the headers only
+        profile = "http://www.opengis.net/def/profile/ogc/0/jsonfg"
+        response = self.client.get(f"{collections_url}/tests.geometry_2056/items", {"limit": 1, "profile": "jsonfg"})
+
+        [next_link] = [link for link in response.json()["links"] if link["rel"] == "next"]
+        self.assertEqual(next_link["profile"], [profile])
+        self.assertIn(
+            f'<{next_link["href"]}>; rel="next"; type="application/geo+json"; profile="{profile}"', response["Link"]
+        )
+        self.assertEqual(response["OGC-NumberMatched"], "2")
+
+    def test_pages_of_the_default_profile_have_their_own(self):
+        # the next page of a column of any type has the profile of its own features
+        response = self.client.get(f"{collections_url}/tests.geometry_2056/items", {"limit": 1})
+
+        self.assertFalse([link for link in response.json()["links"] if "profile" in link])
+
     def test_pages_draw_the_curves(self):
         url = f"{collections_url}/tests.arc_2056_10fields/items"
         for page_url in (url, f"{url}/{self.arc_id}"):
@@ -2176,6 +2213,18 @@ class TestConformance(TestCase):
             "http://www.opengis.net/spec/ogcapi-features-5/1.0/conf/schemas",
             "http://www.opengis.net/spec/ogcapi-features-5/1.0/conf/returnables-and-receivables",
             "http://www.opengis.net/spec/ogcapi-features-5/1.0/conf/feature-references",
+        ):
+            self.assertIn(uri, conforms_to)
+
+    def test_jsonfg_is_declared(self):
+        conforms_to = self.client.get("/oapif/conformance").json()["conformsTo"]
+
+        for uri in (
+            "http://www.opengis.net/spec/json-fg-1/1.0/conf/core",
+            "http://www.opengis.net/spec/json-fg-1/1.0/conf/circular-arcs",
+            "http://www.opengis.net/spec/json-fg-1/1.0/conf/profiles",
+            "http://www.opengis.net/spec/json-fg-1/1.0/conf/api",
+            "http://www.opengis.net/spec/ogcapi-common-3/1.0/conf/profile-parameter",
         ):
             self.assertIn(uri, conforms_to)
 

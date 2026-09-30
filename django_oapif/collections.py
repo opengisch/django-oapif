@@ -61,13 +61,20 @@ def get_page_links(
     offset: int,
     total_count: int,
     media_type: str = GEOJSON_MEDIA_TYPE,
+    profile: Profile | None = None,
 ) -> list[OAPIFLink]:
+    """
+    The links of a page of items. Those to pages give the GeoJSON profile asked for, which the next pages have
+    too: without one, each page has the profile of its own features.
+    """
+    profiles = [profile.uri] if profile else None
     links = [
         OAPIFLink(
             rel="self",
             title="items (self)",
             type=media_type,
             href=request.build_absolute_uri(),
+            profile=profiles,
         ),
         html_link(replace_query_param(request, f="html"), "items (as HTML)"),
     ]
@@ -78,6 +85,7 @@ def get_page_links(
                 title="items (prev)",
                 type=media_type,
                 href=replace_query_param(request, offset=None if offset - limit <= 0 else offset - limit),
+                profile=profiles,
             )
         )
     if offset + limit < total_count:
@@ -87,9 +95,28 @@ def get_page_links(
                 title="items (next)",
                 type=media_type,
                 href=replace_query_param(request, offset=offset + limit),
+                profile=profiles,
             )
         )
     return links
+
+
+# the JSON-FG profiles the items are linked in
+JSONFG_TITLES = {Profile.JSONFG: "as JSON-FG"}
+
+
+def jsonfg_links(items_url: str, rel: str, title: str) -> list[OAPIFLink]:
+    """The links to items in the JSON-FG profiles, which QGIS tells from GeoJSON by the profile of the link."""
+    return [
+        OAPIFLink(
+            rel=rel,
+            title=f"{title} {profile_title}",
+            type=GEOJSON_MEDIA_TYPE,
+            href=f"{items_url}?profile={profile}",
+            profile=[profile.uri],
+        )
+        for profile, profile_title in JSONFG_TITLES.items()
+    ]
 
 
 def geojson_response(geojson: Schema, crs: CRS, profile: Profile | None = None) -> HttpResponse:
@@ -121,8 +148,15 @@ def html_link(href: str, title: str) -> OAPIFLink:
 
 
 def link_header(links: list[OAPIFLink]) -> str:
-    """Serialize links as a RFC 8288 Link header, for responses that cannot carry them in the payload."""
-    return ", ".join(f'<{link.href}>; rel="{link.rel}"; type="{link.type}"' for link in links)
+    """
+    Serialize links as a RFC 8288 Link header, for responses that cannot carry them in the payload, and for the
+    clients that read them there only, as QGIS does of JSON-FG.
+    """
+    return ", ".join(
+        f'<{link.href}>; rel="{link.rel}"; type="{link.type}"'
+        + (f'; profile="{" ".join(link.profile)}"' if link.profile else "")
+        for link in links
+    )
 
 
 def accepted_profiles(request: HttpRequest) -> list[str]:
@@ -299,23 +333,19 @@ def get_collection_response(request: HttpRequest, collection: OapifCollection):
                 type=SCHEMA_MEDIA_TYPE,
                 href=request.build_absolute_uri(f"{uri_prefix}{collection.id}/schema"),
             ),
-            OAPIFLink(
-                rel="items",
-                title="Collection items",
-                type="application/geo+json",
-                href=request.build_absolute_uri(f"{uri_prefix}{collection.id}/items"),
-            ),
         ],
+    )
+    items_url = request.build_absolute_uri(f"{uri_prefix}{collection.id}/items")
+    if collection.geometry_field:
+        # before the GeoJSON one: QGIS 4.0 takes the last link of a type, and knows no profiles
+        response.links += jsonfg_links(items_url, "items", "Collection items")
+    response.links.append(
+        OAPIFLink(rel="items", title="Collection items", type=GEOJSON_MEDIA_TYPE, href=items_url),
     )
     if ARROW_AVAILABLE:
         # the same URL, negotiated with the Accept header: clients only pick an encoding the collection lists
         response.links.append(
-            OAPIFLink(
-                rel="items",
-                title="Collection items as GeoArrow",
-                type=ARROW_STREAM_MEDIA_TYPE,
-                href=request.build_absolute_uri(f"{uri_prefix}{collection.id}/items"),
-            )
+            OAPIFLink(rel="items", title="Collection items as GeoArrow", type=ARROW_STREAM_MEDIA_TYPE, href=items_url)
         )
 
     if geom := collection.geometry_field:
@@ -421,6 +451,8 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         total_count = query.count()
 
         html = accepts_html(request)
+        # a page draws the curves itself
+        profile = None if html else requested_profile(request, profile)
         if not html and accepts_geoarrow(request):
             stream = collection.queryset_to_arrow_stream(request, paginated_query, crs)
             response = arrow_response(stream, crs)
@@ -430,13 +462,11 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
             response["OGC-NumberMatched"] = str(total_count)
             return response
 
-        # a page draws the curves itself
-        profile = None if html else requested_profile(request, profile)
         feature_collection = collection.queryset_to_featurecollection(
             request,
             paginated_query,
             number_matched=total_count,
-            links=get_page_links(request, limit, offset, total_count),
+            links=get_page_links(request, limit, offset, total_count, profile=profile),
             crs=crs,
             profile=profile,
         )
@@ -467,7 +497,11 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
                 "geojson": geojson if collection.geometry_field and crs == DEFAULT_CRS else None,
             }
             return html_response(request, "items.html", context, title=title)
-        return geojson_response(feature_collection, crs, profile)
+        response = geojson_response(feature_collection, crs, profile)
+        # where QGIS reads the pages of JSON-FG, as it does those of GeoArrow
+        response["Link"] += ", " + link_header(feature_collection.links)
+        response["OGC-NumberMatched"] = str(total_count)
+        return response
 
     @router.api_operation(
         ["OPTIONS"],
