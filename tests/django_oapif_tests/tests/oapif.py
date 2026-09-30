@@ -6,6 +6,7 @@ from .models import (
     Arc_2056_10fields,
     Geometry_2056,
     GeometryZ_2056,
+    LayerWithConstraints,
     LayerWithDate,
     LayerWithFile,
     LayerWithForeignKey,
@@ -39,6 +40,7 @@ oapif.register_collection(LayerWithDate, AnonReadOnlyCollection)
 oapif.register_collection(LayerWithOrdering, AnonReadOnlyCollection)
 oapif.register_collection(LayerWithVariousTypes, AnonReadOnlyCollection)
 oapif.register_collection(Arc_2056_10fields, AnonReadOnlyCollection)
+oapif.register_collection(LayerWithConstraints, AnonReadOnlyCollection)
 
 
 @oapif.register(Point_2056_10fields)

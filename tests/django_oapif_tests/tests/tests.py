@@ -410,6 +410,14 @@ class TestSchema(TestCase):
 
                 self.assertEqual(response.json()["$id"], f"http://testserver{url}")
 
+    def test_schema_choices_are_an_enum(self):
+        url = f"{collections_url}/tests.layerwithconstraints/schema"
+        properties = self.client.get(url).json()["properties"]
+
+        self.assertEqual(properties["kind"]["enum"], ["house", "shed"])
+        self.assertEqual(properties["level"]["enum"], [1, 2])
+        self.assertNotIn("enum", properties["score"])
+
     def test_properties_schema_keeps_its_extra_behaviour(self):
         # ninja caches schemas by name and fields but not by config: the output schema, built first by
         # a read, used to be handed to writes too, which then silently dropped unknown properties
