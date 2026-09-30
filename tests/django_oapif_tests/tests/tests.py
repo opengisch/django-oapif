@@ -395,6 +395,13 @@ class TestSchema(TestCase):
         self.assertNotIn("field_str_9", schema["properties"])
         self.assertIn("field_str_8", schema["properties"])
 
+    def test_schema_id_has_no_query(self):
+        # Part 5 wants the URI of the schema, without the query parameters of the request
+        url = f"{collections_url}/tests.point_2056_10fields/schema"
+        response = self.client.get(f"{url}?f=json")
+
+        self.assertEqual(response.json()["$id"], f"http://testserver{url}")
+
     def test_properties_schema_keeps_its_extra_behaviour(self):
         # ninja caches schemas by name and fields but not by config: the output schema, built first by
         # a read, used to be handed to writes too, which then silently dropped unknown properties
