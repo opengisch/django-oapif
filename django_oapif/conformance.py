@@ -28,6 +28,7 @@ def create_conformance_router(*, title: str):
                 "http://www.opengis.net/spec/ogcapi-features-4/1.0/conf/update",
                 "http://www.opengis.net/spec/ogcapi-features-4/1.0/conf/features",
                 "http://www.opengis.net/spec/ogcapi-features-5/1.0/conf/core-roles-features",
+                "http://www.opengis.net/spec/ogcapi-features-5/1.0/conf/returnables-and-receivables",
                 "http://www.opengis.net/spec/ogcapi-features-5/1.0/conf/schemas",
             ]
         )
