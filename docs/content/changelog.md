@@ -59,6 +59,7 @@ Please report anything that breaks in the [issues](https://github.com/opengisch/
 - Invalid geometries, such as polygons with unclosed rings, and errors raised by validators now return `422`, instead of a server error.
 - LineString coordinates are checked against the dimension of the column, like those of the other geometry types.
 - Geometry fields declared with `dim=3` accept and serve Z coordinates.
+- The schema of a collection is served, and linked from the collection, as `application/schema+json`, as Part 5 requires, instead of `application/json`.
 
 ### Performance
 
