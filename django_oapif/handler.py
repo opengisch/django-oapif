@@ -10,6 +10,7 @@ from django.contrib.gis.db.models import Extent, GeometryField
 from django.contrib.gis.db.models.functions import AsWKB, Transform
 from django.contrib.gis.geos import Polygon as GEOSPolygon
 from django.core.serializers.json import DjangoJSONEncoder
+from django.core.validators import BaseValidator, MaxValueValidator, MinValueValidator
 from django.db.models import (
     DateTimeField,
     DurationField,
@@ -99,6 +100,11 @@ def json_schema_type(annotation: Any) -> str | None:
         return TypeAdapter(annotation).json_schema(mode="serialization").get("type")
     except Exception:
         return None
+
+
+def limit_values(validators: list, kind: type[BaseValidator]) -> list[int | float]:
+    """The numeric limits of the validators of a kind, leaving out those computed as they validate."""
+    return [v.limit_value for v in validators if isinstance(v, kind) and isinstance(v.limit_value, int | float)]
 
 
 model_config = {
@@ -475,10 +481,17 @@ class OapifCollection[M: Model]:
                 field_props.update(types[0])
 
         for field_name, field_props in schema["properties"].items():
+            field = self.opts.get_field(field_name)
             # the values of the choices, as they are served: their labels have no keyword in Part 5
-            if choices := self.opts.get_field(field_name).flatchoices:
+            if choices := field.flatchoices:
                 adapter = TypeAdapter(properties_schema.model_fields[field_name].annotation)
                 field_props["enum"] = [adapter.dump_python(value, mode="json") for value, _label in choices]
+            # the strictest bounds, the validators of integers including the range of their column
+            if field_props.get("type") in ("integer", "number"):
+                if minimums := limit_values(field.validators, MinValueValidator):
+                    field_props["minimum"] = max(minimums)
+                if maximums := limit_values(field.validators, MaxValueValidator):
+                    field_props["maximum"] = min(maximums)
 
         # served but not written, which QGIS makes read-only fields of
         for field_name in self.get_readonly_fields(request):
