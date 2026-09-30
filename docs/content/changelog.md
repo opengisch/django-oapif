@@ -63,6 +63,7 @@ Please report anything that breaks in the [issues](https://github.com/opengisch/
 - The schema of a collection is served, and linked from the collection, as `application/schema+json`, as Part 5 requires, instead of `application/json`.
 - Decimals are described in the schema as the strings they are served as. They had no type, and QGIS made no field of them.
 - Read-only properties are marked `readOnly` in the schema, so QGIS no longer lets them be edited, only to have the write rejected.
+- The schema leaves out the fields of `exclude`, which it described although they are neither served nor written.
 
 ### Performance
 

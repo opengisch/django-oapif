@@ -461,7 +461,7 @@ class OapifCollection[M: Model]:
         return Feature[GeometrySchema, PropertiesSchema]
 
     def get_json_schema(self, request: HttpRequest) -> dict:
-        properties_schema = self.get_properties_schema(self.get_fields(request))
+        properties_schema = self.get_properties_schema(without(self.get_fields(request), self.get_exclude(request)))
         schema = properties_schema.model_json_schema(
             by_alias=False,
             schema_generator=NinjaGenerateJsonSchema,

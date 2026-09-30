@@ -387,6 +387,15 @@ class TestSchema(TestCase):
         # a POST takes the primary key
         self.assertNotIn("readOnly", properties["id"])
 
+    def test_schema_leaves_out_excluded_fields(self):
+        class Excluding(AnonReadOnlyCollection):
+            exclude = ("field_str_9",)
+
+        schema = Excluding(Point_2056_10fields).get_json_schema(RequestFactory().get("/"))
+
+        self.assertNotIn("field_str_9", schema["properties"])
+        self.assertIn("field_str_8", schema["properties"])
+
     def test_properties_schema_keeps_its_extra_behaviour(self):
         # ninja caches schemas by name and fields but not by config: the output schema, built first by
         # a read, used to be handed to writes too, which then silently dropped unknown properties
