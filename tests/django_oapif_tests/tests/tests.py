@@ -345,7 +345,21 @@ class TestSchema(TestCase):
 
         schema_response = self.client.get(url, headers=headers, content_type="application/json")
         self.assertEqual(schema_response.status_code, 200)
+        self.assertEqual(schema_response.headers["Content-Type"], "application/schema+json")
         self.assertEqual(schema_response.json(), expected_schema)
+
+    def test_collection_links_its_schema(self):
+        collection = self.client.get(f"{collections_url}/tests.point_2056_10fields").json()
+
+        self.assertIn(
+            {
+                "rel": "http://www.opengis.net/def/rel/ogc/1.0/schema",
+                "title": "Collection schema",
+                "type": "application/schema+json",
+                "href": "http://testserver/oapif/collections/tests.point_2056_10fields/schema",
+            },
+            collection["links"],
+        )
 
     def test_properties_schema_keeps_its_extra_behaviour(self):
         # ninja caches schemas by name and fields but not by config: the output schema, built first by
@@ -761,7 +775,7 @@ class TestHtml(TestCase):
                     response = self.client.get(url, headers=headers)
 
                     self.assertEqual(response.status_code, 200)
-                    self.assertRegex(response["Content-Type"], r"^application/(geo\+)?json")
+                    self.assertRegex(response["Content-Type"], r"^application/((geo|schema)\+)?json")
                     self.assertVariesOnAccept(response)
 
     def test_f_chooses_over_the_accept_header(self):

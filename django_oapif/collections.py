@@ -276,7 +276,7 @@ def get_collection_response(request: HttpRequest, collection: OapifCollection):
             OAPIFLink(
                 rel="http://www.opengis.net/def/rel/ogc/1.0/schema",
                 title="Collection schema",
-                type="application/json",
+                type=SCHEMA_MEDIA_TYPE,
                 href=request.build_absolute_uri(f"{uri_prefix}{collection.id}/schema"),
             ),
             OAPIFLink(
@@ -380,7 +380,10 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
             ]
             context = {"collection": collection, "properties": properties}
             return html_response(request, "schema.html", context, title=title)
-        return schema
+        response = HttpResponse(json.dumps(schema), content_type=SCHEMA_MEDIA_TYPE)
+        # the same URL serves an HTML page to a browser
+        patch_vary_headers(response, ["Accept"])
+        return response
 
     @router.get(
         "/{collection_id}/queryables",
