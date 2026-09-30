@@ -1,4 +1,5 @@
 from ninja import Schema
+from pydantic import model_serializer
 
 
 class OAPIFBaseSchema(Schema):
@@ -11,6 +12,16 @@ class OAPIFLink(OAPIFBaseSchema):
     rel: str
     type: str
     title: str
+    # the profiles of the resource linked, which Features 1.1 adds to tell JSON-FG from GeoJSON
+    profile: list[str] | None = None
+
+    @model_serializer(mode="wrap")
+    def leave_out_no_profile(self, serialize):
+        # the feature collections are serialized as they are, where None would be written as null
+        link = serialize(self)
+        if self.profile is None:
+            link.pop("profile", None)
+        return link
 
 
 class OAPIFRoot(OAPIFBaseSchema):

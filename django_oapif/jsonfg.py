@@ -1,7 +1,52 @@
-"""Minimal JSON-FG geometry dict <-> WKB conversions: reads ISO and EWKB, writes ISO. Stdlib only."""
+"""
+Minimal JSON-FG geometry dict <-> WKB conversions: reads ISO and EWKB, writes ISO. Stdlib only. And what tells
+JSON-FG from GeoJSON: its profiles, the geometries GeoJSON has, and the conformance classes a JSON-FG document
+declares.
+"""
 
+import re
+from enum import StrEnum
 from math import sqrt
 from struct import pack, unpack_from
+
+# the prefix of the profile URIs: the OGC register has them under "OGC", but QGIS only knows them under "ogc", as
+# ldproxy first published them
+PROFILES = "http://www.opengis.net/def/profile/ogc/0/"
+PROFILE_URI = re.compile(r"^https?://www\.opengis\.net/def/profile/ogc/0/")
+
+
+class Profile(StrEnum):
+    """The GeoJSON profiles of JSON-FG, by the token that asks for them in the profile query parameter."""
+
+    RFC7946 = "rfc7946"
+    JSONFG = "jsonfg"
+
+    @property
+    def uri(self) -> str:
+        return PROFILES + self.value
+
+    @classmethod
+    def parse(cls, value: str) -> "Profile | None":
+        """A profile from its token or its URI, in either case, or None for another one."""
+        try:
+            return cls(PROFILE_URI.sub("", value.strip().lower()))
+        except ValueError:
+            return None
+
+
+CORE = "http://www.opengis.net/spec/json-fg-1/1.0/conf/core"
+CIRCULAR_ARCS = "http://www.opengis.net/spec/json-fg-1/1.0/conf/circular-arcs"
+
+# the geometry types of GeoJSON, the only ones GEOS knew before its 3.13
+GEOJSON_TYPES = {
+    "Point",
+    "MultiPoint",
+    "LineString",
+    "MultiLineString",
+    "Polygon",
+    "MultiPolygon",
+    "GeometryCollection",
+}
 
 # base type code -> (JSON-FG name, structure)
 #   "pts"  : count + flat coordinate run
@@ -203,3 +248,10 @@ def dumps(geometry):
     out = bytearray()
     _write(out, geometry, _dimension(geometry))
     return bytes(out)
+
+
+def is_geojson(geometry) -> bool:
+    """Whether GeoJSON can carry a geometry dict: one without arcs, a GeometryCollection holding none either."""
+    if geometry["type"] not in GEOJSON_TYPES:
+        return False
+    return geometry["type"] != "GeometryCollection" or all(is_geojson(member) for member in geometry["geometries"])

@@ -169,6 +169,17 @@ class Arc_2056_10fields(models.Model):
     geom = CircularStringField(srid=2056, verbose_name=_("Geometry"))
 
 
+class CurvePolygonField(models.GeometryField):
+    geom_type = "CURVEPOLYGON"
+
+
+class CurvePolygon_2056(models.Model):
+    # a column of curves, like the parcels of a cadastral survey
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255, verbose_name=_("Name"), null=True, blank=True)
+    geom = CurvePolygonField(srid=2056, verbose_name=_("Geometry"))
+
+
 class Point_2056_Empty(Point_2056_10fields): ...
 
 

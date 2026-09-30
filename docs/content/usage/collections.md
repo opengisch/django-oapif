@@ -40,16 +40,17 @@ of its fields, for instance.
 
 ## Options
 
-| Attribute             | Default                                                            | Description                                                                                      |
-|-----------------------|--------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
-| `id`                  | the model label in lower case, `my_app.building`                   | The identifier of the collection in the URLs: `/collections/{id}/items`.                         |
-| `title`               | the model label, `my_app.Building`                                 | The title of the collection.                                                                     |
-| `description`         | none                                                               | The description of the collection.                                                               |
-| `geometry_field`      | the geometry field of the model                                    | The field of the feature geometries. `None` serves the collection without geometry.              |
-| `fields`              | every field of the model, but the geometry and reverse relations   | The fields served as properties, in this order.                                                  |
-| `readonly_fields`     | none                                                               | Fields that are served, but not accepted in writes.                                              |
-| `exclude`             | none                                                               | Fields that are not served.                                                                      |
-| `ordering`            | the model `Meta.ordering`, then the primary key                    | The order of the features.                                                                       |
+| Attribute                 | Default                                                          | Description                                                                                                                                                   |
+|---------------------------|------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `id`                      | the model label in lower case, `my_app.building`                 | The identifier of the collection in the URLs: `/collections/{id}/items`.                                                                                      |
+| `title`                   | the model label, `my_app.Building`                               | The title of the collection.                                                                                                                                  |
+| `description`             | none                                                             | The description of the collection.                                                                                                                            |
+| `geometry_field`          | the geometry field of the model                                  | The field of the feature geometries. `None` serves the collection without geometry.                                                                           |
+| `fields`                  | every field of the model, but the geometry and reverse relations | The fields served as properties, in this order.                                                                                                               |
+| `readonly_fields`         | none                                                             | Fields that are served, but not accepted in writes.                                                                                                           |
+| `exclude`                 | none                                                             | Fields that are not served.                                                                                                                                   |
+| `ordering`                | the model `Meta.ordering`, then the primary key                  | The order of the features.                                                                                                                                    |
+| `linearization_tolerance` | none, 32 segments a quarter of a circle                          | The largest distance between an arc and its segments when [curves are linearized](../fields/geometries.md#linearized-curves), in the unit of the storage CRS. |
 
 A model with several geometry fields has to name one in `geometry_field`, and cannot be registered
 otherwise. The [fields](../fields/index.md) pages describe how each kind of field is served.
