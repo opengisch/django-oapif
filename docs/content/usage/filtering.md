@@ -23,7 +23,8 @@ A filter applies with the other parameters: the items match both the `filter` an
 
 A filter that cannot be applied is rejected with a `400 Bad Request`, which says why. This covers a syntax error,
 a property that is not a [queryable](#queryables), a value of the wrong type, and an operator or function that is
-not supported.
+not supported. So is a filter that nests deeper than 256 levels, and an integer beyond 2^53, which could not be
+compared exactly.
 
 ## Supported expressions
 
@@ -42,7 +43,8 @@ neither is its negation. `NOT (floors = 3)` does not match the buildings whose `
 would not.
 
 In `LIKE`, `%` stands for any characters, `_` for a single one, and a backslash makes the next character an
-ordinary one: `'100\%'` matches `100%`. A quote in a string is written twice, `'Route d''Oron'`.
+ordinary one: `'100\%'` matches `100%`. A quote in a string is written twice, `'Route d''Oron'`: the other
+escape of CQL2, `\'`, is not supported.
 
 ## Queryables
 

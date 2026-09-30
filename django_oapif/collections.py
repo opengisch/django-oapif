@@ -18,7 +18,7 @@ from ninja.errors import AuthorizationError, HttpError, ValidationError
 from pydantic import TypeAdapter
 from pydantic import ValidationError as PydanticValidationError
 
-from django_oapif import cql2, jsonfg
+from django_oapif import filtering, jsonfg
 from django_oapif.crs import CRS, CRS84_SRID, CRS84_URI, BBox
 from django_oapif.geojson import (
     CircularStringParts,
@@ -251,10 +251,10 @@ def filter_or_raise(
     """
     fields = {name: collection.opts.get_field(name) for name in collection.get_queryables(request)}
     try:
-        return query.filter(cql2.to_q(filter_expr, fields, filter_crs.srid))
+        return query.filter(filtering.to_q(filter_expr, fields, filter_crs.srid))
     except DjangoValidationError as e:
         raise HttpError(400, f"Invalid filter: {' '.join(e.messages)}")
-    except (cql2.FilterError, FieldError, ValueError, TypeError) as e:
+    except (filtering.FilterError, FieldError, ValueError, TypeError) as e:
         raise HttpError(400, f"Invalid filter: {e}")
 
 
