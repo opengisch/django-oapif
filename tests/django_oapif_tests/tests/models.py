@@ -214,3 +214,4 @@ class LayerWithConstraints(models.Model):
     )
     website = models.URLField(null=True, blank=True)
     email = models.EmailField(null=True, blank=True)
+    address = models.GenericIPAddressField(protocol="IPv4", null=True, blank=True)

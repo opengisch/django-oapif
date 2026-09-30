@@ -449,6 +449,19 @@ class TestSchema(TestCase):
         # an escaped backslash followed by a letter is no anchor
         self.assertEqual(json_schema_pattern(r"\A\\Z\\\Z"), r"^\\Z\\$")
 
+    def test_schema_formats(self):
+        def properties(collection):
+            return self.client.get(f"{collections_url}/{collection}/schema").json()["properties"]
+
+        constraints = properties("tests.layerwithconstraints")
+        self.assertEqual(constraints["website"]["format"], "uri")
+        self.assertEqual(constraints["email"]["format"], "email")
+        self.assertEqual(constraints["address"]["format"], "ipv4")
+        # files are served as the path their storage gives
+        self.assertEqual(properties("tests.layerwithfile")["file"]["format"], "uri-reference")
+        # an address of either version has no format in JSON Schema
+        self.assertNotIn("format", properties("tests.layerwithvarioustypes")["ip"])
+
     def test_properties_schema_keeps_its_extra_behaviour(self):
         # ninja caches schemas by name and fields but not by config: the output schema, built first by
         # a read, used to be handed to writes too, which then silently dropped unknown properties

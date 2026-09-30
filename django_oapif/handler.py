@@ -22,16 +22,19 @@ from django.core.validators import (
 from django.db.models import (
     DateTimeField,
     DurationField,
+    EmailField,
     FileField,
     ForeignKey,
     Func,
     GeneratedField,
+    GenericIPAddressField,
     ManyToManyRel,
     ManyToOneRel,
     Model,
     QuerySet,
     TextField,
     TimeField,
+    URLField,
 )
 from django.http import HttpRequest
 from ninja import Field, ModelSchema, Schema
@@ -514,6 +517,19 @@ class OapifCollection[M: Model]:
             if choices := field.flatchoices:
                 adapter = TypeAdapter(properties_schema.model_fields[field_name].annotation)
                 field_props["enum"] = [adapter.dump_python(value, mode="json") for value, _label in choices]
+            # the formats of JSON Schema, files being served as the path their storage gives, and IP addresses
+            # instead of pydantic's own format, which JSON Schema has none of for both versions
+            if isinstance(field, URLField):
+                field_props["format"] = "uri"
+            elif isinstance(field, EmailField):
+                field_props["format"] = "email"
+            elif isinstance(field, FileField):
+                field_props["format"] = "uri-reference"
+            elif isinstance(field, GenericIPAddressField):
+                if ip_format := {"ipv4": "ipv4", "ipv6": "ipv6"}.get(field.protocol.lower()):
+                    field_props["format"] = ip_format
+                else:
+                    field_props.pop("format", None)
             # the strictest bounds, the validators of integers including the range of their column
             if field_props.get("type") in ("integer", "number"):
                 if minimums := limit_values(field.validators, MinValueValidator):
