@@ -21,14 +21,20 @@ prefers it explicitly, and needs the `arrow` extra of django-oapif: without it, 
 a `406 Not Acceptable`. HTML is served to a request that prefers `text/html`, as browsers do, or that asks for
 it with `f=html`, `f=json` asking for the JSON instead: see [HTML](html.md#content-negotiation).
 
+GeoJSON is served in the [GeoJSON profile](../fields/geometries.md#json-fg) a request asks for with the
+`profile` query parameter, or the `profile` parameter of `application/geo+json` in its `Accept` header: GeoJSON,
+the default, which refuses curves, or JSON-FG, which has them.
+
 As the same URL serves several encodings, the responses carry a `Vary: Accept` header, for caches to keep them apart.
 
-A collection links its items in each format it serves, with the same URL and the `items` relation:
+A collection links its items in each format it serves, with the same URL and the `items` relation, and in
+JSON-FG, with the `profile` of the link:
 
 ```json
 {
   "id": "my_app.building",
   "links": [
+    {"rel": "items", "type": "application/geo+json", "profile": ["http://www.opengis.net/def/profile/ogc/0/jsonfg"], "href": "https://example.com/oapif/collections/my_app.building/items?profile=jsonfg", "title": "Collection items as JSON-FG"},
     {"rel": "items", "type": "application/geo+json", "href": "https://example.com/oapif/collections/my_app.building/items", "title": "Collection items"},
     {"rel": "items", "type": "application/vnd.apache.arrow.stream", "href": "https://example.com/oapif/collections/my_app.building/items", "title": "Collection items as GeoArrow"},
     ...
