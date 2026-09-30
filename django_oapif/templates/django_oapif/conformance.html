@@ -1,0 +1,17 @@
+{% extends "django_oapif/base.html" %}
+
+{% block title %}Conformance - {{ api_title }}{% endblock %}
+
+{% block breadcrumbs %}<span>Conformance</span>{% endblock %}
+
+{% block content %}
+<h1>Conformance</h1>
+<p class="description">The OGC API conformance classes this server implements.</p>
+<div class="panel">
+  <ul class="plain">
+    {% for uri in conformance.conformsTo %}
+    <li><a href="{{ uri }}">{{ uri }}</a></li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

@@ -31,6 +31,7 @@ nav = [
     "formats/index.md",
     {"GeoJSON" = "formats/geojson.md"},
     {"GeoArrow" = "formats/geoarrow.md"},
+    {"HTML" = "formats/html.md"},
   ]},
   {"Contributing" = [
     "contributing/index.md",

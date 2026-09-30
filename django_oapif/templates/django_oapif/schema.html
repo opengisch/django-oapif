@@ -1,0 +1,25 @@
+{% extends "django_oapif/base.html" %}
+
+{% block title %}Schema of {{ collection.title }} - {{ api_title }}{% endblock %}
+
+{% block breadcrumbs %}<a href="{{ root_url }}collections">Collections</a><a href="{{ root_url }}collections/{{ collection.id|urlencode:"" }}">{{ collection.title }}</a><span>Schema</span>{% endblock %}
+
+{% block content %}
+<h1>{{ collection.title }}</h1>
+<p class="muted">The properties of its features.</p>
+<div class="table">
+  <table>
+    <thead><tr><th>Property</th><th>Title</th><th>Type</th><th>Required</th></tr></thead>
+    <tbody>
+      {% for property in properties %}
+      <tr>
+        <td class="id">{{ property.name }}</td>
+        <td>{{ property.title|default:"" }}</td>
+        <td class="id">{{ property.type }}</td>
+        <td>{% if property.required %}yes{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

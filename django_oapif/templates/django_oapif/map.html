@@ -1,0 +1,101 @@
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+  // Adds to points the arc from p0 to p2 through p1, as segments of a few degrees.
+  function oapifArc(p0, p1, p2, points) {
+    const [ax, ay] = p0, [bx, by] = p1, [cx, cy] = p2;
+    let x, y, sweep;
+    if (ax === cx && ay === cy) {
+      // a full circle, of which p1 is the opposite point
+      [x, y, sweep] = [(ax + bx) / 2, (ay + by) / 2, 2 * Math.PI];
+    } else {
+      // twice the cross product of p0p1 and p0p2: positive for a counterclockwise arc, and zero for a straight one
+      const d = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by));
+      if (d === 0) {
+        points.push(p1, p2);
+        return;
+      }
+      x = ((ax * ax + ay * ay) * (by - cy) + (bx * bx + by * by) * (cy - ay) + (cx * cx + cy * cy) * (ay - by)) / d;
+      y = ((ax * ax + ay * ay) * (cx - bx) + (bx * bx + by * by) * (ax - cx) + (cx * cx + cy * cy) * (bx - ax)) / d;
+      sweep = Math.atan2(cy - y, cx - x) - Math.atan2(ay - y, ax - x);
+      if (d > 0 && sweep < 0) sweep += 2 * Math.PI;
+      if (d < 0 && sweep > 0) sweep -= 2 * Math.PI;
+    }
+    const radius = Math.hypot(ax - x, ay - y), start = Math.atan2(ay - y, ax - x);
+    const steps = Math.max(4, Math.ceil(Math.abs(sweep) / (Math.PI / 32)));
+    for (let i = 1; i <= steps; i++) {
+      const angle = start + (sweep * i) / steps;
+      points.push([x + radius * Math.cos(angle), y + radius * Math.sin(angle)]);
+    }
+  }
+
+  // The coordinates of a LineString, CircularString or CompoundCurve, with its arcs made of segments.
+  function oapifLine(curve) {
+    if (curve.type === "CompoundCurve") {
+      return curve.geometries.flatMap((part, index) => oapifLine(part).slice(index ? 1 : 0));
+    }
+    if (curve.type !== "CircularString" || !curve.coordinates.length) return curve.coordinates;
+    const coordinates = curve.coordinates, points = [coordinates[0]];
+    for (let i = 0; i + 2 < coordinates.length; i += 2) oapifArc(coordinates[i], coordinates[i + 1], coordinates[i + 2], points);
+    return points;
+  }
+
+  // A JSON-FG geometry as the GeoJSON one Leaflet draws, its curves made of segments.
+  function oapifLinear(geometry) {
+    switch (geometry?.type) {
+      case "CircularString":
+      case "CompoundCurve":
+        return {type: "LineString", coordinates: oapifLine(geometry)};
+      case "CurvePolygon":
+        return {type: "Polygon", coordinates: geometry.geometries.map(oapifLine)};
+      case "MultiCurve":
+        return {type: "MultiLineString", coordinates: geometry.geometries.map(oapifLine)};
+      case "MultiSurface":
+        return {type: "MultiPolygon", coordinates: geometry.geometries.map((surface) => oapifLinear(surface).coordinates)};
+      case "GeometryCollection":
+        return {...geometry, geometries: geometry.geometries.map(oapifLinear)};
+      default:
+        return geometry;
+    }
+  }
+
+  // Draws GeoJSON in CRS84 on an OpenStreetMap background. featureUrl, when given, gives the page of a
+  // feature, which its popup links to.
+  function oapifMap(element, geojson, featureUrl) {
+    const map = L.map(element);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      // the OpenStreetMap servers refuse tiles without a Referer, which the same-origin policy Django sends by
+      // default leaves out: the origin of the page is sent, not its path
+      referrerPolicy: "strict-origin-when-cross-origin",
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(map);
+    const style = {color: "#3776ab", weight: 2, fillOpacity: 0.25};
+    const layer = L.geoJSON(null, {
+      style: style,
+      pointToLayer: (feature, latlng) => L.circleMarker(latlng, {...style, radius: 6, fillOpacity: 0.6}),
+      onEachFeature: (feature, featureLayer) => {
+        if (!featureUrl) return;
+        const link = document.createElement("a");
+        link.href = featureUrl(feature);
+        link.textContent = feature.id;
+        featureLayer.bindPopup(link);
+      },
+    }).addTo(map);
+    for (const feature of geojson.type === "FeatureCollection" ? geojson.features : [geojson]) {
+      try {
+        layer.addData({...feature, geometry: oapifLinear(feature.geometry)});
+      } catch (error) {
+        // a geometry Leaflet cannot draw, which leaves the others on the map
+      }
+    }
+    const bounds = layer.getBounds();
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, {maxZoom: 17, padding: [20, 20]});
+    } else {
+      map.setView([0, 0], 1);
+    }
+  }
+</script>

@@ -1,15 +1,17 @@
 from django.http import HttpRequest
 from ninja import Router
 
+from django_oapif.collections import accepts_html
+from django_oapif.html import html_response
 from django_oapif.schema import OAPIFConformance
 
 
-def create_conformance_router():
+def create_conformance_router(*, title: str):
     router = Router()
 
     @router.get("", response=OAPIFConformance, operation_id="get_conformance")
     def conformance(request: HttpRequest):
-        return OAPIFConformance(
+        response = OAPIFConformance(
             conformsTo=[
                 "http://www.opengis.net/spec/ogcapi-common-1/1.0/conf/core",
                 "http://www.opengis.net/spec/ogcapi-common-1/1.0/conf/json",
@@ -29,5 +31,8 @@ def create_conformance_router():
                 "http://www.opengis.net/spec/ogcapi-features-5/1.0/conf/schemas",
             ]
         )
+        if accepts_html(request):
+            return html_response(request, "conformance.html", {"conformance": response}, title=title)
+        return response
 
     return router

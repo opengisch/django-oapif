@@ -616,7 +616,7 @@ class TestOutputFormat(TestCase):
 
         self.assertEqual(arrow.status_code, 200)
         self.assertEqual(arrow.headers["OGC-NumberMatched"], str(geojson["numberMatched"]))
-        self.assertEqual({link["rel"] for link in geojson["links"]}, {"self", "prev", "next"})
+        self.assertEqual({link["rel"] for link in geojson["links"]}, {"self", "alternate", "prev", "next"})
         for link in geojson["links"]:
             self.assertIn(f'<{link["href"]}>; rel="{link["rel"]}"', arrow.headers["Link"])
 
@@ -713,6 +713,130 @@ class TestOutputFormat(TestCase):
                     self.assertEqual(table.num_rows, 1)
                 else:
                     self.assertNotIn("geometry", table.schema.names)
+
+
+class TestHtml(TestCase):
+    # what browsers send
+    BROWSER = {"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"}
+    HTML = "text/html; charset=utf-8"
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("populate_data", "-s 10")
+        call_command("populate_users")
+
+    def urls(self) -> list[str]:
+        point = Point_2056_10fields.objects.first().pk
+        return [
+            "/oapif/",
+            "/oapif/conformance",
+            collections_url,
+            f"{collections_url}/tests.point_2056_10fields",
+            f"{collections_url}/tests.point_2056_10fields/schema",
+            f"{collections_url}/tests.point_2056_10fields/items",
+            f"{collections_url}/tests.point_2056_10fields/items/{point}",
+            f"{collections_url}/tests.nogeom_10fields/items",
+            f"{collections_url}/tests.arc_2056_10fields/items",
+            f"{collections_url}/tests.point_2056_empty/items",
+        ]
+
+    def assertVariesOnAccept(self, response):
+        self.assertIn("Accept", [value.strip() for value in response.headers["Vary"].split(",")])
+
+    def test_browsers_get_the_pages(self):
+        for url in self.urls():
+            with self.subTest(url=url):
+                response = self.client.get(url, headers=self.BROWSER)
+
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response["Content-Type"], self.HTML)
+                self.assertVariesOnAccept(response)
+
+    def test_other_clients_get_the_json(self):
+        # the JSON stays the default, for a client that accepts any type or does not say
+        for url in self.urls():
+            for headers in ({}, {"Accept": "*/*"}, {"Accept": "application/json"}):
+                with self.subTest(url=url, headers=headers):
+                    response = self.client.get(url, headers=headers)
+
+                    self.assertEqual(response.status_code, 200)
+                    self.assertRegex(response["Content-Type"], r"^application/(geo\+)?json")
+                    self.assertVariesOnAccept(response)
+
+    def test_f_chooses_over_the_accept_header(self):
+        url = f"{collections_url}/tests.point_2056_10fields/items"
+
+        self.assertEqual(self.client.get(url, {"f": "html"})["Content-Type"], self.HTML)
+        self.assertEqual(
+            self.client.get(url, {"f": "json"}, headers=self.BROWSER)["Content-Type"], "application/geo+json"
+        )
+        arrow = {"Accept": "application/vnd.apache.arrow.stream"}
+        self.assertEqual(self.client.get(url, {"f": "html"}, headers=arrow)["Content-Type"], self.HTML)
+
+    def test_json_links_the_page(self):
+        collection_url = f"{collections_url}/tests.point_2056_10fields"
+        # the conformance declaration and the schema have no links
+        for url in ("/oapif/", collections_url, collection_url, f"{collection_url}/items"):
+            with self.subTest(url=url):
+                links = self.client.get(url).json()["links"]
+
+                [alternate] = [link for link in links if link["rel"] == "alternate"]
+                self.assertEqual(alternate["type"], "text/html")
+                self.assertEqual(self.client.get(alternate["href"])["Content-Type"], self.HTML)
+
+    def test_landing_page_links_the_api_documentation(self):
+        links = self.client.get("/oapif/").json()["links"]
+
+        [doc] = [link for link in links if link["rel"] == "service-doc"]
+        self.assertEqual(self.client.get(doc["href"]).status_code, 200)
+
+    def test_items_page_shows_the_features(self):
+        url = f"{collections_url}/tests.point_2056_10fields/items?limit=3&offset=3"
+        geojson = self.client.get(url).json()
+
+        page = self.client.get(url, headers=self.BROWSER).content.decode()
+
+        for feature in geojson["features"]:
+            self.assertIn(
+                f'href="http://testserver{collections_url}/tests.point_2056_10fields/items/{feature["id"]}"', page
+            )
+        for link in geojson["links"]:
+            if link["rel"] in ("prev", "next"):
+                self.assertIn(f'href="{link["href"].replace("&", "&amp;")}"', page)
+        self.assertIn("oapifMap(", page)
+
+    def test_map_is_drawn_in_crs84_only(self):
+        url = f"{collections_url}/tests.point_2056_10fields/items"
+
+        page = self.client.get(url, {"crs": crs_2056}, headers=self.BROWSER)
+
+        self.assertEqual(page.status_code, 200)
+        self.assertNotIn("oapifMap(", page.content.decode())
+
+    def test_pages_escape_the_properties(self):
+        point = Point_2056_10fields.objects.first()
+        point.field_str_0 = "<script>alert(1)</script>"
+        point.save()
+        urls = [
+            f"{collections_url}/tests.point_2056_10fields/items",
+            f"{collections_url}/tests.point_2056_10fields/items/{point.pk}",
+        ]
+        for url in urls:
+            with self.subTest(url=url):
+                page = self.client.get(url, {"limit": 1000}, headers=self.BROWSER).content.decode()
+
+                self.assertNotIn("<script>alert(1)", page)
+                self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", page)
+
+    def test_pages_keep_the_permissions(self):
+        url = f"{collections_url}/tests.secretlayer"
+        for path in (url, f"{url}/items"):
+            with self.subTest(path=path):
+                page = self.client.get(path, headers=self.BROWSER)
+
+                self.assertEqual(page.status_code, self.client.get(path).status_code)
+                self.assertNotEqual(page.status_code, 200)
+        self.assertNotIn("tests.secretlayer", self.client.get(collections_url, headers=self.BROWSER).content.decode())
 
 
 class TestGeometry3D(TestCase):

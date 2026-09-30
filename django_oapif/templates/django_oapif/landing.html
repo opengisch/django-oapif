@@ -1,0 +1,18 @@
+{% extends "django_oapif/base.html" %}
+
+{% block content %}
+<h1>{{ root.title }}</h1>
+{% if root.description %}<p class="description">{{ root.description }}</p>{% endif %}
+
+<div class="panel">
+  <ul class="plain">
+    {% for link in root.links %}{% if link.rel != "self" and link.rel != "alternate" %}
+    <li><a href="{{ link.href }}">{{ link.title }}</a> <span class="id">{{ link.rel }}</span></li>
+    {% endif %}{% endfor %}
+  </ul>
+</div>
+
+<h2>Connect a client</h2>
+<p>QGIS, and the other OGC API - Features clients, connect to this URL:</p>
+<div class="panel"><code>{{ root.links.0.href }}</code></div>
+{% endblock %}

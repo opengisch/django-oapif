@@ -1,0 +1,30 @@
+{% extends "django_oapif/base.html" %}
+
+{% block title %}Collections - {{ api_title }}{% endblock %}
+
+{% block breadcrumbs %}<span>Collections</span>{% endblock %}
+
+{% block content %}
+<h1>Collections</h1>
+{% if collections %}
+<div class="table">
+  <table>
+    <thead><tr><th>Collection</th><th>Description</th><th></th></tr></thead>
+    <tbody>
+      {% for collection in collections %}
+      <tr>
+        <td>
+          <a href="{{ root_url }}collections/{{ collection.id|urlencode:"" }}">{{ collection.title }}</a><br>
+          <span class="id">{{ collection.id }}</span>
+        </td>
+        <td>{{ collection.description|default:"" }}</td>
+        <td><a href="{{ root_url }}collections/{{ collection.id|urlencode:"" }}/items">Items</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="muted">No collection is available.</p>
+{% endif %}
+{% endblock %}
