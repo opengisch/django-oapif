@@ -70,6 +70,7 @@ from django_oapif.geojson import (
     Point,
     Polygon,
 )
+from django_oapif.jsonfg import Profile
 from django_oapif.schema import OAPIFLink
 from django_oapif.utils import PatchSchema
 
@@ -498,7 +499,8 @@ class OapifCollection[M: Model]:
 
     def get_feature_output_schema(self, request: HttpRequest) -> type[Feature]:
         PropertiesSchema = self.get_feature_properties_schema(request)
-        GeometrySchema = self.get_geometry_schema()
+        # a curve has no geometry in GeoJSON
+        GeometrySchema = self.get_geometry_schema() | None if self.geometry_field else None
         return Feature[GeometrySchema, PropertiesSchema]
 
     def get_jsonfg_feature_output_schema(self, request: HttpRequest, *, root: bool = False) -> type[JsonFgFeature]:
@@ -612,11 +614,12 @@ class OapifCollection[M: Model]:
         number_matched: int | None = None,
         links: list[OAPIFLink] | None = None,
         crs: CRS = CRS84,
+        profile: Profile | None = None,
     ) -> FeatureCollection:
         """
-        Convert a queryset (as produced by `query()`, in `crs`) to a FeatureCollection, a JSON-FG one when it
-        has curves. `number_matched` defaults to the number of features returned, for a queryset that is not a
-        page of a larger one.
+        Convert a queryset (as produced by `query()`, in `crs`) to a FeatureCollection in a GeoJSON `profile`, by
+        default a JSON-FG one when it has curves. `number_matched` defaults to the number of features returned,
+        for a queryset that is not a page of a larger one.
         """
         rows = list(qs)
         # the boxes of the geometries, taken as they are read, so that the collection one takes no extra
@@ -634,7 +637,7 @@ class OapifCollection[M: Model]:
             "numberMatched": len(rows) if number_matched is None else number_matched,
             "links": links or [],
         }
-        if self._has_curves(geometries):
+        if self._is_jsonfg(geometries, profile):
             FeatureSchema = self.get_jsonfg_feature_output_schema(request)
             features = [
                 self._jsonfg_feature(FeatureSchema, row, geometry, crs) for row, geometry in zip(rows, geometries)
@@ -706,10 +709,15 @@ class OapifCollection[M: Model]:
             writer.write_table(table)
         return stream
 
-    def model_to_feature(self, request: HttpRequest, obj: M, *, crs: CRS = CRS84) -> Feature:
-        """Convert a row (as produced by `query()`, in `crs`) to a Feature, a JSON-FG one for a curve."""
+    def model_to_feature(
+        self, request: HttpRequest, obj: M, *, crs: CRS = CRS84, profile: Profile | None = None
+    ) -> Feature:
+        """
+        Convert a row (as produced by `query()`, in `crs`) to a Feature in a GeoJSON `profile`, by default a
+        JSON-FG one for a curve.
+        """
         geometry = self._geometry_of(obj)
-        if self._has_curves([geometry]):
+        if self._is_jsonfg([geometry], profile):
             schema = self.get_jsonfg_feature_output_schema(request, root=True)
             return self._jsonfg_feature(schema, obj, geometry, crs, **self._jsonfg_document([geometry], crs))
         return self._feature(self.get_feature_output_schema(request), obj, geometry)
@@ -725,12 +733,19 @@ class OapifCollection[M: Model]:
         """
         return self.curved or any(geometry is not None and not jsonfg.is_geojson(geometry) for geometry in geometries)
 
+    def _is_jsonfg(self, geometries: list[dict | None], profile: Profile | None) -> bool:
+        """Whether features are served as JSON-FG: in its profile, and by default when they have curves."""
+        return profile is Profile.JSONFG if profile else self._has_curves(geometries)
+
     def _jsonfg_document(self, geometries: list[dict | None], crs: CRS) -> dict:
         """The members of a JSON-FG document of features, which declares its classes and the CRS of "place"."""
         conforms_to = [jsonfg.CORE, jsonfg.CIRCULAR_ARCS] if self._has_curves(geometries) else [jsonfg.CORE]
         return {"conformsTo": conforms_to, "coordRefSys": crs.uri()}
 
     def _feature(self, schema: type[Feature], obj: M, geometry: dict | None) -> Feature:
+        # a GeoJSON reader gets no geometry rather than a curve it does not know
+        if geometry is not None and not jsonfg.is_geojson(geometry):
+            geometry = None
         return schema(type="Feature", id=str(obj.pk), geometry=geometry, properties=obj)
 
     def _jsonfg_feature(

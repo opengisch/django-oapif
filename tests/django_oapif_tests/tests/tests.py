@@ -1728,6 +1728,94 @@ class TestJsonFg(TestCase):
         self.assertIsNone(response.json()["geometry"])
         self.assertEqual(response.json()["place"]["type"], "CircularString")
 
+    def profile_of(self, response) -> str:
+        [profile] = re.findall(r'<([^>]*)>; rel="profile"', response.headers.get("Link", ""))
+        return profile
+
+    def test_jsonfg_is_asked_for_with_the_profile(self):
+        # by the query parameter of Part 5, and the parameter of the media type
+        url = f"{collections_url}/tests.point_2056_10fields/items"
+        profile = "http://www.opengis.net/def/profile/ogc/0/jsonfg"
+        for params, accept in (
+            ({"profile": "jsonfg"}, "application/geo+json"),
+            ({"profile": profile}, "application/geo+json"),
+            # as the OGC register writes it
+            ({"profile": profile.replace("/ogc/", "/OGC/")}, "application/geo+json"),
+            ({"profile": "flatgeobuf,jsonfg"}, "application/geo+json"),
+            ({}, f'application/geo+json; profile="{profile}"'),
+            # and not taken for another type than the one it goes with
+            ({}, f'application/geo+json; profile="{profile}", text/html;q=0.1'),
+        ):
+            for item_url in (url, f"{url}/{self.point.pk}"):
+                with self.subTest(url=item_url, params=params, accept=accept):
+                    response = self.client.get(item_url, params, headers={"Accept": accept})
+
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(response["Content-Type"], "application/geo+json")
+                    self.assertEqual(response.json()["conformsTo"], self.CONFORMS_TO[:1])
+                    self.assertEqual(self.profile_of(response), profile)
+                    self.assertIn("Accept", [value.strip() for value in response["Vary"].split(",")])
+
+    def test_geometries_of_jsonfg_follow_the_crs(self):
+        # JSON-FG gives "geometry" in CRS84, and a geometry in another CRS in "place"
+        url = f"{collections_url}/tests.point_2056_10fields/items/{self.point.pk}"
+        for crs, member in ((crs84, "geometry"), (crs_2056, "place")):
+            with self.subTest(crs=crs):
+                feature = self.client.get(url, {"crs": crs, "profile": "jsonfg"}).json()
+
+                self.assertEqual(feature["coordRefSys"], crs)
+                self.assertEqual(feature[member]["type"], "Point")
+                self.assertIsNone(feature["place" if member == "geometry" else "geometry"])
+
+    def test_curves_have_no_geometry_in_geojson(self):
+        # asked for GeoJSON, a reader gets no geometry rather than a curve it does not know
+        url = f"{collections_url}/tests.arc_2056_10fields/items"
+        profile = "http://www.opengis.net/def/profile/ogc/0/rfc7946"
+        for params, accept in (({"profile": "rfc7946"}, "*/*"), ({}, f'application/geo+json; profile="{profile}"')):
+            for item_url in (url, f"{url}/{self.arc_id}"):
+                with self.subTest(url=item_url, params=params, accept=accept):
+                    response = self.client.get(item_url, params, headers={"Accept": accept})
+
+                    self.assertEqual(response.status_code, 200)
+                    document = response.json()
+                    self.assertFalse({"conformsTo", "coordRefSys"} & set(document))
+                    for feature in document.get("features", [document]):
+                        self.assertIsNone(feature["geometry"])
+                        self.assertNotIn("place", feature)
+                    self.assertEqual(self.profile_of(response), profile)
+
+    def test_default_profile_is_linked(self):
+        url = f"{collections_url}/tests.point_2056_10fields/items"
+        for item_url, profile in (
+            (url, "rfc7946"),
+            (f"{url}/{self.point.pk}", "rfc7946"),
+            (f"{collections_url}/tests.arc_2056_10fields/items", "jsonfg"),
+            (f"{collections_url}/tests.arc_2056_10fields/items/{self.arc_id}", "jsonfg"),
+        ):
+            with self.subTest(url=item_url):
+                response = self.client.get(item_url)
+
+                self.assertEqual(self.profile_of(response), f"http://www.opengis.net/def/profile/ogc/0/{profile}")
+
+    def test_other_profiles_are_ignored(self):
+        # Part 5 recommends that no profile fails a request
+        url = f"{collections_url}/tests.arc_2056_10fields/items"
+        for params, accept in (({"profile": "unknown"}, "*/*"), ({}, 'application/geo+json; profile="unknown"')):
+            with self.subTest(params=params, accept=accept):
+                response = self.client.get(url, params, headers={"Accept": accept})
+
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()["conformsTo"], self.CONFORMS_TO)
+
+    def test_query_parameter_chooses_over_the_accept_header(self):
+        response = self.client.get(
+            f"{collections_url}/tests.arc_2056_10fields/items",
+            {"profile": "rfc7946"},
+            headers={"Accept": 'application/geo+json; profile="http://www.opengis.net/def/profile/ogc/0/jsonfg"'},
+        )
+
+        self.assertNotIn("conformsTo", response.json())
+
     def test_pages_draw_the_curves(self):
         url = f"{collections_url}/tests.arc_2056_10fields/items"
         for page_url in (url, f"{url}/{self.arc_id}"):

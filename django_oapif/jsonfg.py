@@ -1,10 +1,38 @@
 """
 Minimal JSON-FG geometry dict <-> WKB conversions: reads ISO and EWKB, writes ISO. Stdlib only. And what tells
-JSON-FG from GeoJSON: the geometries GeoJSON has, and the conformance classes a JSON-FG document declares.
+JSON-FG from GeoJSON: its profiles, the geometries GeoJSON has, and the conformance classes a JSON-FG document
+declares.
 """
 
+import re
+from enum import StrEnum
 from math import sqrt
 from struct import pack, unpack_from
+
+# the prefix of the profile URIs: the OGC register has them under "OGC", but QGIS only knows them under "ogc", as
+# ldproxy first published them
+PROFILES = "http://www.opengis.net/def/profile/ogc/0/"
+PROFILE_URI = re.compile(r"^https?://www\.opengis\.net/def/profile/ogc/0/")
+
+
+class Profile(StrEnum):
+    """The GeoJSON profiles of JSON-FG, by the token that asks for them in the profile query parameter."""
+
+    RFC7946 = "rfc7946"
+    JSONFG = "jsonfg"
+
+    @property
+    def uri(self) -> str:
+        return PROFILES + self.value
+
+    @classmethod
+    def parse(cls, value: str) -> "Profile | None":
+        """A profile from its token or its URI, in either case, or None for another one."""
+        try:
+            return cls(PROFILE_URI.sub("", value.strip().lower()))
+        except ValueError:
+            return None
+
 
 CORE = "http://www.opengis.net/spec/json-fg-1/1.0/conf/core"
 CIRCULAR_ARCS = "http://www.opengis.net/spec/json-fg-1/1.0/conf/circular-arcs"
