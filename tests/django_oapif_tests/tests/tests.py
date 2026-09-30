@@ -4,6 +4,7 @@ import json
 import logging
 import re
 import uuid
+from html.parser import HTMLParser
 from typing import Annotated
 from unittest import skipIf, skipUnless
 from unittest.mock import patch
@@ -887,6 +888,38 @@ class TestOutputFormat(TestCase):
                     self.assertNotIn("geometry", table.schema.names)
 
 
+class TableText(HTMLParser):
+    """The text of the cells of the tables of a page, row by row, the parts of a cell separated by a space."""
+
+    def __init__(self):
+        super().__init__()
+        self.rows: list[list[str]] = []
+        self.cell: list[str] | None = None
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "tr":
+            self.rows.append([])
+        elif tag in ("th", "td"):
+            self.cell = []
+
+    def handle_endtag(self, tag):
+        if tag in ("th", "td"):
+            self.rows[-1].append(" ".join(" ".join(self.cell).split()))
+            self.cell = None
+
+    def handle_data(self, data):
+        if self.cell is not None:
+            self.cell.append(data)
+
+
+def properties_table(page: str) -> dict[str, dict[str, str]]:
+    """The table of the properties of a schema page, by property and by column."""
+    parser = TableText()
+    parser.feed(page)
+    header, *rows = parser.rows
+    return {row[0]: dict(zip(header, row)) for row in rows}
+
+
 class TestHtml(TestCase):
     # what browsers send
     BROWSER = {"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"}
@@ -955,6 +988,49 @@ class TestHtml(TestCase):
                 [alternate] = [link for link in links if link["rel"] == "alternate"]
                 self.assertEqual(alternate["type"], "text/html")
                 self.assertEqual(self.client.get(alternate["href"])["Content-Type"], self.HTML)
+
+    def page(self, url: str) -> str:
+        return self.client.get(url, headers=self.BROWSER).content.decode()
+
+    def test_schema_page_shows_the_constraints(self):
+        rows = properties_table(self.page(f"{collections_url}/tests.layerwithconstraints/schema"))
+
+        self.assertEqual(rows["id"]["Role"], "id")
+        self.assertEqual(rows["kind"]["Default"], '"house"')
+        self.assertEqual(rows["kind"]["Constraints"], 'maxLength 10 enum ["house", "shed"]')
+        self.assertEqual(rows["score"]["Constraints"], "minimum 0 maximum 10")
+        self.assertEqual(rows["code"]["Constraints"], "maxLength 5 minLength 2 pattern ^[A-Z]+$")
+        self.assertEqual(rows["website"]["Type"], "string (uri)")
+        self.assertEqual(rows["address"]["Type"], "string (ipv4)")
+
+    def test_schema_page_shows_the_read_only_properties(self):
+        rows = properties_table(self.page(f"{collections_url}/tests.layerwithfile/schema"))
+
+        self.assertEqual((rows["file"]["Required"], rows["file"]["Read-only"]), ("yes", "yes"))
+        self.assertEqual(rows["id"]["Read-only"], "")
+
+    def test_schema_page_links_the_referenced_collections(self):
+        page = self.page(f"{collections_url}/tests.layerwithforeignkey/schema")
+
+        role = properties_table(page)["point"]["Role"]
+        self.assertEqual(role, "reference tests.point_2056_10fields tests.point_2056_10fields_subset")
+        self.assertIn(f'href="{collections_url}/tests.point_2056_10fields"', page)
+
+    def test_schema_page_leaves_out_no_keyword(self):
+        # a keyword the page has no column for, such as one a collection adds, is listed with the constraints
+        collection = oapif.collections["tests.layerwithconstraints"]
+        get_json_schema = collection.get_json_schema
+
+        def with_unit(request):
+            schema = get_json_schema(request)
+            schema["properties"]["score"] |= {"description": "Out of ten", "x-ogc-unit": "point"}
+            return schema
+
+        with patch.object(collection, "get_json_schema", with_unit):
+            rows = properties_table(self.page(f"{collections_url}/tests.layerwithconstraints/schema"))
+
+        self.assertEqual(rows["score"]["Title"], "Score Out of ten")
+        self.assertEqual(rows["score"]["Constraints"], "minimum 0 maximum 10 x-ogc-unit point")
 
     def test_landing_page_links_the_api_documentation(self):
         links = self.client.get("/oapif/").json()["links"]
