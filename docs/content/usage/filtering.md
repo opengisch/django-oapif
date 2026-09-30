@@ -57,7 +57,7 @@ The properties that a filter can take are the queryables of the collection, desc
   "title": "my_app.Building",
   "properties": {
     "name": {"title": "Name", "maxLength": 255, "type": "string", "x-ogc-propertySeq": 2},
-    "floors": {"title": "Floors", "type": "integer", "x-ogc-propertySeq": 3},
+    "floors": {"title": "Floors", "type": "integer", "minimum": 0, "maximum": 32767, "x-ogc-propertySeq": 3},
     "geom": {
       "title": "geometry",
       "x-ogc-role": "primary-geometry",
