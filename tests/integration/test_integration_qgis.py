@@ -1,5 +1,7 @@
 import requests
+from osgeo import gdal
 from qgis.core import (
+    Qgis,
     QgsDataSourceUri,
     QgsEditError,
     QgsFeature,
@@ -13,6 +15,9 @@ from qgis.core import (
 from qgis.testing import start_app, unittest
 
 start_app()
+
+# GDAL reads the curves of JSON-FG since its 3.12
+GDAL_READS_CURVES = int(gdal.VersionInfo()) >= 3120000
 
 ROOT_URL = "http://django:8000/oapif/"
 COLLECTIONS_URL = "http://django:8000/oapif/collections"
@@ -174,3 +179,79 @@ class TestStack(unittest.TestCase):
         self.assertIsNotNone(layer)
         self.assertEqual(layer.featureCount(), 0)
         self.assertEqual(layer.geometryType(), QgsWkbTypes.PointGeometry)
+
+    def load_curves(self, url: str = ROOT_URL, **params) -> QgsVectorLayer:
+        uri = QgsDataSourceUri()
+        uri.setParam("service", "wfs")
+        uri.setParam("typename", "tests.curvepolygon_2056")
+        uri.setParam("url", url)
+        for name, value in params.items():
+            uri.setParam(name, value)
+        layer = QgsVectorLayer(uri.uri(), "curves", "OAPIF")
+        self.assertTrue(layer.isValid())
+        return layer
+
+    def assert_in_the_storage_crs(self, layer: QgsVectorLayer, feature: QgsFeature):
+        # the area of the test data, in EPSG:2056
+        self.assertEqual(layer.crs().authid(), "EPSG:2056")
+        box = feature.geometry().boundingBox()
+        self.assertGreaterEqual(box.xMinimum(), 2508500)
+        self.assertLess(box.xMaximum(), 2512000)
+        self.assertGreaterEqual(box.yMinimum(), 1152000)
+        self.assertLess(box.yMaximum(), 1156000)
+
+    def test_curves_are_not_linearized_unasked(self):
+        layer = self.load_curves()
+
+        features = list(layer.getFeatures())
+        self.assertTrue(features)
+        if GDAL_READS_CURVES:
+            self.assertEqual(layer.wkbType(), QgsWkbTypes.CurvePolygon)
+        else:
+            # rather than a geometry that is not theirs
+            self.assertTrue(all(feature.geometry().isNull() for feature in features))
+
+    def test_curves_are_linearized_with_the_plus_profile(self):
+        # QGIS 3 asks for it with the query of the URL, which it copies to every request
+        layer = self.load_curves(f"{ROOT_URL}?profile=jsonfg-plus")
+
+        feature = next(layer.getFeatures())
+        geometry = feature.geometry().constGet()
+        # GDAL reads "place" first, when it knows curves
+        self.assertEqual(geometry.hasCurvedSegments(), GDAL_READS_CURVES)
+        if not GDAL_READS_CURVES:
+            # the rounded corner, linearized
+            self.assertGreater(geometry.exteriorRing().numPoints(), 7)
+        # which GDAL reprojects from CRS84, as JSON-FG gives it to GeoJSON readers
+        self.assert_in_the_storage_crs(layer, feature)
+
+    @unittest.skipUnless(Qgis.QGIS_VERSION_INT >= 40200, "QGIS tells JSON-FG from GeoJSON by the link since 4.2")
+    def test_jsonfg_is_read_through_its_link(self):
+        # in pages QGIS reads from the headers
+        uri = QgsDataSourceUri()
+        uri.setParam("service", "wfs")
+        uri.setParam("typename", "tests.point_2056_10fields")
+        uri.setParam("url", ROOT_URL)
+        uri.setParam("outputformat", "application/fg+json")
+        uri.setParam("pageSize", "100")
+        layer = QgsVectorLayer(uri.uri(), "point", "OAPIF")
+        self.assertTrue(layer.isValid())
+
+        features = list(layer.getFeatures())
+        self.assertEqual(len(features), requests.get(f"{POINTS_URL}/items").json()["numberMatched"])
+        self.assertEqual(layer.crs().authid(), "EPSG:2056")
+        # in "place", in the storage CRS
+        point = features[0].geometry().asPoint()
+        self.assertGreaterEqual(point.x(), 2508500)
+        self.assertGreaterEqual(point.y(), 1152000)
+
+    @unittest.skipUnless(
+        Qgis.QGIS_VERSION_INT >= 40200 and GDAL_READS_CURVES, "needs QGIS 4.2, and GDAL 3.12 for the curves of JSON-FG"
+    )
+    def test_curves_are_read_in_jsonfg(self):
+        layer = self.load_curves(outputformat="application/fg+json")
+
+        self.assertEqual(layer.wkbType(), QgsWkbTypes.CurvePolygon)
+        feature = next(layer.getFeatures())
+        self.assertTrue(feature.geometry().constGet().hasCurvedSegments())
+        self.assert_in_the_storage_crs(layer, feature)

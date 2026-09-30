@@ -20,6 +20,8 @@ class Profile(StrEnum):
 
     RFC7946 = "rfc7946"
     JSONFG = "jsonfg"
+    # JSON-FG with a GeoJSON geometry in CRS84 for the GeoJSON readers, for curves their linearization
+    JSONFG_PLUS = "jsonfg-plus"
 
     @property
     def uri(self) -> str:

@@ -51,7 +51,10 @@ ACCEPTED_TYPES = [
 ]
 
 DEFAULT_CRS = CRS("OGC", CRS84_SRID)
-PROFILE_DESCRIPTION = "GeoJSON profile: rfc7946 for GeoJSON, jsonfg for JSON-FG, by default for curves"
+PROFILE_DESCRIPTION = (
+    "GeoJSON profile: rfc7946 for GeoJSON, jsonfg for JSON-FG, by default for curves, or jsonfg-plus for JSON-FG "
+    "with GeoJSON geometries in CRS84, the curves linearized"
+)
 CRS_ADAPTER = TypeAdapter(CRS)
 
 
@@ -102,7 +105,10 @@ def get_page_links(
 
 
 # the JSON-FG profiles the items are linked in
-JSONFG_TITLES = {Profile.JSONFG: "as JSON-FG"}
+JSONFG_TITLES = {
+    Profile.JSONFG: "as JSON-FG",
+    Profile.JSONFG_PLUS: "as JSON-FG, with GeoJSON geometries, the curves linearized",
+}
 
 
 def jsonfg_links(items_url: str, rel: str, title: str) -> list[OAPIFLink]:
@@ -445,15 +451,19 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         validate_crs_or_raise(collection, crs, "crs")
         validate_crs_or_raise(collection, bbox_crs, "bbox-crs")
 
+        html = accepts_html(request)
+        arrow = not html and accepts_geoarrow(request)
+        # a page draws the curves itself, and GeoArrow has them as they are
+        profile = None if html or arrow else requested_profile(request, profile)
+
         query = collection.query(request, crs, bbox, bbox_crs)
+        if profile is Profile.JSONFG_PLUS:
+            query = collection.linearize(query)
         paginated_query = query[offset : offset + limit]
 
         total_count = query.count()
 
-        html = accepts_html(request)
-        # a page draws the curves itself
-        profile = None if html else requested_profile(request, profile)
-        if not html and accepts_geoarrow(request):
+        if arrow:
             stream = collection.queryset_to_arrow_stream(request, paginated_query, crs)
             response = arrow_response(stream, crs)
             # an Arrow stream has nowhere to put them, and the row count is the only one a client
@@ -534,15 +544,18 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
     ):
         collection = get_collection_by_id(collection_id, request)
         validate_crs_or_raise(collection, crs, "crs")
+        html = accepts_html(request)
+        arrow = not html and accepts_geoarrow(request)
+        profile = None if html or arrow else requested_profile(request, profile)
         query = collection.query(request, crs)
+        if profile is Profile.JSONFG_PLUS:
+            query = collection.linearize(query)
         item = get_object_or_404(query, pk=item_id)
         if not collection.has_view_permission(request, item):
             raise AuthorizationError()
-        html = accepts_html(request)
-        if not html and accepts_geoarrow(request):
+        if arrow:
             stream = collection.queryset_to_arrow_stream(request, query.filter(pk=item_id), crs)
             return arrow_response(stream, crs)
-        profile = None if html else requested_profile(request, profile)
         feature = collection.model_to_feature(request, item, crs=crs, profile=profile)
         if html:
             geojson = json.loads(feature.model_dump_json())

@@ -139,7 +139,8 @@ class Feature[G: Geometry | None, P: Schema](Schema):
 
 
 class JsonFgFeature[G: Geometry | None, L: Geometry | None, P: Schema](Feature[G, P]):
-    # the geometry GeoJSON cannot carry, a curve or one in another CRS than CRS84, "geometry" being then null
+    # the geometry GeoJSON cannot carry, a curve or one in another CRS than CRS84, "geometry" being then null or,
+    # in the jsonfg-plus profile, a GeoJSON geometry for the GeoJSON readers
     place: L
 
 

@@ -11,6 +11,7 @@ from django.core.management.base import BaseCommand
 from django.db import connection, transaction
 from django_oapif_tests.tests.models import (
     Arc_2056_10fields,
+    CurvePolygon_2056,
     LayerWithDate,
     LayerWithForeignKey,
     Line_2056_10fields,
@@ -41,6 +42,7 @@ class Command(BaseCommand):
         secret_points = []
         lines = []
         arcs = []
+        curve_polygons = []
         no_geoms = []
         no_geoms_100fields = []
 
@@ -88,14 +90,34 @@ class Command(BaseCommand):
                 lines.append(line)
 
                 arcs.append((uuid.uuid4(), circularstring_wkt))
+                # a square with a rounded corner
+                size, radius = random.randint(20, 50), random.randint(5, 15)
+                curve_polygon_wkt = (
+                    f"CurvePolygon(CompoundCurve(("
+                    f"{x} {y}, {x + size} {y}, {x + size} {y + size - radius}), "
+                    f"CircularString({x + size} {y + size - radius}, "
+                    f"{x + size - radius * (1 - math.sqrt(0.5)):4f} {y + size - radius * (1 - math.sqrt(0.5)):4f}, "
+                    f"{x + size - radius} {y + size}), "
+                    f"({x + size - radius} {y + size}, {x} {y + size}, {x} {y})))"
+                )
+                curve_polygons.append((
+                    uuid.uuid4(),
+                    "".join(random.choice(letters) for i in range(10)),
+                    curve_polygon_wkt,
+                ))
 
         # Create objects in batches
         # The GEOS version used by geodjango does not support curves
         arc_table_name = connection.ops.quote_name(Arc_2056_10fields._meta.db_table)
+        curve_polygon_table_name = connection.ops.quote_name(CurvePolygon_2056._meta.db_table)
         with connection.cursor() as cursor:
             cursor.executemany(
                 f"INSERT INTO {arc_table_name} (id, geom) VALUES (%s, ST_GeomFromText(%s, 2056))",
                 [(arc_id, wkt) for arc_id, wkt in arcs],
+            )
+            cursor.executemany(
+                f"INSERT INTO {curve_polygon_table_name} (id, name, geom) VALUES (%s, %s, ST_GeomFromText(%s, 2056))",
+                curve_polygons,
             )
         Point_2056_10fields.objects.bulk_create(points, batch_size=10000)
         SecretLayer.objects.bulk_create(secret_points, batch_size=10000)
