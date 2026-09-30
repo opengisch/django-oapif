@@ -65,13 +65,17 @@ def get_page_links(
     offset: int,
     total_count: int,
     media_type: str = GEOJSON_MEDIA_TYPE,
+    profile: Profile | None = None,
 ) -> list[OAPIFLink]:
+    """The links of a page of items. Those to pages give the GeoJSON profile asked for, which the others have too."""
+    profiles = [profile.uri] if profile else None
     links = [
         OAPIFLink(
             rel="self",
             title="items (self)",
             type=media_type,
             href=request.build_absolute_uri(),
+            profile=profiles,
         ),
         html_link(replace_query_param(request, f="html"), "items (as HTML)"),
     ]
@@ -82,6 +86,7 @@ def get_page_links(
                 title="items (prev)",
                 type=media_type,
                 href=replace_query_param(request, offset=None if offset - limit <= 0 else offset - limit),
+                profile=profiles,
             )
         )
     if offset + limit < total_count:
@@ -91,6 +96,7 @@ def get_page_links(
                 title="items (next)",
                 type=media_type,
                 href=replace_query_param(request, offset=offset + limit),
+                profile=profiles,
             )
         )
     return links
@@ -145,6 +151,9 @@ def geojson_response(geojson: Schema, crs: CRS) -> HttpResponse:
     """
     response = HttpResponse(geojson.model_dump_json(), content_type=GEOJSON_MEDIA_TYPE)
     response["Content-Crs"] = crs.uri_header()
+    # the profile of the document, which Part 5 links from the response
+    profile = Profile.JSONFG if isinstance(geojson, JsonFgDocument) else Profile.RFC7946
+    response["Link"] = f'<{profile.uri}>; rel="profile"'
     # the same URL serves GeoArrow too: a cache must not hand one encoding to a request for the other
     patch_vary_headers(response, ["Accept"])
     return response
@@ -163,8 +172,15 @@ def html_link(href: str, title: str) -> OAPIFLink:
 
 
 def link_header(links: list[OAPIFLink]) -> str:
-    """Serialize links as a RFC 8288 Link header, for responses that cannot carry them in the payload."""
-    return ", ".join(f'<{link.href}>; rel="{link.rel}"; type="{link.type}"' for link in links)
+    """
+    Serialize links as a RFC 8288 Link header, for responses that cannot carry them in the payload, and for the
+    clients that read them there only, as QGIS does of JSON-FG.
+    """
+    return ", ".join(
+        f'<{link.href}>; rel="{link.rel}"; type="{link.type}"'
+        + (f'; profile="{" ".join(link.profile)}"' if link.profile else "")
+        for link in links
+    )
 
 
 def accepted_profiles(request: HttpRequest) -> list[str]:
@@ -341,23 +357,25 @@ def get_collection_response(request: HttpRequest, collection: OapifCollection):
                 type=SCHEMA_MEDIA_TYPE,
                 href=request.build_absolute_uri(f"{uri_prefix}{collection.id}/schema"),
             ),
-            OAPIFLink(
-                rel="items",
-                title="Collection items",
-                type="application/geo+json",
-                href=request.build_absolute_uri(f"{uri_prefix}{collection.id}/items"),
-            ),
         ],
     )
-    if ARROW_AVAILABLE:
-        # the same URL, negotiated with the Accept header: clients only pick an encoding the collection lists
+    items_url = request.build_absolute_uri(f"{uri_prefix}{collection.id}/items")
+    if collection.geometry_field:
+        # before the GeoJSON one: QGIS 4.0 takes the last link of a type, and knows no profiles
         response.links.append(
             OAPIFLink(
                 rel="items",
-                title="Collection items as GeoArrow",
-                type=ARROW_STREAM_MEDIA_TYPE,
-                href=request.build_absolute_uri(f"{uri_prefix}{collection.id}/items"),
+                title="Collection items as JSON-FG",
+                type=GEOJSON_MEDIA_TYPE,
+                href=f"{items_url}?profile={Profile.JSONFG}",
+                profile=[Profile.JSONFG.uri],
             )
+        )
+    response.links.append(OAPIFLink(rel="items", title="Collection items", type=GEOJSON_MEDIA_TYPE, href=items_url))
+    if ARROW_AVAILABLE:
+        # the same URL, negotiated with the Accept header: clients only pick an encoding the collection lists
+        response.links.append(
+            OAPIFLink(rel="items", title="Collection items as GeoArrow", type=ARROW_STREAM_MEDIA_TYPE, href=items_url)
         )
 
     if geom := collection.geometry_field:
@@ -488,7 +506,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
             request,
             paginated_query,
             number_matched=total_count,
-            links=get_page_links(request, limit, offset, total_count),
+            links=get_page_links(request, limit, offset, total_count, profile=profile),
             crs=crs,
             profile=encoding,
         )
@@ -522,7 +540,11 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         # a page with a curve, of a column of any geometry
         if asks_geojson and isinstance(feature_collection, JsonFgDocument):
             return curves_not_acceptable(request)
-        return geojson_response(feature_collection, crs)
+        response = geojson_response(feature_collection, crs)
+        # where QGIS reads the pages of JSON-FG, as it does those of GeoArrow
+        response["Link"] += ", " + link_header(feature_collection.links)
+        response["OGC-NumberMatched"] = str(total_count)
+        return response
 
     @router.api_operation(
         ["OPTIONS"],

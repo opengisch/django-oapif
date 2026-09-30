@@ -818,7 +818,8 @@ class TestOutputFormat(TestCase):
         response = self.client.get(f"{collections_url}/tests.point_2056_10fields")
 
         self.assertEqual(response.status_code, 200)
-        items = [link for link in response.json()["links"] if link["rel"] == "items"]
+        # but for the profile of JSON-FG
+        items = [link for link in response.json()["links"] if link["rel"] == "items" and "profile" not in link]
         encodings = {"application/geo+json", *({"application/vnd.apache.arrow.stream"} if ARROW_AVAILABLE else ())}
         self.assertEqual({link["type"] for link in items}, encodings)
         # a single URL, negotiated with the Accept header
@@ -1950,6 +1951,68 @@ class TestJsonFg(TestCase):
         table = pa.ipc.open_stream(response.content).read_all()
         self.assertEqual(jsonfg.loads(table["geometry"][0].as_py())["type"], "CircularString")
 
+    def profile_of(self, response) -> str:
+        [profile] = re.findall(r'<([^>]*)>; rel="profile"', response.headers.get("Link", ""))
+        return profile
+
+    def test_responses_link_their_profile(self):
+        # as Part 5 wants: GeoJSON, but for JSON-FG asked for, and the linearized curves are GeoJSON
+        rfc7946 = "http://www.opengis.net/def/profile/ogc/0/rfc7946"
+        points = f"{collections_url}/tests.point_2056_10fields/items"
+        arcs = f"{collections_url}/tests.arc_2056_10fields/items"
+        for url, params, profile in (
+            (points, {}, rfc7946),
+            (f"{points}/{self.point.pk}", {}, rfc7946),
+            (points, {"profile": "jsonfg"}, self.JSONFG),
+            (arcs, {"profile": "jsonfg"}, self.JSONFG),
+            (f"{arcs}/{self.arc_id}", {"profile": "jsonfg"}, self.JSONFG),
+            (arcs, {"linearize": "true"}, rfc7946),
+        ):
+            with self.subTest(url=url, **params):
+                self.assertEqual(self.profile_of(self.client.get(url, params)), profile)
+
+    def test_collection_links_its_items_in_jsonfg(self):
+        # as QGIS 4.2 tells them from GeoJSON: GeoJSON links with a single profile. The link without one comes
+        # last, as QGIS 4.0 takes the last link of a type
+        for collection in ("tests.point_2056_10fields", "tests.arc_2056_10fields"):
+            with self.subTest(collection=collection):
+                links = self.client.get(f"{collections_url}/{collection}").json()["links"]
+
+                items = [link for link in links if link["rel"] == "items" and link["type"] == "application/geo+json"]
+                self.assertEqual([link.get("profile") for link in items], [[self.JSONFG], None])
+                self.assertEqual(self.profile_of(self.client.get(items[0]["href"])), self.JSONFG)
+
+    def test_collection_without_geometry_links_no_jsonfg(self):
+        links = self.client.get(f"{collections_url}/tests.nogeom_10fields").json()["links"]
+
+        self.assertFalse([link for link in links if "profile" in link])
+
+    def test_pages_are_linked_in_the_headers(self):
+        # QGIS reads the next page of JSON-FG, and the number of features, from the headers only
+        url = f"{collections_url}/tests.geometry_2056/items"
+        response = self.client.get(url, {"limit": 1, "profile": "jsonfg"})
+
+        [next_link] = [link for link in response.json()["links"] if link["rel"] == "next"]
+        self.assertEqual(next_link["profile"], [self.JSONFG])
+        self.assertIn(
+            f'<{next_link["href"]}>; rel="next"; type="application/geo+json"; profile="{self.JSONFG}"', response["Link"]
+        )
+        self.assertEqual(response["OGC-NumberMatched"], "2")
+
+    def test_pages_without_a_profile_link_none(self):
+        Point_2056_10fields.objects.create(geom="POINT(2508600 1152000)")
+
+        links = self.client.get(f"{collections_url}/tests.point_2056_10fields/items", {"limit": 1}).json()["links"]
+
+        self.assertIn("next", {link["rel"] for link in links})
+        self.assertFalse([link for link in links if "profile" in link])
+
+    def test_linearized_pages_link_linearized_pages(self):
+        response = self.client.get(f"{collections_url}/tests.geometry_2056/items", {"limit": 1, "linearize": "true"})
+
+        [next_link] = [link for link in response.json()["links"] if link["rel"] == "next"]
+        self.assertIn("linearize=true", next_link["href"])
+
     def test_query_parameter_chooses_over_the_accept_header(self):
         response = self.client.get(
             f"{collections_url}/tests.point_2056_10fields/items",
@@ -2315,6 +2378,18 @@ class TestConformance(TestCase):
             "http://www.opengis.net/spec/ogcapi-features-5/1.0/conf/schemas",
             "http://www.opengis.net/spec/ogcapi-features-5/1.0/conf/returnables-and-receivables",
             "http://www.opengis.net/spec/ogcapi-features-5/1.0/conf/feature-references",
+        ):
+            self.assertIn(uri, conforms_to)
+
+    def test_jsonfg_is_declared(self):
+        conforms_to = self.client.get("/oapif/conformance").json()["conformsTo"]
+
+        for uri in (
+            "http://www.opengis.net/spec/json-fg-1/1.0/conf/core",
+            "http://www.opengis.net/spec/json-fg-1/1.0/conf/circular-arcs",
+            "http://www.opengis.net/spec/json-fg-1/1.0/conf/profiles",
+            "http://www.opengis.net/spec/json-fg-1/1.0/conf/api",
+            "http://www.opengis.net/spec/ogcapi-common-3/1.0/conf/profile-parameter",
         ):
             self.assertIn(uri, conforms_to)
 

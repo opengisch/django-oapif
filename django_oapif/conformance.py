@@ -31,6 +31,14 @@ def create_conformance_router(*, title: str):
                 "http://www.opengis.net/spec/ogcapi-features-5/1.0/conf/feature-references",
                 "http://www.opengis.net/spec/ogcapi-features-5/1.0/conf/returnables-and-receivables",
                 "http://www.opengis.net/spec/ogcapi-features-5/1.0/conf/schemas",
+                # the profile query parameter, which Part 5 now specifies under the name of Common Part 3, as
+                # ldproxy declares it
+                "http://www.opengis.net/spec/ogcapi-common-3/1.0/conf/profile-parameter",
+                # JSON-FG, which serves the curves in "place", in the GeoJSON profile that parameter asks for
+                "http://www.opengis.net/spec/json-fg-1/1.0/conf/core",
+                "http://www.opengis.net/spec/json-fg-1/1.0/conf/circular-arcs",
+                "http://www.opengis.net/spec/json-fg-1/1.0/conf/profiles",
+                "http://www.opengis.net/spec/json-fg-1/1.0/conf/api",
             ]
         )
         if accepts_html(request):

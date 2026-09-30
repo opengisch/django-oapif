@@ -1,5 +1,7 @@
 import requests
+from osgeo import gdal
 from qgis.core import (
+    Qgis,
     QgsDataSourceUri,
     QgsEditError,
     QgsFeature,
@@ -13,6 +15,9 @@ from qgis.core import (
 from qgis.testing import start_app, unittest
 
 start_app()
+
+# GDAL reads the curves of JSON-FG since its 3.12
+GDAL_READS_CURVES = int(gdal.VersionInfo()) >= 3120000
 
 ROOT_URL = "http://django:8000/oapif/"
 COLLECTIONS_URL = "http://django:8000/oapif/collections"
@@ -204,3 +209,33 @@ class TestStack(unittest.TestCase):
         self.assertEqual([[point.x(), point.y()] for point in ring.points()], served["geometry"]["coordinates"][0])
         # the rounded corner, linearized
         self.assertGreater(ring.numPoints(), 7)
+
+    @unittest.skipUnless(Qgis.QGIS_VERSION_INT >= 40200, "QGIS tells JSON-FG from GeoJSON by the link since 4.2")
+    def test_jsonfg_is_read_through_its_link(self):
+        # in pages QGIS reads from the headers
+        uri = QgsDataSourceUri()
+        uri.setParam("service", "wfs")
+        uri.setParam("typename", "tests.point_2056_10fields")
+        uri.setParam("url", ROOT_URL)
+        uri.setParam("outputformat", "application/fg+json")
+        uri.setParam("pageSize", "100")
+        layer = QgsVectorLayer(uri.uri(), "point", "OAPIF")
+        self.assertTrue(layer.isValid())
+
+        features = list(layer.getFeatures())
+        self.assertEqual(len(features), requests.get(f"{POINTS_URL}/items").json()["numberMatched"])
+        self.assertEqual(layer.crs().authid(), "EPSG:2056")
+        # in "place", in the storage CRS
+        point = features[0].geometry().asPoint()
+        self.assertGreaterEqual(point.x(), 2508500)
+        self.assertGreaterEqual(point.y(), 1152000)
+
+    @unittest.skipUnless(
+        Qgis.QGIS_VERSION_INT >= 40200 and GDAL_READS_CURVES, "needs QGIS 4.2, and GDAL 3.12 for the curves of JSON-FG"
+    )
+    def test_curves_are_read_in_jsonfg(self):
+        layer = self.curve_layer(outputformat="application/fg+json")
+
+        self.assertTrue(layer.isValid())
+        self.assertEqual(layer.wkbType(), QgsWkbTypes.CurvePolygon)
+        self.assertTrue(next(layer.getFeatures()).geometry().constGet().hasCurvedSegments())
