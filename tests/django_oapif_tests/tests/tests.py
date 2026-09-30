@@ -70,6 +70,11 @@ def extent(queryset, geometry) -> tuple[float, float, float, float]:
     return tuple(queryset.aggregate(**aggregates).values())
 
 
+def geometry_of(feature: dict) -> dict | None:
+    """The geometry of a feature, which JSON-FG gives in "place" when GeoJSON cannot carry it."""
+    return feature["place"] if feature.get("place") is not None else feature["geometry"]
+
+
 class TestBasicAuth(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -645,15 +650,18 @@ class TestOutputFormat(TestCase):
     def test_geojson_geometry_types(self):
         for collection, geometry_type in self.COLLECTIONS.items():
             with self.subTest(collection=collection):
+                # which GeoJSON has not, in JSON-FG
+                params = {"profile": "jsonfg"} if geometry_type == "CircularString" else {}
                 response = self.client.get(
                     f"{collections_url}/{collection}/items?limit=1",
+                    params,
                     headers={"Accept": "application/geo+json"},
                 )
 
                 self.assertEqual(response.status_code, 200)
                 feature = response.json()["features"][0]
                 if geometry_type:
-                    self.assertEqual(feature["geometry"]["type"], geometry_type)
+                    self.assertEqual(geometry_of(feature)["type"], geometry_type)
                 else:
                     self.assertEqual(feature["geometry"], None)
 
@@ -959,8 +967,9 @@ class TestHtml(TestCase):
                 self.assertVariesOnAccept(response)
 
     def test_other_clients_get_the_json(self):
-        # the JSON stays the default, for a client that accepts any type or does not say
-        for url in self.urls():
+        # the JSON stays the default, for a client that accepts any type or does not say, but for the curves,
+        # which GeoJSON refuses
+        for url in [url for url in self.urls() if "arc_2056" not in url]:
             for headers in ({}, {"Accept": "*/*"}, {"Accept": "application/json"}):
                 with self.subTest(url=url, headers=headers):
                     response = self.client.get(url, headers=headers)
@@ -1232,21 +1241,21 @@ class TestGeometry3D(TestCase):
         for name, (_, expected) in self.GEOMETRIES.items():
             with self.subTest(geometry=name):
                 response = self.client.get(
-                    f"{collections_url}/tests.geometryz_2056/items/{self.ids[name]}?crs={crs_2056}",
+                    f"{collections_url}/tests.geometryz_2056/items/{self.ids[name]}?crs={crs_2056}&profile=jsonfg",
                     headers={"Accept": "application/geo+json"},
                 )
 
                 self.assertEqual(response.status_code, 200)
-                self.assertEqual(response.json()["geometry"], expected)
+                self.assertEqual(geometry_of(response.json()), expected)
 
     def test_items_keep_z(self):
         response = self.client.get(
-            f"{collections_url}/tests.geometryz_2056/items?crs={crs_2056}",
+            f"{collections_url}/tests.geometryz_2056/items?crs={crs_2056}&profile=jsonfg",
             headers={"Accept": "application/geo+json"},
         )
 
         self.assertEqual(response.status_code, 200)
-        features = {feature["id"]: feature["geometry"] for feature in response.json()["features"]}
+        features = {feature["id"]: geometry_of(feature) for feature in response.json()["features"]}
         expected = {str(self.ids[name]): geometry for name, (_, geometry) in self.GEOMETRIES.items()}
         self.assertEqual(features, expected)
 
@@ -1462,18 +1471,22 @@ class TestCircularString(TestCase):
     def test_arc_of_any_odd_length_is_served(self):
         for count in self.POINT_COUNTS:
             with self.subTest(points=count):
-                response = self.client.get(f"{collections_url}/tests.arc_2056_10fields/items/{self.ids[count]}")
+                response = self.client.get(
+                    f"{collections_url}/tests.arc_2056_10fields/items/{self.ids[count]}", {"profile": "jsonfg"}
+                )
 
                 self.assertEqual(response.status_code, 200)
-                self.assertEqual(len(arc_points(response.json()["geometry"])), count)
+                self.assertEqual(len(arc_points(response.json()["place"])), count)
 
     def test_long_arc_is_served_in_parts(self):
         # JSON-FG allows 11 points in a CircularString, so a longer one is the CompoundCurve of its arcs
         for count, sizes in ((5, None), (13, [11, 3]), (27, [11, 11, 7])):
             with self.subTest(points=count):
-                response = self.client.get(f"{collections_url}/tests.arc_2056_10fields/items/{self.ids[count]}")
+                response = self.client.get(
+                    f"{collections_url}/tests.arc_2056_10fields/items/{self.ids[count]}", {"profile": "jsonfg"}
+                )
 
-                geometry = response.json()["geometry"]
+                geometry = response.json()["place"]
                 if sizes is None:
                     self.assertEqual(geometry["type"], "CircularString")
                 else:
@@ -1517,8 +1530,8 @@ class TestCircularString(TestCase):
 
         for crs_uri, geometry in ((None, Transform("geom", 4326)), (crs_2056, "geom")):
             with self.subTest(crs=crs_uri or crs84):
-                url = f"{collections_url}/tests.arc_2056_10fields/items"
-                response = self.client.get(f"{url}?crs={crs_uri}" if crs_uri else url)
+                url = f"{collections_url}/tests.arc_2056_10fields/items?profile=jsonfg"
+                response = self.client.get(f"{url}&crs={crs_uri}" if crs_uri else url)
 
                 self.assertEqual(response.status_code, 200)
                 bbox = tuple(response.json()["bbox"])
@@ -1594,7 +1607,7 @@ class TestCircularString(TestCase):
 class TestJsonFg(TestCase):
     """
     GeoJSON has no curves, which JSON-FG gives in "place", "geometry" being null: a client asks for it with the
-    profile of Part 5, the jsonfg one.
+    profile of Part 5, the jsonfg one, and a request of curves in GeoJSON is refused.
     """
 
     ARC = "CIRCULARSTRING(2508500 1152000, 2508510 1152010, 2508520 1152000)"
@@ -1730,6 +1743,88 @@ class TestJsonFg(TestCase):
                     for feature in document.get("features", [document]):
                         self.assertNotIn("place", feature)
                         self.assertIsNotNone(feature["geometry"])
+
+    def test_geojson_refuses_curves(self):
+        # rather than give features without geometry, or with one GeoJSON has not: the answer links them in JSON-FG
+        url = f"{collections_url}/tests.arc_2056_10fields/items"
+        for params, accept in (
+            ({}, "application/geo+json"),
+            ({}, "application/json"),
+            ({}, "*/*"),
+            ({"profile": "rfc7946"}, "application/geo+json"),
+        ):
+            for item_url in (url, f"{url}/{self.arc_id}"):
+                with self.subTest(url=item_url, params=params, accept=accept):
+                    response = self.client.get(item_url, {**params, "crs": crs_2056}, headers={"Accept": accept})
+
+                    self.assertEqual(response.status_code, 406)
+                    self.assertIn("Accept", [value.strip() for value in response["Vary"].split(",")])
+                    [link] = response.json()["links"]
+                    self.assertEqual(link["profile"], [self.JSONFG])
+                    jsonfg = self.client.get(link["href"])
+                    self.assertEqual(jsonfg.status_code, 200)
+                    self.assertEqual(jsonfg.json()["conformsTo"], self.CONFORMS_TO)
+                    # in the CRS asked for
+                    self.assertEqual(jsonfg["Content-Crs"], f"<{crs_2056}>")
+
+    def test_curve_column_refuses_geojson_on_every_page(self):
+        # even without a feature
+        response = self.client.get(f"{collections_url}/tests.arc_2056_10fields/items", {"bbox": "0,0,1,1"})
+
+        self.assertEqual(response.status_code, 406)
+
+    def test_page_with_a_curve_refuses_geojson(self):
+        # a geometry column of any type may hold curves: its pages are refused in GeoJSON as they have one
+        url = f"{collections_url}/tests.geometry_2056/items"
+        for offset in (0, 1):
+            with self.subTest(offset=offset):
+                page = self.client.get(url, {"limit": 1, "offset": offset})
+                jsonfg = self.client.get(url, {"limit": 1, "offset": offset, "profile": "jsonfg"}).json()
+
+                [feature] = jsonfg["features"]
+                self.assertEqual(page.status_code, 406 if feature["id"] == str(self.curve_id) else 200)
+        self.assertEqual(self.client.get(f"{url}/{self.curve_id}").status_code, 406)
+        self.assertEqual(self.client.get(f"{url}/{self.point_id}").status_code, 200)
+
+    @skipUnless(writes_curves(), "needs GEOS 3.13 or newer and a Django that supports curves")
+    def test_curve_written_is_returned_in_jsonfg(self):
+        self.client.force_login(User.objects.get(username="demo_editor"))
+        curve = {"type": "CircularString", "coordinates": arc(2508500.0, 1152000.0)}
+
+        response = self.client.post(
+            f"{collections_url}/tests.arc_2056_10fields/items",
+            {"type": "Feature", "geometry": curve, "properties": {}},
+            headers=headers,
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response["Content-Type"], "application/geo+json")
+        self.assertEqual(response.json()["conformsTo"], self.CONFORMS_TO)
+        self.assertIsNone(response.json()["geometry"])
+        self.assertEqual(response.json()["place"]["type"], "CircularString")
+
+    def test_pages_draw_the_curves(self):
+        url = f"{collections_url}/tests.arc_2056_10fields/items"
+        for page_url in (url, f"{url}/{self.arc_id}"):
+            with self.subTest(url=page_url):
+                page = self.client.get(page_url, {"f": "html"})
+
+                self.assertEqual(page.status_code, 200)
+                self.assertIn("oapifMap(", page.content.decode())
+                self.assertIn("CircularString", page.content.decode())
+
+    @requires_arrow
+    def test_geoarrow_has_the_curves(self):
+        # its WKB carries them
+        response = self.client.get(
+            f"{collections_url}/tests.arc_2056_10fields/items",
+            headers={"Accept": "application/vnd.apache.arrow.stream"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        table = pa.ipc.open_stream(response.content).read_all()
+        self.assertEqual(jsonfg.loads(table["geometry"][0].as_py())["type"], "CircularString")
 
     def test_query_parameter_chooses_over_the_accept_header(self):
         response = self.client.get(
@@ -1895,8 +1990,11 @@ class TestWriteGeometries(TestCase):
                 response = self.post(collection, geometry)
 
                 self.assertEqual(response.status_code, 201)
-                item = self.client.get(f"{collections_url}/{collection}/items/{response.json()['id']}?crs={crs_2056}")
-                self.assertEqual(item.json()["geometry"], geometry)
+                item = self.client.get(
+                    f"{collections_url}/{collection}/items/{response.json()['id']}",
+                    {"crs": crs_2056, "profile": "jsonfg"},
+                )
+                self.assertEqual(geometry_of(item.json()), geometry)
 
     def test_geojson_geometries_round_trip(self):
         self.assert_round_trip("tests.geometry_2056", self.GEOJSON)
@@ -1973,7 +2071,7 @@ class TestWriteGeometries(TestCase):
         self.assertEqual(post.status_code, 201 if writes_curves() else 501)
         self.assertEqual(patch.status_code, status)
         if writes_curves():
-            self.assertEqual(self.client.get(f"{item_url}?crs={crs_2056}").json()["geometry"], place)
+            self.assertEqual(self.client.get(f"{item_url}?crs={crs_2056}&profile=jsonfg").json()["place"], place)
 
     def test_coord_ref_sys_must_be_the_content_crs(self):
         # the coordinates are read in the Content-Crs: another coordRefSys would be ignored
@@ -2034,7 +2132,7 @@ class TestWriteGeometries(TestCase):
                 response = method(item_url, feature, headers=headers, content_type="application/json")
 
                 self.assertEqual(response.status_code, 200)
-                self.assertEqual(self.client.get(f"{item_url}?crs={crs_2056}").json()["geometry"], curve)
+                self.assertEqual(self.client.get(f"{item_url}?crs={crs_2056}&profile=jsonfg").json()["place"], curve)
 
     @skipUnless(writes_curves(), "needs GEOS 3.13 or newer and a Django that supports curves")
     def test_long_arc_round_trips_in_parts(self):
@@ -2046,12 +2144,12 @@ class TestWriteGeometries(TestCase):
                 f"UPDATE {table_name} SET geom = ST_GeomFromText(%s, 2056) WHERE id = %s", [wkt, self.arc_id]
             )
         item_url = f"{collections_url}/tests.arc_2056_10fields/items/{self.arc_id}"
-        served = self.client.get(f"{item_url}?crs={crs_2056}").json()
+        served = self.client.get(f"{item_url}?crs={crs_2056}&profile=jsonfg").json()
 
         response = self.client.put(item_url, served, headers=headers, content_type="application/json")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(self.client.get(f"{item_url}?crs={crs_2056}").json()["geometry"], served["geometry"])
+        self.assertEqual(self.client.get(f"{item_url}?crs={crs_2056}&profile=jsonfg").json()["place"], served["place"])
         with connection.cursor() as cursor:
             cursor.execute(
                 f"SELECT ST_Equals(geom, ST_GeomFromText(%s, 2056)) FROM {table_name} WHERE id = %s", [wkt, self.arc_id]
@@ -2065,8 +2163,10 @@ class TestWriteGeometries(TestCase):
         response = self.post("tests.arc_2056_10fields", curve, crs=crs84)
 
         self.assertEqual(response.status_code, 201)
-        stored = self.client.get(f"{collections_url}/tests.arc_2056_10fields/items/{response.json()['id']}")
-        for position, expected in zip(stored.json()["geometry"]["coordinates"], curve["coordinates"], strict=True):
+        stored = self.client.get(
+            f"{collections_url}/tests.arc_2056_10fields/items/{response.json()['id']}", {"profile": "jsonfg"}
+        )
+        for position, expected in zip(stored.json()["place"]["coordinates"], curve["coordinates"], strict=True):
             self.assertAlmostEqual(position[0], expected[0], places=7)
             self.assertAlmostEqual(position[1], expected[1], places=7)
 

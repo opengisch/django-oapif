@@ -25,6 +25,7 @@ from django_oapif.geojson import (
     GenericFeatureCollection,
     GenericFeatureInput,
     GenericFeaturePatch,
+    JsonFgDocument,
 )
 from django_oapif.handler import ARROW_AVAILABLE, OapifCollection, ReprojectedExtent, parse_box2d
 from django_oapif.html import HTML_MEDIA_TYPE, as_text, html_response, schema_properties
@@ -89,6 +90,26 @@ def get_page_links(
             )
         )
     return links
+
+
+def curves_not_acceptable(request: HttpRequest) -> HttpResponse:
+    """The answer to a request of curves in GeoJSON, which cannot carry them: a 406, linking them in JSON-FG."""
+    links = [
+        OAPIFLink(
+            rel="alternate",
+            title="This document as JSON-FG",
+            type=GEOJSON_MEDIA_TYPE,
+            href=replace_query_param(request, profile=Profile.JSONFG),
+            profile=[Profile.JSONFG.uri],
+        ),
+    ]
+    body = {
+        "detail": "GeoJSON cannot carry curves: ask for them in JSON-FG, with profile=jsonfg",
+        "links": [link.model_dump() for link in links],
+    }
+    response = HttpResponse(json.dumps(body), status=406, content_type=JSON_MEDIA_TYPE)
+    patch_vary_headers(response, ["Accept"])
+    return response
 
 
 def geojson_response(geojson: Schema, crs: CRS) -> HttpResponse:
@@ -410,15 +431,21 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         validate_crs_or_raise(collection, crs, "crs")
         validate_crs_or_raise(collection, bbox_crs, "bbox-crs")
 
+        html = accepts_html(request)
+        arrow = not html and accepts_geoarrow(request)
+        # a page draws the curves itself, and GeoArrow has them as they are
+        profile = None if html or arrow else requested_profile(request, profile)
+        asks_geojson = not html and not arrow and profile is not Profile.JSONFG
+        # whatever the page, even without a feature
+        if asks_geojson and collection.curved:
+            return curves_not_acceptable(request)
+
         query = collection.query(request, crs, bbox, bbox_crs)
         paginated_query = query[offset : offset + limit]
 
         total_count = query.count()
 
-        html = accepts_html(request)
-        # a page draws the curves itself
-        profile = None if html else requested_profile(request, profile)
-        if not html and accepts_geoarrow(request):
+        if arrow:
             stream = collection.queryset_to_arrow_stream(request, paginated_query, crs)
             response = arrow_response(stream, crs)
             # an Arrow stream has nowhere to put them, and the row count is the only one a client
@@ -462,6 +489,9 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
                 "geojson": geojson if collection.geometry_field and crs == DEFAULT_CRS else None,
             }
             return html_response(request, "items.html", context, title=title)
+        # a page with a curve, of a column of any geometry
+        if asks_geojson and isinstance(feature_collection, JsonFgDocument):
+            return curves_not_acceptable(request)
         return geojson_response(feature_collection, crs)
 
     @router.api_operation(
@@ -495,15 +525,17 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
     ):
         collection = get_collection_by_id(collection_id, request)
         validate_crs_or_raise(collection, crs, "crs")
+        html = accepts_html(request)
+        arrow = not html and accepts_geoarrow(request)
+        profile = None if html or arrow else requested_profile(request, profile)
+        asks_geojson = not html and not arrow and profile is not Profile.JSONFG
         query = collection.query(request, crs)
         item = get_object_or_404(query, pk=item_id)
         if not collection.has_view_permission(request, item):
             raise AuthorizationError()
-        html = accepts_html(request)
-        if not html and accepts_geoarrow(request):
+        if arrow:
             stream = collection.queryset_to_arrow_stream(request, query.filter(pk=item_id), crs)
             return arrow_response(stream, crs)
-        profile = None if html else requested_profile(request, profile)
         feature = collection.model_to_feature(request, item, crs=crs, profile=profile)
         if html:
             geojson = json.loads(feature.model_dump_json())
@@ -514,6 +546,9 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
                 "geojson": geojson if collection.geometry_field and crs == DEFAULT_CRS else None,
             }
             return html_response(request, "item.html", context, title=title)
+        # a curve, of any column
+        if asks_geojson and isinstance(feature, JsonFgDocument):
+            return curves_not_acceptable(request)
         return geojson_response(feature, crs)
 
     @router.post(
@@ -523,7 +558,6 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
     )
     def create_item(
         request: HttpRequest,
-        response: HttpResponse,
         collection_id: str,
         feature: GenericFeatureInput,
         crs: CRS = Header(DEFAULT_CRS, alias="Content-Crs"),
@@ -543,10 +577,11 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
             raise AuthorizationError()
         collection.save_model(request, item, False)
         item = collection.query(request, DEFAULT_CRS).get(pk=item.pk)
-        response.headers["Location"] = request.build_absolute_uri(f"items/{item.pk}")  # type: ignore
-        response["Content-Crs"] = DEFAULT_CRS.uri_header()
-        response["Content-Type"] = GEOJSON_MEDIA_TYPE
-        return 201, collection.model_to_feature(request, item)
+        # in JSON-FG for a curve, which ninja would take for GeoJSON
+        response = geojson_response(collection.model_to_feature(request, item), DEFAULT_CRS)
+        response.status_code = 201
+        response["Location"] = request.build_absolute_uri(f"items/{item.pk}")
+        return response
 
     @router.api_operation(
         ["OPTIONS"],
@@ -578,7 +613,6 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
     )
     def replace_item(
         request: HttpRequest,
-        response: HttpResponse,
         collection_id: str,
         item_id: str,
         feature: GenericFeatureInput,
@@ -601,9 +635,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
             setattr(item, geom_field, geometry_to_save(feature.geometry, crs))
         collection.save_model(request, item, True)
         item = collection.query(request, DEFAULT_CRS).get(pk=item_id)
-        response["Content-Crs"] = DEFAULT_CRS.uri_header()
-        response["Content-Type"] = GEOJSON_MEDIA_TYPE
-        return collection.model_to_feature(request, item)
+        return geojson_response(collection.model_to_feature(request, item), DEFAULT_CRS)
 
     @router.patch(
         "/{collection_id}/items/{item_id}",
@@ -612,7 +644,6 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
     )
     def update_item(
         request: HttpRequest,
-        response: HttpResponse,
         collection_id: str,
         item_id: str,
         feature: GenericFeaturePatch,
@@ -636,9 +667,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
             setattr(item, geom_field, geometry_to_save(feature.geometry, crs))
         collection.save_model(request, item, True)
         item = collection.query(request, DEFAULT_CRS).get(pk=item_id)
-        response["Content-Crs"] = DEFAULT_CRS.uri_header()
-        response["Content-Type"] = GEOJSON_MEDIA_TYPE
-        return collection.model_to_feature(request, item)
+        return geojson_response(collection.model_to_feature(request, item), DEFAULT_CRS)
 
     @router.delete("/{collection_id}/items/{item_id}", operation_id="delete_collection_item")
     def delete_item(

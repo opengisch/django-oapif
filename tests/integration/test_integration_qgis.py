@@ -174,3 +174,16 @@ class TestStack(unittest.TestCase):
         self.assertIsNotNone(layer)
         self.assertEqual(layer.featureCount(), 0)
         self.assertEqual(layer.geometryType(), QgsWkbTypes.PointGeometry)
+
+    def curve_layer(self, url: str = ROOT_URL, **params) -> QgsVectorLayer:
+        uri = QgsDataSourceUri()
+        uri.setParam("service", "wfs")
+        uri.setParam("typename", "tests.curvepolygon_2056")
+        uri.setParam("url", url)
+        for name, value in params.items():
+            uri.setParam(name, value)
+        return QgsVectorLayer(uri.uri(), "curves", "OAPIF")
+
+    def test_curves_are_refused_in_geojson(self):
+        # QGIS fails to load the layer, rather than giving it features without geometry
+        self.assertFalse(self.curve_layer().isValid())
