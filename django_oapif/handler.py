@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import date, datetime, time
 from functools import cache
 from types import NoneType, UnionType, new_class
@@ -10,7 +11,14 @@ from django.contrib.gis.db.models import Extent, GeometryField
 from django.contrib.gis.db.models.functions import AsWKB, Transform
 from django.contrib.gis.geos import Polygon as GEOSPolygon
 from django.core.serializers.json import DjangoJSONEncoder
-from django.core.validators import BaseValidator, MaxValueValidator, MinValueValidator
+from django.core.validators import (
+    BaseValidator,
+    MaxLengthValidator,
+    MaxValueValidator,
+    MinLengthValidator,
+    MinValueValidator,
+    RegexValidator,
+)
 from django.db.models import (
     DateTimeField,
     DurationField,
@@ -105,6 +113,14 @@ def json_schema_type(annotation: Any) -> str | None:
 def limit_values(validators: list, kind: type[BaseValidator]) -> list[int | float]:
     """The numeric limits of the validators of a kind, leaving out those computed as they validate."""
     return [v.limit_value for v in validators if isinstance(v, kind) and isinstance(v.limit_value, int | float)]
+
+
+def json_schema_pattern(pattern: str) -> str:
+    """
+    A Python regular expression anchored as JSON Schema's ECMA-262 ones are, with ^ and $: Django's end with \\Z,
+    which ECMA-262 does not have. \\A and \\Z are anchors unless an odd number of backslashes precede them.
+    """
+    return re.sub(r"(?<!\\)((?:\\\\)*)\\([AZ])", lambda m: m[1] + ("^" if m[2] == "A" else "$"), pattern)
 
 
 model_config = {
@@ -492,6 +508,19 @@ class OapifCollection[M: Model]:
                     field_props["minimum"] = max(minimums)
                 if maximums := limit_values(field.validators, MaxValueValidator):
                     field_props["maximum"] = min(maximums)
+            if field_props.get("type") == "string":
+                if minimums := limit_values(field.validators, MinLengthValidator):
+                    field_props["minLength"] = max(minimums)
+                if maximums := limit_values(field.validators, MaxLengthValidator):
+                    field_props["maxLength"] = min(maximums)
+                # JSON Schema takes a single pattern, and no flags: the one of URLs, which ignores case, is left out
+                patterns = [
+                    v.regex.pattern
+                    for v in field.validators
+                    if isinstance(v, RegexValidator) and not v.inverse_match and not v.regex.flags & ~re.UNICODE
+                ]
+                if len(patterns) == 1:
+                    field_props["pattern"] = json_schema_pattern(patterns[0])
 
         # served but not written, which QGIS makes read-only fields of
         for field_name in self.get_readonly_fields(request):
