@@ -660,11 +660,32 @@ class OapifCollection[M: Model]:
         `linearize()` made lines of them. `number_matched` defaults to the number of features returned, for a
         queryset that is not a page of a larger one.
         """
-        rows = list(qs)
+        # JSON-FG as asked for, or for a column of curves, and for a column of any geometry from its first curve
+        as_jsonfg = profile is Profile.JSONFG if profile else self.curved
+        if as_jsonfg:
+            FeatureSchema = self.get_jsonfg_feature_output_schema(request)
+        else:
+            FeatureSchema = self.get_feature_output_schema(request)
+        features = []
+        curves = self.curved
         # the boxes of the geometries, taken as they are read, so that the collection one takes no extra
         # query, nor reprojecting them all again
         boxes = []
-        geometries = [self._geometry_of(row, boxes) for row in rows]
+        # a feature is made of each geometry as it is read, and the geometry dropped: kept to the end of the page,
+        # the lists of their coordinates would have the garbage collector go through them over and over
+        for obj in qs:
+            geometry = self._geometry_of(obj, boxes)
+            if geometry is not None and not jsonfg.is_geojson(geometry):
+                if not profile and not as_jsonfg:
+                    # the page is JSON-FG after all: made again, of the rows the queryset keeps
+                    return self.queryset_to_featurecollection(
+                        request, qs, number_matched=number_matched, links=links, crs=crs, profile=Profile.JSONFG
+                    )
+                curves = True
+            if as_jsonfg:
+                features.append(self._jsonfg_feature(FeatureSchema, obj, geometry, crs))
+            else:
+                features.append(self._feature(FeatureSchema, obj, geometry))
         bbox = None
         if boxes:
             xmins, ymins, xmaxs, ymaxs = zip(*boxes)
@@ -672,20 +693,14 @@ class OapifCollection[M: Model]:
         members = {
             "type": "FeatureCollection",
             "bbox": bbox,
-            "numberReturned": len(rows),
-            "numberMatched": len(rows) if number_matched is None else number_matched,
+            "numberReturned": len(features),
+            "numberMatched": len(features) if number_matched is None else number_matched,
             "links": links or [],
         }
-        if self._is_jsonfg(geometries, profile):
-            FeatureSchema = self.get_jsonfg_feature_output_schema(request)
-            features = [
-                self._jsonfg_feature(FeatureSchema, row, geometry, crs) for row, geometry in zip(rows, geometries)
-            ]
+        if as_jsonfg:
             return JsonFgFeatureCollection[FeatureSchema].model_construct(
-                **members, **self._jsonfg_document(geometries, crs), features=features
+                **members, **self._jsonfg_document(curves, crs), features=features
             )
-        FeatureSchema = self.get_feature_output_schema(request)
-        features = [self._feature(FeatureSchema, row, geometry) for row, geometry in zip(rows, geometries)]
         return FeatureCollection[FeatureSchema].model_construct(**members, features=features)
 
     def get_arrow_properties_schema(self, properties_schema: type[Schema]) -> tuple["pa.Schema", dict[str, str]]:
@@ -758,7 +773,8 @@ class OapifCollection[M: Model]:
         geometry = self._geometry_of(obj)
         if self._is_jsonfg([geometry], profile):
             schema = self.get_jsonfg_feature_output_schema(request, root=True)
-            return self._jsonfg_feature(schema, obj, geometry, crs, **self._jsonfg_document([geometry], crs))
+            members = self._jsonfg_document(self._has_curves([geometry]), crs)
+            return self._jsonfg_feature(schema, obj, geometry, crs, **members)
         return self._feature(self.get_feature_output_schema(request), obj, geometry)
 
     def _geometry_of(self, obj: M, bounds: list | None = None) -> dict | None:
@@ -776,9 +792,12 @@ class OapifCollection[M: Model]:
         """Whether features are served as JSON-FG: in the profile asked for, and by default when they have curves."""
         return profile is Profile.JSONFG if profile else self._has_curves(geometries)
 
-    def _jsonfg_document(self, geometries: list[dict | None], crs: CRS) -> dict:
-        """The members of a JSON-FG document of features, which declares its classes and the CRS of "place"."""
-        conforms_to = [jsonfg.CORE, jsonfg.CIRCULAR_ARCS] if self._has_curves(geometries) else [jsonfg.CORE]
+    def _jsonfg_document(self, curves: bool, crs: CRS) -> dict:
+        """
+        The members of a JSON-FG document of features, with `curves` or not, which declares its classes and the CRS
+        of "place".
+        """
+        conforms_to = [jsonfg.CORE, jsonfg.CIRCULAR_ARCS] if curves else [jsonfg.CORE]
         return {"conformsTo": conforms_to, "coordRefSys": crs.uri()}
 
     def _feature(self, schema: type[Feature], obj: M, geometry: dict | None) -> Feature:

@@ -1,5 +1,7 @@
 import argparse
 import os
+import random
+import sys
 import time
 from pathlib import Path
 
@@ -46,8 +48,13 @@ CRSS = {
 
 ITERATIONS = 20
 
-# a change of less than this, either way, is taken for noise
-THRESHOLD = 0.1
+# a change of less than this, either way, is taken for noise: runs of the same library differ by less than 4%, but
+# for about one case in a few hundred
+THRESHOLD = 0.06
+
+# the requests a case that changes by more is timed again with, as one slow spell of the runner could make it look
+# so: its second timing is the one reported, and the benchmark fails if it is still slower
+RETIME_ITERATIONS = 60
 
 # Django itself, on the port the dev compose file publishes: the Caddy of the test stack only has a
 # certificate for OGCAPIF_HOST, and timing it would add TLS and proxying to what is measured
@@ -96,50 +103,117 @@ def media_format(response: requests.Response) -> str:
     return "json" if media_type == "application/json" or media_type.endswith("+json") else media_type
 
 
-def format_time(median: float, base: float | None) -> str:
-    if base is None:
+def time_cases(
+    session: requests.Session, cases: list[tuple], urls: dict[str, str], compared: set, iterations: int
+) -> list[dict]:
+    """
+    The time of each request, of each case on each server. A pass over every case at a time, so that a slow spell
+    of the runner does not fall on one of them, and each case on both servers in a row, the first of them in turn.
+    The passes go through the cases in another order each time: in the same one, what a request leaves to the next,
+    like garbage to collect, would fall on the same case every time.
+    """
+    rows = []
+    # the same orders at every run
+    shuffle = random.Random(0)
+    for iteration in range(iterations):
+        for layer, limit, accept, crs in shuffle.sample(cases, len(cases)):
+            servers = [server for server in urls if server == "head" or (layer, limit, accept, crs) in compared]
+            for server in reversed(servers) if iteration % 2 else servers:
+                rows.append({
+                    "server": server,
+                    "layer": layer,
+                    "limit": limit,
+                    "accept": accept,
+                    "crs": crs,
+                    "time_ms": time_request(session, items_url(urls[server], layer, limit, crs), accept),
+                    "iteration": iteration,
+                })
+    return rows
+
+
+def summarize(rows: list[dict]) -> pl.DataFrame:
+    return (
+        pl.DataFrame(rows)
+        .group_by(KEY)
+        .agg(
+            # the median, which one slow request does not move, is what the servers are compared on
+            pl.col("time_ms").median().alias("median_ms"),
+            pl.col("time_ms").mean().alias("mean_ms"),
+            pl.col("time_ms").min().alias("min_ms"),
+            pl.col("time_ms").max().alias("max_ms"),
+            pl.col("time_ms").std().alias("stddev_ms"),
+            pl.len().alias("requests"),
+        )
+        .sort(KEY)
+    )
+
+
+def changes(summary_df: pl.DataFrame) -> dict[tuple, float]:
+    """How much the median time of each case the base serves changes, by case: layer, limit, accept and CRS."""
+    medians = {tuple(row[column] for column in KEY): row["median_ms"] for row in summary_df.iter_rows(named=True)}
+    return {
+        (layer, limit, accept, crs): median / medians["base", accept, crs, layer, limit] - 1
+        for (server, accept, crs, layer, limit), median in medians.items()
+        if server == "head" and ("base", accept, crs, layer, limit) in medians
+    }
+
+
+def format_time(median: float, change: float | None) -> str:
+    """The median time, and how much it changes when that is more than noise."""
+    if change is None or abs(change) <= THRESHOLD:
         return f"{median:.1f}"
-    change = median / base - 1
-    marker = "🟢" if change < -THRESHOLD else "🔴" if change > THRESHOLD else "⚪"
-    return f"{median:.1f} {marker} {change:+.0%}"
+    return f"{median:.1f} {'🟢' if change < 0 else '🔴'} {change:+.0%}"
 
 
 def write_markdown(summary_df: pl.DataFrame, features: dict[str, int], base_name: str | None) -> None:
     """A table of the median response times, compared with the base if any, for a pull request comment."""
     columns = [(accept, crs) for accept in ACCEPTS for crs in CRSS]
     medians = {tuple(row[column] for column in KEY): row["median_ms"] for row in summary_df.iter_rows(named=True)}
+    compared = changes(summary_df)
     lines = [
         "## ⏱️ Benchmark",
         "",
         f"`/items` response time in ms, median of {ITERATIONS} requests after a warm-up one. The collections are"
         " stored in EPSG:2056, and reprojected to be served in CRS84.",
     ]
-    compared = (summary_df["server"] == "base").sum()
     if compared:
         lines += [
             "",
             f"Compared with the `django_oapif` of {base_name}, served on the same runner and data, a request to each"
-            f" in turn: 🟢 faster and 🔴 slower by more than {THRESHOLD:.0%}, ⚪ within {THRESHOLD:.0%}.",
+            f" in turn: 🟢 faster and 🔴 slower by more than {THRESHOLD:.0%}, as timed again with"
+            f" {RETIME_ITERATIONS} requests. The rows where every case is within {THRESHOLD:.0%} are left out.",
         ]
-        if compared < (summary_df["server"] == "head").sum():
-            lines[-1] += " Without a marker, the cases it does not serve, or not in the same format."
+        if len(compared) < (summary_df["server"] == "head").sum():
+            lines[-1] += " The cases it does not serve, or not in the same format, are not compared."
+        if slower := sum(change > THRESHOLD for change in compared.values()):
+            lines += ["", f"**{slower} {'case is' if slower == 1 else 'cases are'} slower: the benchmark fails.**"]
     elif base_name:
         lines += ["", f"The `django_oapif` of {base_name} could not serve the collections, so there is no comparison."]
-    lines += [
-        "",
-        f"| Collection | Features | Limit | {' | '.join(f'{LABELS[accept]}, {crs}' for accept, crs in columns)} |",
-        f"|---|---:|---:|{'---:|' * len(columns)}",
-    ]
+    table = []
     for layer in COLLECTIONS:
-        for index, limit in enumerate(LIMITS):
+        shown = 0
+        for limit in LIMITS:
+            cases = [(layer, limit, accept, crs) for accept, crs in columns]
+            # noise only, which the artifact has
+            if all(case in compared and abs(compared[case]) <= THRESHOLD for case in cases):
+                continue
             times = [
-                format_time(
-                    medians["head", accept, crs, layer, limit], medians.get(("base", accept, crs, layer, limit))
-                )
+                format_time(medians["head", accept, crs, layer, limit], compared.get((layer, limit, accept, crs)))
                 for accept, crs in columns
             ]
-            collection, count = (f"`{layer}`", str(features[layer])) if index == 0 else ("", "")
-            lines.append(f"| {collection} | {count} | {limit} | {' | '.join(times)} |")
+            # the collection on the first of its rows that is shown
+            collection, count = (f"`{layer}`", str(features[layer])) if not shown else ("", "")
+            shown += 1
+            table.append(f"| {collection} | {count} | {limit} | {' | '.join(times)} |")
+    if table:
+        lines += [
+            "",
+            f"| Collection | Features | Limit | {' | '.join(f'{LABELS[accept]}, {crs}' for accept, crs in columns)} |",
+            f"|---|---:|---:|{'---:|' * len(columns)}",
+            *table,
+        ]
+    else:
+        lines += ["", f"No case changes by more than {THRESHOLD:.0%}."]
     (OUTPUT_PATH / "result.md").write_text("\n".join(lines) + "\n")
 
 
@@ -191,7 +265,8 @@ def plot(summary_df: pl.DataFrame) -> None:
     plt.close(fig)
 
 
-def main(url: str, base_url: str | None, base_name: str) -> None:
+def main(url: str, base_url: str | None, base_name: str) -> list[tuple]:
+    """Times the cases, and returns those slower than on the base."""
     cases = [
         (layer, limit, accept, crs) for layer in COLLECTIONS for limit in LIMITS for accept in ACCEPTS for crs in CRSS
     ]
@@ -223,41 +298,21 @@ def main(url: str, base_url: str | None, base_name: str) -> None:
                 print(f"{len(compared)} of {len(cases)} cases compared with {base_name}")
             except requests.ConnectionError as error:
                 print(f"No comparison, as the server of {base_name} does not answer: {error}")
-        rows = []
-        # a pass over every case at a time, so that a slow spell of the runner does not fall on one of them,
-        # and each case on both servers in a row, the first of them in turn
-        for iteration in range(ITERATIONS):
-            for layer, limit, accept, crs in cases:
-                servers = {"head": url} | ({"base": base_url} if (layer, limit, accept, crs) in compared else {})
-                for server in reversed(servers) if iteration % 2 else servers:
-                    rows.append({
-                        "server": server,
-                        "layer": layer,
-                        "limit": limit,
-                        "accept": accept,
-                        "crs": crs,
-                        "time_ms": time_request(session, items_url(servers[server], layer, limit, crs), accept),
-                        "iteration": iteration,
-                    })
-        result_df = pl.DataFrame(rows)
+        urls = {"head": url} | ({"base": base_url} if base_url else {})
+        rows = time_cases(session, cases, urls, compared, ITERATIONS)
+        # the cases that look faster or slower, timed again for longer, which replaces their first timing
+        retimed = [case for case, change in changes(summarize(rows)).items() if abs(change) > THRESHOLD]
+        if retimed:
+            print(f"{len(retimed)} cases timed again, faster or slower by more than {THRESHOLD:.0%}")
+            rows = [row for row in rows if (row["layer"], row["limit"], row["accept"], row["crs"]) not in retimed]
+            rows += time_cases(session, retimed, urls, compared, RETIME_ITERATIONS)
 
-    summary_df = (
-        result_df.group_by(KEY)
-        .agg(
-            # the median, which one slow request does not move, is what the servers are compared on
-            pl.col("time_ms").median().alias("median_ms"),
-            pl.col("time_ms").mean().alias("mean_ms"),
-            pl.col("time_ms").min().alias("min_ms"),
-            pl.col("time_ms").max().alias("max_ms"),
-            pl.col("time_ms").std().alias("stddev_ms"),
-        )
-        .sort(KEY)
-    )
-
+    summary_df = summarize(rows)
     OUTPUT_PATH.mkdir(parents=True, exist_ok=True)
     summary_df.write_csv(OUTPUT_PATH / "result.csv")
     write_markdown(summary_df, features, base_name if base_url else None)
     plot(summary_df.filter(pl.col("server") == "head"))
+    return [case for case, change in changes(summary_df).items() if change > THRESHOLD]
 
 
 if __name__ == "__main__":
@@ -271,4 +326,6 @@ if __name__ == "__main__":
         "--base-name", default="the base branch", help="what the server to compare with runs, for the comment"
     )
     args = parser.parse_args()
-    main(args.url, args.base_url, args.base_name)
+    if slower := main(args.url, args.base_url, args.base_name):
+        cases = "\n".join(f"  {layer}, limit {limit}, {LABELS[accept]}, {crs}" for layer, limit, accept, crs in slower)
+        sys.exit(f"Slower than {args.base_name} by more than {THRESHOLD:.0%}:\n{cases}")
