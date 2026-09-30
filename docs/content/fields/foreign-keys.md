@@ -53,3 +53,22 @@ Writes take the same primary key, in `POST`, `PUT` and `PATCH`. A key that refer
 ```
 
 The reverse relations, the children of a parent here, are not served.
+
+## Schema
+
+The [schema](index.md#schema) of the collection gives the property the `reference` role of
+[Part 5](https://docs.ogc.org/DRAFTS/23-058r1.html), with the collections of the referenced model that the user may
+view in `x-ogc-collectionId`: a single id, or a list when the model has several collections.
+
+```json
+"parent": {
+  "title": "Parent",
+  "type": "string",
+  "format": "uuid",
+  "x-ogc-role": "reference",
+  "x-ogc-collectionId": "my_app.parent",
+  "x-ogc-propertySeq": 2
+}
+```
+
+A key to a model without a collection, or to another field than its primary key, has no role.

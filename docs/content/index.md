@@ -38,7 +38,7 @@ The API declares these conformance classes:
 | [OGC API - Features - Part 3: Filtering](https://docs.ogc.org/is/19-079r2/19-079r2.html)                                | Queryables, Filter, Features Filter         |
 | [Common Query Language (CQL2)](https://docs.ogc.org/is/21-065r2/21-065r2.html)                                           | Basic CQL2, Advanced comparison operators, Case-insensitive comparison, Basic spatial functions, CQL2 Text |
 | [OGC API - Features - Part 4: Create, Replace, Update and Delete](https://docs.ogc.org/DRAFTS/20-002r1.html)             | Create/Replace/Delete, Update, Features     |
-| [OGC API - Features - Part 5: Schemas](https://docs.ogc.org/DRAFTS/23-058r1.html)                                        | Core roles for features, Returnables and receivables, Schemas |
+| [OGC API - Features - Part 5: Schemas](https://docs.ogc.org/DRAFTS/23-058r1.html)                                        | Core roles for features, Feature references, Returnables and receivables, Schemas |
 
 OpenAPI 3.1 is a class of the 1.1 draft of Part 1, as the published standards only have one for OpenAPI 3.0:
 see [conformance](contributing/conformance.md#openapi-31).

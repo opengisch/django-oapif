@@ -54,6 +54,7 @@ Please report anything that breaks in the [issues](https://github.com/opengisch/
 - The items `limit` is published under `components/parameters` in the OpenAPI document, which is where QGIS reads the page size from.
 - Feature collections carry the `bbox` of the page.
 - The schema gives the choices of a field as the `enum` of its property, and the bounds of a number, from its validators and the range of its column, as its `minimum` and `maximum`. The validators of a string give its `minLength`, `maxLength` and `pattern`. URLs, emails, files, and IP addresses of a single version have their `format`.
+- The schema gives the primary key the `id` role, and a [foreign key](fields/foreign-keys.md) the `reference` role, with the collections it references in `x-ogc-collectionId`. The conformance declaration lists the feature references class of Part 5.
 
 ### Fixes
 
