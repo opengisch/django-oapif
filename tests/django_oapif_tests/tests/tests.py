@@ -415,11 +415,13 @@ class TestSchema(TestCase):
         self.assertIn("field_str_8", schema["properties"])
 
     def test_schema_id_has_no_query(self):
-        # Part 5 wants the URI of the schema, without the query parameters of the request
-        url = f"{collections_url}/tests.point_2056_10fields/schema"
-        response = self.client.get(f"{url}?f=json")
+        # Part 5 wants the URI of the schema, without the query parameters of the request, the queryables' too
+        for resource in ("schema", "queryables"):
+            url = f"{collections_url}/tests.point_2056_10fields/{resource}"
+            with self.subTest(url=url):
+                response = self.client.get(f"{url}?f=json")
 
-        self.assertEqual(response.json()["$id"], f"http://testserver{url}")
+                self.assertEqual(response.json()["$id"], f"http://testserver{url}")
 
     def test_schema_choices_are_an_enum(self):
         url = f"{collections_url}/tests.layerwithconstraints/schema"
