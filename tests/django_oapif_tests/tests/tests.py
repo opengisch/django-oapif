@@ -321,20 +321,25 @@ class TestSchema(TestCase):
         expected_schema = {
             "additionalProperties": False,
             "properties": {
-                "id": {"title": "Id", "format": "uuid", "type": "string"},
-                "field_int": {"title": "Field Int", "type": "integer"},
-                "field_bool": {"default": True, "title": "Field Bool", "type": "boolean"},
-                "field_str_0": {"title": "Field 0", "maxLength": 255, "type": "string"},
-                "field_str_1": {"title": "Field 1", "maxLength": 255, "type": "string"},
-                "field_str_2": {"title": "Field 2", "maxLength": 255, "type": "string"},
-                "field_str_3": {"title": "Field 3", "maxLength": 255, "type": "string"},
-                "field_str_4": {"title": "Field 4", "maxLength": 255, "type": "string"},
-                "field_str_5": {"title": "Field 5", "maxLength": 255, "type": "string"},
-                "field_str_6": {"title": "Field 6", "maxLength": 255, "type": "string"},
-                "field_str_7": {"title": "Field 7", "maxLength": 255, "type": "string"},
-                "field_str_8": {"title": "Field 8", "maxLength": 255, "type": "string"},
-                "field_str_9": {"title": "Field 9", "maxLength": 255, "type": "string"},
-                "geom": {"title": "geometry", "x-ogc-role": "primary-geometry", "format": "geometry-point"},
+                "id": {"title": "Id", "format": "uuid", "type": "string", "x-ogc-propertySeq": 1},
+                "field_int": {"title": "Field Int", "type": "integer", "x-ogc-propertySeq": 3},
+                "field_bool": {"default": True, "title": "Field Bool", "type": "boolean", "x-ogc-propertySeq": 2},
+                "field_str_0": {"title": "Field 0", "maxLength": 255, "type": "string", "x-ogc-propertySeq": 4},
+                "field_str_1": {"title": "Field 1", "maxLength": 255, "type": "string", "x-ogc-propertySeq": 5},
+                "field_str_2": {"title": "Field 2", "maxLength": 255, "type": "string", "x-ogc-propertySeq": 6},
+                "field_str_3": {"title": "Field 3", "maxLength": 255, "type": "string", "x-ogc-propertySeq": 7},
+                "field_str_4": {"title": "Field 4", "maxLength": 255, "type": "string", "x-ogc-propertySeq": 8},
+                "field_str_5": {"title": "Field 5", "maxLength": 255, "type": "string", "x-ogc-propertySeq": 9},
+                "field_str_6": {"title": "Field 6", "maxLength": 255, "type": "string", "x-ogc-propertySeq": 10},
+                "field_str_7": {"title": "Field 7", "maxLength": 255, "type": "string", "x-ogc-propertySeq": 11},
+                "field_str_8": {"title": "Field 8", "maxLength": 255, "type": "string", "x-ogc-propertySeq": 12},
+                "field_str_9": {"title": "Field 9", "maxLength": 255, "type": "string", "x-ogc-propertySeq": 13},
+                "geom": {
+                    "title": "geometry",
+                    "x-ogc-role": "primary-geometry",
+                    "format": "geometry-point",
+                    "x-ogc-propertySeq": 14,
+                },
             },
             "title": "tests.Point_2056_10fields",
             "type": "object",
@@ -435,9 +440,14 @@ class TestSchema(TestCase):
         expected_schema = {
             "additionalProperties": False,
             "properties": {
-                "field_int": {"title": "Field Int", "type": "integer"},
-                "field_str_0": {"title": "Field 0", "maxLength": 255, "type": "string"},
-                "geom": {"title": "geometry", "x-ogc-role": "primary-geometry", "format": "geometry-point"},
+                "field_int": {"title": "Field Int", "type": "integer", "x-ogc-propertySeq": 1},
+                "field_str_0": {"title": "Field 0", "maxLength": 255, "type": "string", "x-ogc-propertySeq": 2},
+                "geom": {
+                    "title": "geometry",
+                    "x-ogc-role": "primary-geometry",
+                    "format": "geometry-point",
+                    "x-ogc-propertySeq": 3,
+                },
             },
             "title": "tests.Point_2056_10fields",
             "type": "object",
@@ -455,9 +465,19 @@ class TestSchema(TestCase):
         expected_schema = {
             "additionalProperties": False,
             "properties": {
-                "id": {"format": "uuid", "title": "Id", "type": "string"},
-                "text_mandatory_field": {"maxLength": 255, "title": "Mandatory Field", "type": "string"},
-                "geom": {"title": "geometry", "x-ogc-role": "primary-geometry", "format": "geometry-point"},
+                "id": {"format": "uuid", "title": "Id", "type": "string", "x-ogc-propertySeq": 1},
+                "text_mandatory_field": {
+                    "maxLength": 255,
+                    "title": "Mandatory Field",
+                    "type": "string",
+                    "x-ogc-propertySeq": 2,
+                },
+                "geom": {
+                    "title": "geometry",
+                    "x-ogc-role": "primary-geometry",
+                    "format": "geometry-point",
+                    "x-ogc-propertySeq": 3,
+                },
             },
             "required": ["text_mandatory_field"],
             "title": "tests.MandatoryField",
@@ -477,7 +497,12 @@ class TestSchema(TestCase):
         self.assertEqual(schema_response.status_code, 200)
         self.assertEqual(
             schema_response.json()["properties"]["geom"],
-            {"title": "geometry", "x-ogc-role": "primary-geometry", "format": "geometry-point"},
+            {
+                "title": "geometry",
+                "x-ogc-role": "primary-geometry",
+                "format": "geometry-point",
+                "x-ogc-propertySeq": 14,
+            },
         )
 
     def test_schema_geometry_type_linestring(self):
@@ -487,7 +512,12 @@ class TestSchema(TestCase):
         self.assertEqual(schema_response.status_code, 200)
         self.assertEqual(
             schema_response.json()["properties"]["geom"],
-            {"title": "geometry", "x-ogc-role": "primary-geometry", "format": "geometry-linestring"},
+            {
+                "title": "geometry",
+                "x-ogc-role": "primary-geometry",
+                "format": "geometry-linestring",
+                "x-ogc-propertySeq": 14,
+            },
         )
 
     def test_schema_geometry_type_polygon(self):
@@ -497,7 +527,12 @@ class TestSchema(TestCase):
         self.assertEqual(schema_response.status_code, 200)
         self.assertEqual(
             schema_response.json()["properties"]["geom"],
-            {"title": "geometry", "x-ogc-role": "primary-geometry", "format": "geometry-multipolygon"},
+            {
+                "title": "geometry",
+                "x-ogc-role": "primary-geometry",
+                "format": "geometry-multipolygon",
+                "x-ogc-propertySeq": 3,
+            },
         )
 
     def test_schema_geometry_type_any(self):
@@ -507,7 +542,7 @@ class TestSchema(TestCase):
         self.assertEqual(schema_response.status_code, 200)
         self.assertEqual(
             schema_response.json()["properties"]["geom"],
-            {"title": "geometry", "x-ogc-role": "primary-geometry", "format": "geometry-any"},
+            {"title": "geometry", "x-ogc-role": "primary-geometry", "format": "geometry-any", "x-ogc-propertySeq": 2},
         )
 
 

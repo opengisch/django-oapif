@@ -491,6 +491,9 @@ class OapifCollection[M: Model]:
                 "x-ogc-role": "primary-geometry",
                 "format": f"geometry-{geom_type}",
             }
+        # QGIS orders the fields by their position, and alphabetically without one
+        for position, field_props in enumerate(schema["properties"].values(), start=1):
+            field_props["x-ogc-propertySeq"] = position
         schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
         schema["title"] = self.title
         return schema
