@@ -2,7 +2,7 @@
 
 ## 2.0.0rc1
 
-First release candidate of django-oapif 2.0. It adds GeoArrow output and JSON-FG curves, fixes a permission check on delete, and changes several behaviours that clients or projects may rely on: read [upgrading from 1.x](#upgrading-from-1x) before trying it.
+First release candidate of django-oapif 2.0. It adds GeoArrow output and JSON-FG curves, fixes a permission check on delete, and changes several behaviours that clients or projects may rely on: read [upgrading from 1.x](#upgrading-from-1x) before trying it, and [from 2.0.0-beta1](#upgrading-from-200-beta1) for curves.
 
 pip only installs it when asked for:
 
@@ -15,6 +15,10 @@ Please report anything that breaks in the [issues](https://github.com/opengisch/
 ### Security
 
 - **Deleting a feature now requires the delete permission.** 1.x checked the view permission, so anyone who could read a feature could also delete it. Upgrade, or check your permissions on 1.x if deleting matters to you.
+
+### Upgrading from 2.0.0-beta1
+
+- **Curves are no longer served in `geometry`**, which GeoJSON does not allow, and GeoJSON readers such as QGIS dropped. The features of a curve column, and the pages of a `GeometryField` column that have a curve, are served as JSON-FG features, with the curve in `place` and `null` in `geometry`, in a document that declares its classes in `conformsTo` and its CRS in `coordRefSys`. Read the curves in `place`, or ask for their linearization in `geometry` with the [`jsonfg-plus` profile](fields/geometries.md#linearized-curves). The documents without curves are unchanged.
 
 ### Upgrading from 1.x
 
@@ -45,8 +49,10 @@ Please report anything that breaks in the [issues](https://github.com/opengisch/
 ### New
 
 - **GeoArrow**: `/items` and `/items/{featureId}` return an Apache Arrow stream, with GeoArrow WKB geometries, when the request's `Accept` header prefers `application/vnd.apache.arrow.stream`. Paging links come in a `Link` header and the total in `OGC-NumberMatched`. The collection links to this encoding of its items. This needs the new `arrow` extra (`pip install "django-oapif[arrow]"`); without it such requests get a `406`. See [GeoArrow](formats/geoarrow.md).
-- **[Curves](fields/geometries.md#curves)**: CircularString, CompoundCurve, CurvePolygon, MultiCurve and MultiSurface columns are served as JSON-FG geometries. A CircularString of more than 5 arcs, the most JSON-FG allows, is served as a CompoundCurve of its arcs, and accepted back in that form. Writing curves needs GEOS 3.13 and a Django whose GEOS bindings support curves, which no Django release has yet; otherwise writing one returns `501`.
-- **[JSON-FG input](fields/geometries.md#json-fg-features)**: `POST`, `PUT` and `PATCH` accept a `place`, which is stored instead of the `geometry` fallback, and a `coordRefSys`, which must match the `Content-Crs`.
+- **[Curves](fields/geometries.md#curves)**: CircularString, CompoundCurve, CurvePolygon, MultiCurve and MultiSurface columns are served as JSON-FG features, the curves in `place`, and so are the pages of a `GeometryField` column that have a curve. A CircularString of more than 5 arcs, the most JSON-FG allows, is served as a CompoundCurve of its arcs, and accepted back in that form. Writing curves needs GEOS 3.13 and a Django whose GEOS bindings support curves, which no Django release has yet; otherwise writing one returns `501`.
+- **[GeoJSON profiles](fields/geometries.md#profiles)**: the `profile` query parameter, or the `profile` of `application/geo+json` in the `Accept` header, asks for GeoJSON (`rfc7946`), JSON-FG (`jsonfg`), or JSON-FG with GeoJSON geometries in CRS84, the curves linearized (`jsonfg-plus`), which QGIS 3 asks for with the URL of its connection. The responses link their profile in a `Link` header, and the pages of items their other pages and their number of features in the headers too, where QGIS reads them in JSON-FG. A collection links its items in the JSON-FG profiles, as QGIS 4.2 finds them, and the conformance declaration lists the classes of JSON-FG and the profile query parameter.
+- `linearization_tolerance` sets how closely the linearized curves follow the arcs, and `require_jsonfg` answers the requests of the items of a curve column in GeoJSON with a `406` that links them in JSON-FG: see the [options](usage/collections.md#options) of the collections.
+- **[JSON-FG input](fields/geometries.md#json-fg-features)**: `POST`, `PUT` and `PATCH` accept a `place`, which is stored instead of the `geometry` fallback, and a `coordRefSys`, which must match the `Content-Crs`. A curve column sent a GeoJSON geometry, such as a linearized curve, answers that the curve goes in `place`.
 - **[HTML](formats/html.md)**: browsers get an HTML page of every resource but the API definition, with a map of the features, which the JSON links with the `alternate` relation. `f=html` and `f=json` choose the encoding instead of the `Accept` header. The landing page links Swagger UI with the `service-doc` relation.
 - PolyhedralSurface and TIN geometries are served as MultiPolygons, and Triangles as Polygons.
 - CRS URIs are accepted with `https://`, and a `Content-Crs` is accepted in angle brackets, the way the responses send it.

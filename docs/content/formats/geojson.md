@@ -3,7 +3,9 @@
 Features are served as [GeoJSON](https://datatracker.ietf.org/doc/html/rfc7946), with the media type
 `application/geo+json`, and the members that
 [OGC API - Features](https://docs.ogc.org/is/17-069r4/17-069r4.html) adds to it. Their geometries are those of
-GeoJSON, and those of [JSON-FG](../fields/geometries.md#curves) for curves.
+GeoJSON. Curves, which GeoJSON does not have, are served as [JSON-FG](../fields/geometries.md#curves) features,
+with the same media type, and any feature in the [GeoJSON profile](../fields/geometries.md#profiles) a request
+asks for.
 
 ## Feature collections
 
@@ -31,7 +33,11 @@ GeoJSON, and those of [JSON-FG](../fields/geometries.md#curves) for curves.
 
 The `limit` parameter sets the number of features of a page, 100 by default, and `offset` the number of
 features before it. `bbox` restricts the features to those that intersect a box, `xmin,ymin,xmax,ymax`, in the
-CRS given by `bbox-crs`, and `crs` asks for the features in another [CRS](../usage/crs.md).
+CRS given by `bbox-crs`, `crs` asks for the features in another [CRS](../usage/crs.md), and `profile` in
+another [GeoJSON profile](../fields/geometries.md#profiles).
+
+The links of the page are in its `Link` header as well, with the number of features that match the query in
+`OGC-NumberMatched`, as a client of JSON-FG such as QGIS reads them there.
 
 ## Features
 
@@ -49,7 +55,8 @@ CRS given by `bbox-crs`, and `crs` asks for the features in another [CRS](../usa
 The `id` of a feature is its primary key, as a string. Its `geometry` and `properties` are described in
 [fields](../fields/index.md).
 
-Both responses give the CRS of their coordinates in a `Content-Crs` header.
+Both responses give the CRS of their coordinates in a `Content-Crs` header, and their GeoJSON profile in a
+`Link` header, with the `profile` relation.
 
 ## Writing features
 
@@ -65,7 +72,7 @@ The collections are writable, as defined by
 | `DELETE /collections/{collectionId}/items/{featureId}`   | Deletes a feature.                                                               |
 
 The body of a `POST`, `PUT` or `PATCH` is a GeoJSON feature, whose coordinates are in the CRS of the
-`Content-Crs` header, CRS84 by default. The feature returned is in CRS84:
+`Content-Crs` header, CRS84 by default. The feature returned is in CRS84, and in JSON-FG for a curve:
 
 ```bash
 curl -X POST "https://example.com/oapif/collections/my_app.building/items" \
