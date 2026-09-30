@@ -60,6 +60,7 @@ Please report anything that breaks in the [issues](https://github.com/opengisch/
 - LineString coordinates are checked against the dimension of the column, like those of the other geometry types.
 - Geometry fields declared with `dim=3` accept and serve Z coordinates.
 - The schema of a collection is served, and linked from the collection, as `application/schema+json`, as Part 5 requires, instead of `application/json`.
+- Decimals are described in the schema as the strings they are served as. They had no type, and QGIS made no field of them.
 
 ### Performance
 
