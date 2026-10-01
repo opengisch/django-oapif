@@ -55,6 +55,8 @@ MIRRORED = {"lt": "gt", "lte": "gte", "gt": "lt", "gte": "lte", "contains": "wit
 LITERALS = (str, int, float, date)
 
 
+# cql2.lark, this transformer and parser() go once a release of pygeofilter has its pull requests #170, #171 and
+# #172, for the parser of pygeofilter
 class Transformer(cql2_text.CQLTransformer):
     """The one of pygeofilter, with the fixes of its pull requests that cql2.lark takes."""
 
