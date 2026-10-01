@@ -1,5 +1,7 @@
 django>=5.2
 django-ninja
 inflection
+# once a release has geopython/pygeofilter#170, #171 and #172, require it and drop django_oapif/cql2.lark
+pygeofilter>=0.4,<0.5
 pyyaml
 uritemplate

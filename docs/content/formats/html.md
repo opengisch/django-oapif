@@ -1,8 +1,8 @@
 # HTML
 
-Every resource but the API definition is also an HTML page, to browse the API in a browser: the landing
-page, the conformance declaration, the collections, their schema, their items and each feature. The items
-of a page and a feature are drawn on a map, and so is the extent of a collection. The API definition has
+Every resource but the API definition is also an HTML page, to browse the API in a browser: the landing page,
+the conformance declaration, the collections, their schema and queryables, their items and each feature. The
+items of a page and a feature are drawn on a map, and so is the extent of a collection. The API definition has
 its own page, Swagger UI at `/docs`, which the landing page links with the `service-doc` relation.
 
 ## Content negotiation
@@ -21,11 +21,11 @@ As the same URL serves both, the responses carry a `Vary: Accept` header.
 
 ## Schemas
 
-The page of the schema of a collection has a row for each property, with all that its JSON Schema says of it:
-its title and description, its type and format, its role, whether it is required or read-only, its default,
-and its constraints, such as its bounds, length, pattern and choices. A foreign key links the collections it
-references. A keyword without a column of its own is listed with the constraints, including one that a
-collection adds to its schema.
+The pages of the schema and of the queryables of a collection have a row for each property, with all that its
+JSON Schema says of it: its title and description, its type and format, its role, whether it is required or
+read-only, its default, and its constraints, such as its bounds, length, pattern and choices. A foreign key
+links the collections it references. A keyword without a column of its own is listed with the constraints,
+including one that a collection adds to its schema.
 
 ## Maps
 
@@ -49,7 +49,8 @@ before those of django-oapif, such as in a directory of its `TEMPLATES` `DIRS`:
 | `django_oapif/collections.html` | `/collections`                                         |
 | `django_oapif/collection.html`  | `/collections/{collectionId}`                          |
 | `django_oapif/schema.html`      | `/collections/{collectionId}/schema`                   |
-| `django_oapif/properties.html`  | the table of the properties, included by the schema    |
+| `django_oapif/queryables.html`  | `/collections/{collectionId}/queryables`               |
+| `django_oapif/properties.html`  | the table of the properties, included by these two     |
 | `django_oapif/items.html`       | `/collections/{collectionId}/items`                    |
 | `django_oapif/item.html`        | `/collections/{collectionId}/items/{featureId}`        |
 

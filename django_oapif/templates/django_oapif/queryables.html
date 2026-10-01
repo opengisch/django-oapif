@@ -1,0 +1,11 @@
+{% extends "django_oapif/base.html" %}
+
+{% block title %}Queryables of {{ collection.title }} - {{ api_title }}{% endblock %}
+
+{% block breadcrumbs %}<a href="{{ root_url }}collections">Collections</a><a href="{{ root_url }}collections/{{ collection.id|urlencode:"" }}">{{ collection.title }}</a><span>Queryables</span>{% endblock %}
+
+{% block content %}
+<h1>{{ collection.title }}</h1>
+<p class="muted">The properties its items can be filtered on.</p>
+{% include "django_oapif/properties.html" %}
+{% endblock %}

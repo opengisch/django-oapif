@@ -1,14 +1,15 @@
 import json
-from typing import Any
-from urllib.parse import quote
-
 from functools import cache
+from typing import Any, Literal
+from urllib.parse import quote
 
 from django.contrib.gis.db.models import Extent
 from django.contrib.gis.geos import GEOSException, GEOSGeometry
 from django.contrib.gis.geos.libgeos import geos_version_tuple
+from django.core.exceptions import FieldError
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db.models import Model
+from django.db.models import Model, QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils.cache import patch_vary_headers
@@ -17,7 +18,7 @@ from ninja.errors import AuthorizationError, HttpError, ValidationError
 from pydantic import TypeAdapter
 from pydantic import ValidationError as PydanticValidationError
 
-from django_oapif import jsonfg
+from django_oapif import cql2, jsonfg
 from django_oapif.crs import CRS, CRS84_SRID, CRS84_URI, BBox
 from django_oapif.geojson import (
     CircularStringParts,
@@ -240,6 +241,23 @@ def validate_crs_or_raise(collection: OapifCollection, crs: CRS, parameter: str)
     )
 
 
+def filter_or_raise(
+    collection: OapifCollection, request: HttpRequest, query: QuerySet, filter_expr: str, filter_crs: CRS
+) -> QuerySet:
+    """
+    The items matching a CQL2 filter. A filter that cannot be applied is a client error: one naming what is not a
+    queryable, but also one comparing a property with a value of another type, which Django finds out as it builds
+    the lookups.
+    """
+    fields = {name: collection.opts.get_field(name) for name in collection.get_queryables(request)}
+    try:
+        return query.filter(cql2.to_q(filter_expr, fields, filter_crs.srid))
+    except DjangoValidationError as e:
+        raise HttpError(400, f"Invalid filter: {' '.join(e.messages)}")
+    except (cql2.FilterError, FieldError, ValueError, TypeError) as e:
+        raise HttpError(400, f"Invalid filter: {e}")
+
+
 def take_jsonfg_members_or_raise(feature: GenericFeatureInput | GenericFeaturePatch, crs: CRS) -> None:
     """
     JSON-FG writes the geometries GeoJSON cannot carry, like the ones with arcs, in "place", its "geometry" being
@@ -357,6 +375,12 @@ def get_collection_response(request: HttpRequest, collection: OapifCollection):
                 type=SCHEMA_MEDIA_TYPE,
                 href=request.build_absolute_uri(f"{uri_prefix}{collection.id}/schema"),
             ),
+            OAPIFLink(
+                rel="http://www.opengis.net/def/rel/ogc/1.0/queryables",
+                title="Collection queryables",
+                type=SCHEMA_MEDIA_TYPE,
+                href=request.build_absolute_uri(f"{uri_prefix}{collection.id}/queryables"),
+            ),
         ],
     )
     items_url = request.build_absolute_uri(f"{uri_prefix}{collection.id}/items")
@@ -457,6 +481,21 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         return response
 
     @router.get(
+        "/{collection_id}/queryables",
+        operation_id="get_collection_queryables",
+    )
+    def get_queryables(request: HttpRequest, collection_id: str):
+        collection = get_collection_by_id(collection_id, request)
+        schema = collection.get_queryables_schema(request)
+        schema["$id"] = request.build_absolute_uri(request.path)
+        if accepts_html(request):
+            context = {"collection": collection, "properties": schema_properties(schema)}
+            return html_response(request, "queryables.html", context, title=title)
+        response = HttpResponse(json.dumps(schema, cls=DjangoJSONEncoder), content_type=SCHEMA_MEDIA_TYPE)
+        patch_vary_headers(response, ["Accept"])
+        return response
+
+    @router.get(
         "/{collection_id}/items",
         operation_id="get_collection_items",
         response=GenericFeatureCollection,
@@ -469,12 +508,16 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         crs: CRS = DEFAULT_CRS,
         bbox_crs: CRS = Query(DEFAULT_CRS, alias="bbox-crs"),
         bbox: BBox | None = Query(None, alias="bbox", description="BBOX in the format: minx,miny,maxx,maxy"),
+        filter_expr: str | None = Query(None, alias="filter", description="CQL2 expression the items must match"),
+        filter_lang: Literal["cql2-text"] = Query("cql2-text", alias="filter-lang"),
+        filter_crs: CRS = Query(DEFAULT_CRS, alias="filter-crs"),
         profile: str | None = Query(None, description=PROFILE_DESCRIPTION),
         linearize: bool = Query(False, description=LINEARIZE_DESCRIPTION),
     ):
         collection = get_collection_by_id(collection_id, request)
         validate_crs_or_raise(collection, crs, "crs")
         validate_crs_or_raise(collection, bbox_crs, "bbox-crs")
+        validate_crs_or_raise(collection, filter_crs, "filter-crs")
 
         html = accepts_html(request)
         arrow = not html and accepts_geoarrow(request)
@@ -487,6 +530,8 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
             return curves_not_acceptable(request)
 
         query = collection.query(request, crs, bbox, bbox_crs)
+        if filter_expr is not None:
+            query = filter_or_raise(collection, request, query, filter_expr, filter_crs)
         if asks_geojson and linearize:
             query = collection.linearize(query, crs)
         paginated_query = query[offset : offset + limit]

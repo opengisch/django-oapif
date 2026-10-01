@@ -14,6 +14,7 @@
 <div class="buttons">
   <a class="button" href="{{ root_url }}collections/{{ collection.id|urlencode:"" }}/items">Browse the items</a>
   <a class="button secondary" href="{{ root_url }}collections/{{ collection.id|urlencode:"" }}/schema">Schema</a>
+  <a class="button secondary" href="{{ root_url }}collections/{{ collection.id|urlencode:"" }}/queryables">Queryables</a>
 </div>
 
 {% if collection.extent %}<div id="map"></div>{% endif %}
