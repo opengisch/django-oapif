@@ -115,7 +115,7 @@ jobs:
         } >> tests/benchmark/output/result.md
 
     - name: 💬 Create comment
-      uses: marocchino/sticky-pull-request-comment@v2
+      uses: marocchino/sticky-pull-request-comment@v3
       # the token of a pull request from a fork cannot comment
       if: >-
         ${{ !cancelled() && github.event_name == 'pull_request' && steps.artifact.outcome == 'success'
