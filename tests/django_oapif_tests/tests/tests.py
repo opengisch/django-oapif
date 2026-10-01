@@ -2503,6 +2503,8 @@ class TestFilter(TestCase):
             ('"field_int" = 2', ["b"]),
             ("((field_int = 1) OR (field_int = 10))", ["a", "d"]),
             ("((field_int >= 1) AND (field_str_1 = 'x'))", ["b"]),
+            # AND binds tighter than OR
+            ("field_int = 1 OR field_int = 2 AND field_str_1 = 'y'", ["a"]),
             ("field_int IN (1,10)", ["a", "d"]),
             ("field_int BETWEEN 1 AND 2", ["a", "b"]),
             ("(field_int IS NULL)", ["c"]),
@@ -2524,7 +2526,7 @@ class TestFilter(TestCase):
             ("(NOT ((field_int = 1)))", ["b", "d"]),
             ("NOT (field_int = 1 OR field_int = 2)", ["d"]),
             ("NOT (field_str_1 = 'x' AND field_int = 2)", ["a", "d"]),
-            ("NOT NOT (field_int = 1)", ["a"]),
+            ("NOT (NOT (field_int = 1))", ["a"]),
             ("field_int NOT IN (1,2)", ["d"]),
             ("field_int NOT BETWEEN 1 AND 2", ["d"]),
             ("(field_str_0 NOT LIKE 'foo%')", ["a", "c"]),
@@ -2571,6 +2573,7 @@ class TestFilter(TestCase):
         # the literals are in CRS84 unless the filter-crs says otherwise, whatever the CRS of the geometries
         self.assert_matches((
             (f"S_INTERSECTS(geom,{self.ZURICH})", ["b"]),
+            ("S_INTERSECTS(geom,BBOX(8.4,47.3,0,8.7,47.5,1000))", ["b"]),
             (f"S_INTERSECTS(geom,{self.GENEVA})", ["c"]),
             (f"S_CONTAINS({self.GENEVA},geom)", ["c"]),
             (f"S_DISJOINT(geom,{self.ZURICH})", ["a", "c", "d"]),
@@ -2618,6 +2621,8 @@ class TestFilter(TestCase):
             ("geom = 1", "tests.point_2056_10fields", {}),
             ("S_INTERSECTS(field_int,BBOX(0,0,1,1))", "tests.point_2056_10fields", {}),
             ("S_INTERSECTS(geom,field_int)", "tests.point_2056_10fields", {}),
+            ("S_INTERSECTS(geom,BBOX(8.4,47.3,8.7))", "tests.point_2056_10fields", {}),
+            ("field_int = BBOX(0,0,1,1)", "tests.point_2056_10fields", {}),
             # coordinates of another CRS, sent without a filter-crs: PostGIS would fail to reproject them
             ("S_INTERSECTS(geom,BBOX(2590000,1190000,2610000,1210000))", "tests.point_2056_10fields", {}),
             ("field_int = 1", "tests.point_2056_10fields", {"filter-crs": f"{crs_base}/EPSG/0/3857"}),

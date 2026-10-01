@@ -31,7 +31,7 @@ tracker = "https://github.com/opengisch/django-oapif/issues"
 packages = ["django_oapif"]
 
 [tool.setuptools.package-data]
-django_oapif = ["templates/django_oapif/*.html"]
+django_oapif = ["templates/django_oapif/*.html", "cql2.lark"]
 
 [tool.setuptools-git-versioning]
 enabled = true

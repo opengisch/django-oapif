@@ -17,7 +17,7 @@ from operator import and_, or_
 from django.contrib.gis.db.models import GeometryField
 from django.contrib.gis.geos import GEOSException, GEOSGeometry, Polygon
 from django.db.models import F, Field, Q
-from lark import Lark
+from lark import Lark, v_args
 from lark.exceptions import LarkError
 from pygeofilter import ast, values
 from pygeofilter.parsers.cql2_text import parser as cql2_text
@@ -29,17 +29,6 @@ from django_oapif.crs import CRS84_SRID
 class FilterError(ValueError):
     """A filter that cannot be applied, for a reason the client can fix."""
 
-
-# what the grammar of pygeofilter gets wrong of CQL2, as patterns to replace and their replacements
-GRAMMAR_FIXES = (
-    # NOT only took a predicate, where QGIS sends NOT ((intfield = 0)), and CQL2 allows NOT (a OR b)
-    (
-        r'\|\s*"NOT"i predicate\s*-> not_\s*\|\s*"NOT"i "\(" predicate "\)"\s*-> not_',
-        '| "NOT"i condition_1 -> not_',
-    ),
-    # a string ended at its first quote: CQL2 escapes one as '' or \', and QGIS does the former
-    (re.escape('''SINGLE_QUOTED: "'" /.*?/ "'"'''), r"SINGLE_QUOTED: /'(?:[^'\\]|\\.|'')*'/"),
-)
 
 # the lookups of the comparisons, <> being the negation of =
 COMPARISONS = {
@@ -67,21 +56,26 @@ LITERALS = (str, int, float, date)
 
 
 class Transformer(cql2_text.CQLTransformer):
+    """The one of pygeofilter, with the fixes of its pull requests that cql2.lark takes."""
+
     def SINGLE_QUOTED(self, token):
-        # the other backslashes are left for LIKE, where they escape the next character
+        # CQL2 escapes a quote as '' or \', and the other backslashes are left for LIKE, where they escape the next
+        # character
         return re.sub(r"''|\\(.)", lambda m: "'" if m[0] == "''" or m[1] == "'" else m[0], token[1:-1], flags=re.S)
+
+    @v_args(inline=True)
+    def bbox(self, *coordinates):
+        # minx, miny, maxx, maxy, or in 3D minx, miny, minz, maxx, maxy, maxz, whose elevations are dropped
+        half = len(coordinates) // 2
+        return values.Envelope(coordinates[0], coordinates[half], coordinates[1], coordinates[half + 1])
 
 
 @cache
 def parser() -> Lark:
+    # the grammars it imports are the ones of pygeofilter
     parsers = os.path.dirname(os.path.dirname(cql2_text.__file__))
-    with open(os.path.join(parsers, "cql2_text", "grammar.lark")) as file:
+    with open(os.path.join(os.path.dirname(__file__), "cql2.lark")) as file:
         grammar = file.read()
-    for pattern, replacement in GRAMMAR_FIXES:
-        grammar, count = re.subn(pattern, lambda _: replacement, grammar)
-        if count != 1:
-            # a pygeofilter whose grammar changed would otherwise parse as it did before, unnoticed
-            raise RuntimeError(f"The CQL2 grammar of pygeofilter no longer has {pattern}")
     return Lark(grammar, parser="lalr", maybe_placeholders=False, transformer=Transformer(), import_paths=[parsers])
 
 
@@ -232,6 +226,10 @@ class Translator:
             return self.function(node)
         if isinstance(node, values.Geometry):
             return self.geometry(node.geometry)
+        if isinstance(node, values.Envelope):
+            box = Polygon.from_bbox((node.x1, node.y1, node.x2, node.y2))
+            box.srid = self.srid
+            return self.in_range(box)
         if isinstance(node, ast.Arithmetic):
             raise FilterError("Arithmetic is not supported")
         if isinstance(node, datetime) and node.tzinfo is None:
@@ -248,14 +246,6 @@ class Translator:
             if len(arguments) != 1 or not isinstance(arguments[0], (Property, str)):
                 raise FilterError("CASEI takes a property or a string")
             return CaseInsensitive(arguments[0])
-        # and reads the BBOX of CQL2, 2D or 3D, as a function
-        if node.name == "bbox":
-            if len(arguments) not in (4, 6) or not all(isinstance(argument, (int, float)) for argument in arguments):
-                raise FilterError("BBOX takes 4 or 6 numbers")
-            half = len(arguments) // 2
-            box = Polygon.from_bbox((arguments[0], arguments[1], arguments[half], arguments[half + 1]))
-            box.srid = self.srid
-            return self.in_range(box)
         raise FilterError(f"Unsupported function {node.name}")
 
     def geometry(self, geometry: dict) -> GEOSGeometry:
