@@ -37,7 +37,7 @@ jobs:
       SIZE: ${{ inputs.size || 1000 }}
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         # a pull request is checked out merged into its base branch, which is then the first parent
         fetch-depth: 2
