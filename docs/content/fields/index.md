@@ -38,8 +38,9 @@ Read-only fields are served, but not written: the fields of files, generated fie
 is rejected with a `422 Unprocessable Content`, as is a write with an invalid value. A client that writes
 back a feature it has read has to leave out its read-only properties.
 
-The primary key of a `POST` is the one of the feature created, and defaults as the model defines it. `PUT` and
-`PATCH` ignore it: they always change the feature of the URL.
+The primary key of a `POST` is the one of the feature created, and defaults as the model defines it. A `POST` with
+the key of an existing feature is rejected with a `409 Conflict`. `PUT` and `PATCH` ignore the key: they always
+change the feature of the URL.
 
 ## Schema
 
