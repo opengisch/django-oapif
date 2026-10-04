@@ -386,8 +386,11 @@ def get_related_object_or_raise(
     ])
 
 
-def get_collection_response(request: HttpRequest, collection: OapifCollection):
-    uri_prefix = "collections/" if request.get_full_path().endswith("collections") else ""
+def get_collection_response(request: HttpRequest, collection: OapifCollection, uri_prefix: str = ""):
+    """
+    The description of a collection, its links resolved against the path of the request: that of the collection,
+    or with `uri_prefix="collections/"` that of the list of collections.
+    """
     response = OAPIFCollection(
         id=collection.id,
         title=collection.title,
@@ -476,7 +479,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
                 html_link(replace_query_param(request, f="html"), "this document as HTML"),
             ],
             collections=[
-                get_collection_response(request, collection)
+                get_collection_response(request, collection, uri_prefix="collections/")
                 for collection in collections.values()
                 if collection.has_view_permission(request)
             ],

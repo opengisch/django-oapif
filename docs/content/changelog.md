@@ -85,6 +85,7 @@ Please report anything that breaks in the [issues](https://github.com/opengisch/
 - The members a collection has no value for, such as its `description` or `extent`, are left out instead of being `null`, which OGC API - Features does not allow.
 - `/collections` and `/collections/{collectionId}` no longer fail with a server error when the model of a collection has no `objects` manager.
 - `/collections` and `/collections/{collectionId}` no longer fail with a server error when the features of a collection stored in a CRS other than EPSG:4326 lie on one horizontal or vertical line, such as two points side by side, as they did in the 2.0 betas.
+- The links of the collections of `/collections` keep `collections/` in their path when the request has a query, such as an API key or `f=json`: they answered `404`, and GDAL found no feature. Those of a collection whose id ends in `collections` no longer have it twice.
 
 ### Performance
 

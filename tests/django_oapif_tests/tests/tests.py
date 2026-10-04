@@ -1219,6 +1219,28 @@ class TestHtml(TestCase):
                 self.assertEqual(alternate["type"], "text/html")
                 self.assertEqual(self.client.get(alternate["href"])["Content-Type"], self.HTML)
 
+    def test_collections_are_linked_whatever_the_query(self):
+        # with a query, such as the f=json the page links its JSON with, the links of every collection lost
+        # "collections/", and answered 404
+        listed = self.client.get(collections_url).json()["collections"]
+
+        self.assertEqual(self.client.get(collections_url, {"f": "json"}).json()["collections"], listed)
+        for collection in listed:
+            [self_link] = [link for link in collection["links"] if link["rel"] == "self"]
+            self.assertEqual(self_link["href"], f"http://testserver{collections_url}/{collection['id']}")
+
+    def test_collection_whose_id_ends_in_collections_links_itself(self):
+        # its links had "collections/" twice, and answered 404
+        class Collections(AnonReadOnlyCollection):
+            id = "tests.collections"
+
+        collection = Collections(Point_2056_Empty)
+        with patch.dict(oapif.collections, {collection.id: collection}):
+            links = self.client.get(f"{collections_url}/{collection.id}").json()["links"]
+
+        [self_link] = [link for link in links if link["rel"] == "self"]
+        self.assertEqual(self_link["href"], f"http://testserver{collections_url}/tests.collections")
+
     def page(self, url: str) -> str:
         return self.client.get(url, headers=self.BROWSER).content.decode()
 
