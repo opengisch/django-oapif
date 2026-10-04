@@ -19,7 +19,8 @@ class GeometryBase(Schema):
 
 class Point[C: Coordinate](GeometryBase):
     type: Literal["Point"]
-    coordinates: C
+    # a tuple, as an empty list would validate the first ordinate of every point as a position before refusing it
+    coordinates: C | tuple[()]
 
 
 class LineString[C: Coordinate](GeometryBase):

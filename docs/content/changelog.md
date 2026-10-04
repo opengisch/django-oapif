@@ -75,6 +75,7 @@ Please report anything that breaks in the [issues](https://github.com/opengisch/
 - Geometry fields declared with `dim=3` accept and serve Z coordinates.
 - `POST`, `PUT` and `PATCH` no longer fail with a server error when a foreign key references a model that has no `objects` manager.
 - A foreign key to another field than the primary key, with `to_field`, is written as it is served: the value of that field. It was looked up as a primary key, so the value read was refused, or linked the row whose primary key it is.
+- An empty point, `POINT EMPTY`, is served as `{"type": "Point", "coordinates": []}`, which RFC 7946 lets readers take for no geometry, instead of failing `/items` and `/items/{featureId}` with a server error. Writes take it too, as they take an empty LineString.
 - The schema of a collection is served, and linked from the collection, as `application/schema+json`, as Part 5 requires, instead of `application/json`.
 - Decimals are described in the schema as the strings they are served as. They had no type, and QGIS made no field of them.
 - Read-only properties are marked `readOnly` in the schema, so QGIS no longer lets them be edited, only to have the write rejected.
