@@ -63,18 +63,18 @@ The primary key completes the ordering of the model so that pages of features ne
 The methods of `OapifCollection` can be overridden to adapt a collection to each request, the way those of
 Django's `ModelAdmin` are:
 
-| Method                                                                          | Returns                                                                             |
-|---------------------------------------------------------------------------------|-------------------------------------------------------------------------------------|
-| `get_queryset(request)`                                                         | The rows the collection serves, changes and deletes, and computes its extent from.  |
-| `get_fields(request, obj=None)`                                                 | The fields served as properties, `fields` by default.                               |
-| `get_exclude(request, obj=None)`                                                | The fields not served, `exclude` by default.                                        |
-| `get_readonly_fields(request, obj=None)`                                        | The fields not accepted in writes: `readonly_fields`, generated fields and files.   |
-| `get_ordering(request)`                                                         | The order of the features.                                                          |
-| `get_queryables(request)`                                                       | The fields the features can be [filtered](filtering.md#queryables) on.              |
-| `save_model(request, obj, change)`                                              | Saves a created or changed row.                                                     |
-| `delete_model(request, obj)`                                                    | Deletes a row.                                                                      |
-| `has_view_permission(request, obj=None)`, and the add, change and delete ones   | See [permissions](permissions.md).                                                  |
-| `storage_crs()`, `supported_crs()`                                              | See [coordinate reference systems](crs.md).                                         |
+| Method                                                                          | Returns                                                                                                       |
+|---------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------|
+| `get_queryset(request)`                                                         | The rows it serves, changes and deletes, computes its extent from, and that foreign keys to it may reference. |
+| `get_fields(request, obj=None)`                                                 | The fields served as properties, `fields` by default.                                                         |
+| `get_exclude(request, obj=None)`                                                | The fields not served, `exclude` by default.                                                                  |
+| `get_readonly_fields(request, obj=None)`                                        | The fields not accepted in writes: `readonly_fields`, generated fields and files.                             |
+| `get_ordering(request)`                                                         | The order of the features.                                                                                    |
+| `get_queryables(request)`                                                       | The fields the features can be [filtered](filtering.md#queryables) on.                                        |
+| `save_model(request, obj, change)`                                              | Saves a created or changed row.                                                                               |
+| `delete_model(request, obj)`                                                    | Deletes a row.                                                                                                |
+| `has_view_permission(request, obj=None)`, and the add, change and delete ones   | See [permissions](permissions.md).                                                                            |
+| `storage_crs()`, `supported_crs()`                                              | See [coordinate reference systems](crs.md).                                                                   |
 
 For instance, to serve each user their own features only, and to record who created one:
 

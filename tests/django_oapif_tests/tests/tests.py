@@ -77,6 +77,14 @@ def geometry_of(feature: dict) -> dict | None:
     return feature["place"] if feature.get("place") is not None else feature["geometry"]
 
 
+def serving(collection_id: str, *rows):
+    """Patch a collection to serve only some of its rows, as a get_queryset() filtering them would."""
+    collection = oapif.collections[collection_id]
+    get_queryset = collection.get_queryset
+    pks = [row.pk for row in rows]
+    return patch.object(collection, "get_queryset", lambda request: get_queryset(request).filter(pk__in=pks))
+
+
 class TestBasicAuth(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -334,9 +342,15 @@ class TestBasicAuth(TestCase):
         first, second = Point_2056_10fields.objects.all()[:2]
         url = f"{collections_url}/tests.layerwithforeignkey/items"
         feature = {"type": "Feature", "geometry": None, "properties": {"point": str(first.pk)}}
+        points = oapif.collections["tests.point_2056_10fields"]
+        subset = oapif.collections["tests.point_2056_10fields_subset"]
 
-        # standing for such a model
-        with patch.object(Point_2056_10fields, "objects", None):
+        # standing for such a model, whose collections the user may not view: the key is looked up among all its rows
+        with (
+            patch.object(Point_2056_10fields, "objects", None),
+            patch.object(points, "has_view_permission", return_value=False),
+            patch.object(subset, "has_view_permission", return_value=False),
+        ):
             created = self.client.post(url, feature, headers=headers, content_type="application/json")
             feature["properties"]["point"] = str(second.pk)
             replaced = self.client.put(
@@ -373,6 +387,47 @@ class TestBasicAuth(TestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(Coded.objects.get(pk=response.json()["id"]).parent, referenced)
+
+    def test_foreign_key_references_a_feature_served(self):
+        # a key to any row of the model was taken: a user could link a feature to one that the collections of the
+        # model hide from them, such as someone else's, and tell which keys exist from a 201 or a 422
+        self.client.force_login(user=self.demo_editor)
+        first, second, hidden = Point_2056_10fields.objects.all()[:3]
+        url = f"{collections_url}/tests.layerwithforeignkey/items"
+
+        def post(key):
+            feature = {"type": "Feature", "geometry": None, "properties": {"point": str(key)}}
+            return self.client.post(url, feature, headers=headers, content_type="application/json")
+
+        # each collection of the model serves one of them
+        with serving("tests.point_2056_10fields", first), serving("tests.point_2056_10fields_subset", second):
+            created = [post(first.pk).status_code, post(second.pk).status_code]
+            refused, missing = post(hidden.pk), post(uuid.uuid4())
+
+        self.assertEqual(created, [201, 201])
+        self.assertEqual(refused.status_code, 422)
+        # as a key that references no row
+        self.assertEqual(refused.json(), missing.json())
+
+    def test_put_and_patch_check_only_the_foreign_keys_they_change(self):
+        # a feature written back as it was read keeps its reference, though the row has left those the user is
+        # served since, while a key changed to such a row is refused
+        self.client.force_login(user=self.demo_editor)
+        hidden, other = Point_2056_10fields.objects.all()[:2]
+        item = LayerWithForeignKey.objects.create(point=hidden)
+        url = f"{collections_url}/tests.layerwithforeignkey/items/{item.pk}"
+        feature = self.client.get(url).json()
+        changed = feature | {"properties": {"point": str(other.pk)}}
+
+        with serving("tests.point_2056_10fields"), serving("tests.point_2056_10fields_subset"):
+            for method in (self.client.put, self.client.patch):
+                with self.subTest(method=method.__name__):
+                    kept = method(url, feature, headers=headers, content_type="application/json")
+                    refused = method(url, changed, headers=headers, content_type="application/json")
+
+                    self.assertEqual((kept.status_code, refused.status_code), (200, 422))
+                    item.refresh_from_db()
+                    self.assertEqual(item.point, hidden)
 
     def test_file_field(self):
         obj = LayerWithFile.objects.create(file="foo/bar.txt")

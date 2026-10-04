@@ -275,21 +275,28 @@ def take_jsonfg_members_or_raise(feature: GenericFeatureInput | GenericFeaturePa
         feature.geometry = feature.place
 
 
+def referenced_collections(
+    request: HttpRequest, field: ForeignKey, collections: dict[str, OapifCollection]
+) -> list[OapifCollection]:
+    """
+    The collections a foreign key references, in the reference role of Part 5, those of the model it references that
+    the user may view: served as the primary key of a row, it is the id of a feature of theirs. A key to another
+    field, or to a model without a collection, references no feature, and the primary key keeps its role of id.
+    """
+    if field.primary_key or not field.target_field.primary_key:
+        return []
+    model = field.related_model
+    return [other for other in collections.values() if other.model is model and other.has_view_permission(request)]
+
+
 def add_references(
     request: HttpRequest, collection: OapifCollection, collections: dict[str, OapifCollection], schema: dict
 ) -> None:
-    """
-    Give a foreign key the reference role of Part 5, to the collections of the model it references that the user
-    may view: served as the primary key of a row, it is the id of a feature of theirs. A key to another field, or to
-    a model without a collection, references no feature, and the primary key keeps its role of id.
-    """
-    for name, model in collection.foreign_key_fields.items():
-        field = collection.opts.get_field(name)
-        if field.primary_key or not field.target_field.primary_key or name not in schema["properties"]:
+    """Give a foreign key the reference role of Part 5, to the collections it references."""
+    for name in collection.foreign_key_fields:
+        if name not in schema["properties"]:
             continue
-        ids = [
-            other.id for other in collections.values() if other.model is model and other.has_view_permission(request)
-        ]
+        ids = [other.id for other in referenced_collections(request, collection.opts.get_field(name), collections)]
         if ids:
             schema["properties"][name]["x-ogc-role"] = "reference"
             schema["properties"][name]["x-ogc-collectionId"] = ids[0] if len(ids) == 1 else ids
@@ -357,19 +364,26 @@ def geometry_to_save(geometry, crs: CRS) -> GEOSGeometry | None:
         raise HttpError(422, "Invalid geometry")
 
 
-def get_related_object_or_raise(field: ForeignKey, value: Any):
-    """The row a foreign key references, by the value of the field it references, which the key is served as."""
-    related_model = field.related_model
-    try:
-        return related_model._default_manager.get(**{field.target_field.name: value})
-    except related_model.DoesNotExist:
-        raise ValidationError([
-            {
-                "loc": ["body", "feature", "properties", field.name],
-                "msg": "Foreign key not found",
-                "type": "value_error",
-            },
-        ])
+def get_related_object_or_raise(
+    request: HttpRequest, field: ForeignKey, value: Any, collections: dict[str, OapifCollection]
+):
+    """
+    The row a foreign key references, by the value of the field it references, which the key is served as. A
+    reference has to be to a feature that its collections serve the user: any row would let them link to one hidden
+    from them, such as someone else's, and tell which exist. Another key takes any row of its model.
+    """
+    lookup = {field.target_field.name: value}
+    querysets = [other.get_queryset(request) for other in referenced_collections(request, field, collections)]
+    for queryset in querysets or [field.related_model._default_manager]:
+        if (row := queryset.filter(**lookup).first()) is not None:
+            return row
+    raise ValidationError([
+        {
+            "loc": ["body", "feature", "properties", field.name],
+            "msg": "Foreign key not found",
+            "type": "value_error",
+        },
+    ])
 
 
 def get_collection_response(request: HttpRequest, collection: OapifCollection):
@@ -692,7 +706,8 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         item_properties = feature.properties.model_dump() or {}
         for field, value in item_properties.items():
             if value is not None and field in collection.foreign_key_fields:
-                item_properties[field] = get_related_object_or_raise(collection.opts.get_field(field), value)
+                foreign_key = collection.opts.get_field(field)
+                item_properties[field] = get_related_object_or_raise(request, foreign_key, value, collections)
         if (geom_field := collection.geometry_field) and feature.geometry:
             item_properties[geom_field] = geometry_to_save(feature.geometry, crs)
         item = collection.model(**item_properties)
@@ -753,7 +768,11 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
             if field in primary_keys(collection):
                 continue
             if value is not None and field in collection.foreign_key_fields:
-                value = get_related_object_or_raise(collection.opts.get_field(field), value)
+                foreign_key = collection.opts.get_field(field)
+                # written back as it was read, a key is kept: its row may have left those the user is served since
+                if value == getattr(item, foreign_key.attname):
+                    continue
+                value = get_related_object_or_raise(request, foreign_key, value, collections)
             setattr(item, field, value)
         if geom_field := collection.geometry_field:
             setattr(item, geom_field, geometry_to_save(feature.geometry, crs))
@@ -785,7 +804,11 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
                 if field in primary_keys(collection):
                     continue
                 if value is not None and field in collection.foreign_key_fields:
-                    value = get_related_object_or_raise(collection.opts.get_field(field), value)
+                    foreign_key = collection.opts.get_field(field)
+                    # written back as it was read, a key is kept: its row may have left those the user is served since
+                    if value == getattr(item, foreign_key.attname):
+                        continue
+                    value = get_related_object_or_raise(request, foreign_key, value, collections)
                 setattr(item, field, value)
         if (geom_field := collection.geometry_field) and "geometry" in feature.model_fields_set:
             setattr(item, geom_field, geometry_to_save(feature.geometry, crs))

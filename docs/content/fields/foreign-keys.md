@@ -52,6 +52,11 @@ Writes take the same primary key, in `POST`, `PUT` and `PATCH`. A key that refer
 }
 ```
 
+So is a key with the [`reference` role](#schema) to a row that the collections it references do not serve the user:
+a user cannot link a feature to one that [`get_queryset()`](../usage/collections.md#hooks) hides from them, such as
+someone else's, nor tell it from a row that does not exist. A key that a `PUT` or a `PATCH` writes back unchanged is
+kept, though, even if its row is no longer served. A key without the role may reference any row of its model.
+
 The reverse relations, the children of a parent here, are not served.
 
 ## Schema
