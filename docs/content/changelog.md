@@ -74,6 +74,7 @@ Please report anything that breaks in the [issues](https://github.com/opengisch/
 - The conformance declaration lists the returnables and receivables class of Part 5, which the collections already met by linking their schema.
 - The `$id` of a schema is its URI without the query parameters of the request, such as `f=json`.
 - The schema gives the position of each property, which QGIS orders the fields of a layer by, instead of alphabetically.
+- The members a collection has no value for, such as its `description` or `extent`, are left out instead of being `null`, which OGC API - Features does not allow.
 
 ### Performance
 
