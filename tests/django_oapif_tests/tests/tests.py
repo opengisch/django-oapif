@@ -1296,6 +1296,18 @@ class TestHtml(TestCase):
         [doc] = [link for link in links if link["rel"] == "service-doc"]
         self.assertEqual(self.client.get(doc["href"]).status_code, 200)
 
+    def test_collections_page_computes_no_extent(self):
+        # it shows none, but computed that of every collection, a query each
+        with CaptureQueriesContext(connection) as queries:
+            page = self.client.get(collections_url, headers=self.BROWSER)
+
+        self.assertEqual(page.status_code, 200)
+        self.assertFalse(any("ST_Extent" in query["sql"] for query in queries.captured_queries))
+        # the JSON still has them
+        listed = self.client.get(collections_url).json()["collections"]
+        [point] = [collection for collection in listed if collection["id"] == "tests.point_2056_10fields"]
+        self.assertIsNotNone(point["extent"])
+
     def test_items_page_shows_the_features(self):
         url = f"{collections_url}/tests.point_2056_10fields/items?limit=3&offset=3"
         geojson = self.client.get(url).json()

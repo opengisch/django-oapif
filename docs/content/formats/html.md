@@ -54,6 +54,9 @@ before those of django-oapif, such as in a directory of its `TEMPLATES` `DIRS`:
 | `django_oapif/items.html`       | `/collections/{collectionId}/items`                    |
 | `django_oapif/item.html`        | `/collections/{collectionId}/items/{featureId}`        |
 
+The collections of `django_oapif/collections.html` have no extent, which would take a query each, unlike the
+collection of `django_oapif/collection.html`.
+
 ## Conformance
 
 The pages do not make the API meet the HTML conformance classes of OGC API - Common and OGC API - Features,

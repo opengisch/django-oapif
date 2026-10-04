@@ -92,6 +92,7 @@ Please report anything that breaks in the [issues](https://github.com/opengisch/
 - GeoJSON is serialized directly by pydantic, instead of being validated again by django-ninja and then written with `json.dumps`.
 - Geometries are read from the database as WKB, and the bbox of a page is computed from them as they are read.
 - Collection extents are computed in the storage CRS, and only their outline is reprojected, instead of every geometry.
+- The HTML page of `/collections` no longer computes the extent of every collection, which it does not show: a query each, about 45 ms for a table of 200,000 rows.
 - The documentation now has a [deployment](usage/deployment.md) page. Use persistent database connections: PostGIS prepares each reprojection once per connection, which costs about 130 ms, so without them every request in a CRS other than the storage one pays that again.
 
 ## 1.x and earlier
