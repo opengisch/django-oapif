@@ -9,7 +9,7 @@ from django.contrib.gis.geos.libgeos import geos_version_tuple
 from django.core.exceptions import FieldError
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db.models import Model, QuerySet
+from django.db.models import ForeignKey, Model, QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils.cache import patch_vary_headers
@@ -357,13 +357,15 @@ def geometry_to_save(geometry, crs: CRS) -> GEOSGeometry | None:
         raise HttpError(422, "Invalid geometry")
 
 
-def get_related_object_or_raise(field: str, value: Any, related_model: type[Model]):
+def get_related_object_or_raise(field: ForeignKey, value: Any):
+    """The row a foreign key references, by the value of the field it references, which the key is served as."""
+    related_model = field.related_model
     try:
-        return related_model.objects.get(pk=value)
+        return related_model._default_manager.get(**{field.target_field.name: value})
     except related_model.DoesNotExist:
         raise ValidationError([
             {
-                "loc": ["body", "feature", "properties", field],
+                "loc": ["body", "feature", "properties", field.name],
                 "msg": "Foreign key not found",
                 "type": "value_error",
             },
@@ -689,8 +691,8 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         feature = collection.validate_feature_input_or_raise(request, feature)
         item_properties = feature.properties.model_dump() or {}
         for field, value in item_properties.items():
-            if value is not None and (related_model := collection.foreign_key_fields.get(field)):
-                item_properties[field] = get_related_object_or_raise(field, value, related_model)
+            if value is not None and field in collection.foreign_key_fields:
+                item_properties[field] = get_related_object_or_raise(collection.opts.get_field(field), value)
         if (geom_field := collection.geometry_field) and feature.geometry:
             item_properties[geom_field] = geometry_to_save(feature.geometry, crs)
         item = collection.model(**item_properties)
@@ -750,8 +752,8 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         for field, value in feature.properties.model_dump().items():
             if field in primary_keys(collection):
                 continue
-            if value is not None and (related_model := collection.foreign_key_fields.get(field)):
-                value = get_related_object_or_raise(field, value, related_model)
+            if value is not None and field in collection.foreign_key_fields:
+                value = get_related_object_or_raise(collection.opts.get_field(field), value)
             setattr(item, field, value)
         if geom_field := collection.geometry_field:
             setattr(item, geom_field, geometry_to_save(feature.geometry, crs))
@@ -782,8 +784,8 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
             for field, value in feature.properties.model_dump(exclude_unset=True).items():
                 if field in primary_keys(collection):
                     continue
-                if value is not None and (related_model := collection.foreign_key_fields.get(field)):
-                    value = get_related_object_or_raise(field, value, related_model)
+                if value is not None and field in collection.foreign_key_fields:
+                    value = get_related_object_or_raise(collection.opts.get_field(field), value)
                 setattr(item, field, value)
         if (geom_field := collection.geometry_field) and "geometry" in feature.model_fields_set:
             setattr(item, geom_field, geometry_to_save(feature.geometry, crs))
