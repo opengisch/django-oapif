@@ -9,6 +9,7 @@ from uuid import UUID
 from django.contrib.auth import get_permission_codename
 from django.contrib.gis.db.models import Extent, GeometryField
 from django.contrib.gis.db.models.functions import AsWKB, GeomOutputGeoFunc, IsEmpty, Transform
+from django.contrib.gis.geos import GEOSGeometry
 from django.contrib.gis.geos import Polygon as GEOSPolygon
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import (
@@ -207,6 +208,29 @@ class CurveToLine(GeomOutputGeoFunc):
         super().__init__(expression, Value(tolerance), Value(tolerance_type), Value(symmetric), **extra)
 
 
+class Segmentize(GeomOutputGeoFunc):
+    """A geometry with its segments split by PostGIS into ones no longer than `step`, in the unit of its CRS."""
+
+    function = "ST_Segmentize"
+
+    def __init__(self, expression, step: float, **extra):
+        super().__init__(expression, Value(float(step)), **extra)
+
+
+def reprojected(geometry: GEOSGeometry, srid: int) -> GEOSGeometry | Transform:
+    """
+    A geometry to compare with the ones stored in `srid`, reprojected by PostGIS when it is in another CRS: densified
+    first, as its edges curve once reprojected, and its vertices alone would stray from them, by over 2 km for a box
+    across Switzerland.
+    """
+    if geometry.srid == srid:
+        return geometry
+    # 64 segments an edge of a square, and at most 256 more points however many edges the geometry of a filter
+    # has; a box of a single point gives a step of 0, which ST_Segmentize refuses
+    step = geometry.length / 256
+    return Transform(Segmentize(geometry, step) if step else geometry, srid)
+
+
 def without(fields: tuple[str, ...], *excluded: tuple[str, ...]) -> tuple[str, ...]:
     """
     The fields minus the excluded ones, in their declared order. A set difference would do, but its
@@ -337,8 +361,7 @@ class OapifCollection[M: Model]:
                 assert bbox_crs is not None
                 bbox_geom = GEOSPolygon.from_bbox((bbox.xmin, bbox.ymin, bbox.xmax, bbox.ymax))
                 bbox_geom.srid = bbox_crs.srid
-                bbox_expr = bbox_geom if bbox_geom.srid == self.srid else Transform(bbox_geom, self.srid)
-                qs = qs.filter(**{f"{geom_field}__intersects": bbox_expr})
+                qs = qs.filter(**{f"{geom_field}__intersects": reprojected(bbox_geom, self.srid)})
         return qs
 
     def linearize(self, qs: QuerySet[M], crs: CRS) -> QuerySet[M]:

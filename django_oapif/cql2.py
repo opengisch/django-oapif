@@ -24,6 +24,7 @@ from pygeofilter.parsers.cql2_text import parser as cql2_text
 
 from django_oapif import jsonfg
 from django_oapif.crs import CRS84_SRID
+from django_oapif.handler import reprojected
 
 
 class FilterError(ValueError):
@@ -213,11 +214,11 @@ class Translator:
     def spatial(self, lookup: str, lhs, rhs) -> tuple[Q, list[Property]]:
         if not isinstance(lhs, Property):
             lhs, rhs, lookup = rhs, lhs, MIRRORED.get(lookup, lookup)
-        if not isinstance(self.property(lhs).field, GeometryField):
+        if not isinstance(field := self.property(lhs).field, GeometryField):
             raise FilterError(f"'{lhs.name}' is not a geometry, which spatial functions take")
         if not isinstance(rhs, GEOSGeometry):
             raise FilterError("Spatial functions compare the geometry of the features with a geometry literal")
-        return Q(**{f"{lhs.name}__{lookup}": rhs}), [lhs]
+        return Q(**{f"{lhs.name}__{lookup}": reprojected(rhs, field.srid)}), [lhs]
 
     def operand(self, node):
         if isinstance(node, ast.Attribute):
