@@ -72,6 +72,10 @@ The collections are writable, as defined by
 | `PATCH /collections/{collectionId}/items/{featureId}`    | Changes the geometry or the properties that it is sent, and returns the feature. |
 | `DELETE /collections/{collectionId}/items/{featureId}`   | Deletes a feature.                                                               |
 
+A write that leaves the feature out of the rows of [`get_queryset()`](../usage/collections.md#hooks), such as a
+feature moved out of the area of the user, is saved, and answered without it: a `POST` with a `201 Created` and
+its `Location` only, a `PUT` or `PATCH` with a `204 No Content`.
+
 The body of a `POST`, `PUT` or `PATCH` is a GeoJSON feature, whose coordinates are in the CRS of the
 `Content-Crs` header, CRS84 by default. The feature returned is in CRS84, and in JSON-FG for a curve:
 

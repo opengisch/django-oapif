@@ -715,11 +715,17 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
             raise AuthorizationError()
         validate_new_key_or_raise(collection, item)
         collection.save_model(request, item, False)
-        item = collection.query(request, DEFAULT_CRS).get(pk=item.pk)
-        # in JSON-FG for a curve, which ninja would take for GeoJSON
-        response = geojson_response(collection.model_to_feature(request, item), DEFAULT_CRS)
-        response.status_code = 201
-        response["Location"] = request.build_absolute_uri(f"items/{item.pk}")
+        location = request.build_absolute_uri(f"items/{item.pk}")
+        item = collection.query(request, DEFAULT_CRS).filter(pk=item.pk).first()
+        if item is None:
+            # saved out of the rows the collection serves, such as out of the area of the user: Part 4 lets the
+            # response leave the feature out
+            response = HttpResponse(status=201)
+        else:
+            # in JSON-FG for a curve, which ninja would take for GeoJSON
+            response = geojson_response(collection.model_to_feature(request, item), DEFAULT_CRS)
+            response.status_code = 201
+        response["Location"] = location
         return response
 
     @router.api_operation(
@@ -748,7 +754,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
     @router.put(
         "/{collection_id}/items/{item_id}",
         operation_id="replace_collection_item",
-        response=GenericFeature,
+        response={200: GenericFeature, 204: None},
     )
     def replace_item(
         request: HttpRequest,
@@ -777,13 +783,16 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         if geom_field := collection.geometry_field:
             setattr(item, geom_field, geometry_to_save(feature.geometry, crs))
         collection.save_model(request, item, True)
-        item = collection.query(request, DEFAULT_CRS).get(pk=item_id)
+        item = collection.query(request, DEFAULT_CRS).filter(pk=item_id).first()
+        if item is None:
+            # the change took it out of the rows the collection serves
+            return HttpResponse(status=204)
         return geojson_response(collection.model_to_feature(request, item), DEFAULT_CRS)
 
     @router.patch(
         "/{collection_id}/items/{item_id}",
         operation_id="update_collection_item",
-        response=GenericFeature,
+        response={200: GenericFeature, 204: None},
     )
     def update_item(
         request: HttpRequest,
@@ -813,7 +822,10 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         if (geom_field := collection.geometry_field) and "geometry" in feature.model_fields_set:
             setattr(item, geom_field, geometry_to_save(feature.geometry, crs))
         collection.save_model(request, item, True)
-        item = collection.query(request, DEFAULT_CRS).get(pk=item_id)
+        item = collection.query(request, DEFAULT_CRS).filter(pk=item_id).first()
+        if item is None:
+            # the change took it out of the rows the collection serves
+            return HttpResponse(status=204)
         return geojson_response(collection.model_to_feature(request, item), DEFAULT_CRS)
 
     @router.delete("/{collection_id}/items/{item_id}", operation_id="delete_collection_item")

@@ -241,6 +241,59 @@ class TestBasicAuth(TestCase):
 
         self.assertEqual(response.status_code, 409)
 
+    def test_feature_created_out_of_the_rows_served_is_saved(self):
+        # a collection serving the drafts only: a feature created published was saved, and then answered with a
+        # server error, which a client may take for a failure, and send again
+        self.client.force_login(user=self.demo_editor)
+        url = f"{collections_url}/tests.point_2056_10fields/items"
+        collection = oapif.collections["tests.point_2056_10fields"]
+        get_queryset = collection.get_queryset
+
+        def drafts(request):
+            return get_queryset(request).filter(field_str_0="draft")
+
+        def feature(state):
+            geometry = {"type": "Point", "coordinates": [2600000.0, 1200000.0]}
+            return {"type": "Feature", "geometry": geometry, "properties": {"field_str_0": state}}
+
+        with patch.object(collection, "get_queryset", drafts):
+            draft = self.client.post(url, feature("draft"), headers=headers, content_type="application/json")
+            published = self.client.post(url, feature("published"), headers=headers, content_type="application/json")
+
+        self.assertEqual(draft.status_code, 201)
+        self.assertEqual(draft["Location"], f"http://testserver{url}/{draft.json()['id']}")
+        self.assertEqual((published.status_code, published.content), (201, b""))
+        created = Point_2056_10fields.objects.get(field_str_0="published")
+        self.assertEqual(published["Location"], f"http://testserver{url}/{created.pk}")
+
+    def test_feature_changed_out_of_the_rows_served_is_saved(self):
+        # a change publishing a draft, in a collection serving the drafts only, was saved, and then answered with a
+        # server error
+        self.client.force_login(user=self.demo_editor)
+        collection = oapif.collections["tests.point_2056_10fields"]
+        get_queryset = collection.get_queryset
+
+        def drafts(request):
+            return get_queryset(request).filter(field_str_0="draft")
+
+        def feature(state):
+            geometry = {"type": "Point", "coordinates": [2600000.0, 1200000.0]}
+            return {"type": "Feature", "geometry": geometry, "properties": {"field_str_0": state}}
+
+        for method in (self.client.put, self.client.patch):
+            with self.subTest(method=method.__name__):
+                item = Point_2056_10fields.objects.create(geom="SRID=2056;POINT(2600000 1200000)", field_str_0="draft")
+                url = f"{collections_url}/tests.point_2056_10fields/items/{item.pk}"
+
+                with patch.object(collection, "get_queryset", drafts):
+                    draft = method(url, feature("draft"), headers=headers, content_type="application/json")
+                    published = method(url, feature("published"), headers=headers, content_type="application/json")
+
+                self.assertEqual((draft.status_code, draft.json()["id"]), (200, str(item.pk)))
+                self.assertEqual((published.status_code, published.content), (204, b""))
+                item.refresh_from_db()
+                self.assertEqual(item.field_str_0, "published")
+
     def test_unknown_property_is_rejected_after_a_read(self):
         self.client.force_login(user=self.demo_editor)
         url = f"{collections_url}/tests.point_2056_10fields/items"
