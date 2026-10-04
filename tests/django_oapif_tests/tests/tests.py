@@ -1470,6 +1470,31 @@ class TestCrs(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["extent"]["spatial"]["bbox"], [[2600000, 1200000, 2601000, 1201000]])
 
+    def test_extent_covers_features_on_one_northing_or_easting(self):
+        # points on one northing or one easting have an extent of no height or no width, which PostGIS casts to a
+        # line: it has no perimeter to densify it by, and the collection answered 500. A line along one northing
+        # still bulges north in its middle once reprojected. The extent of a single point is cast to a point, which
+        # ST_Segmentize returns as it is, even with a step of 0
+        for points in (
+            ((2485000, 1296000), (2834000, 1296000), (2659500, 1296000)),
+            ((2834000, 1075000), (2834000, 1296000)),
+            ((2600000, 1200000),),
+        ):
+            with self.subTest(points=points):
+                Point_2056_Empty.objects.all().delete()
+                for x, y in points:
+                    Point_2056_Empty.objects.create(geom=f"SRID=2056;POINT({x} {y})")
+
+                response = self.client.get(f"{collections_url}/tests.point_2056_empty")
+
+                self.assertEqual(response.status_code, 200)
+                xmin, ymin, xmax, ymax = response.json()["extent"]["spatial"]["bbox"][0]
+                exact = Point_2056_Empty.objects.aggregate(extent=Extent(Transform("geom", 4326)))["extent"]
+                self.assertLessEqual(xmin, exact[0])
+                self.assertLessEqual(ymin, exact[1])
+                self.assertGreaterEqual(xmax, exact[2])
+                self.assertGreaterEqual(ymax, exact[3])
+
     def test_advertised_crs_are_accepted(self):
         collection_response = self.client.get(f"{collections_url}/tests.point_2056_10fields")
 

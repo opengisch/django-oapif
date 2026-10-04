@@ -186,8 +186,10 @@ class ReprojectedExtent(Func):
     def as_sql(self, compiler, connection, **extra_context):
         extent, params = compiler.compile(self.source_expressions[0])
         box = f"ST_SetSRID({extent}::geometry, {self.source_srid})"
-        sql = f"Box2D(ST_Transform(ST_Segmentize({box}, ST_Perimeter({box}) / 128), {self.target_srid}))"
-        return sql, (*params, *params)
+        # a box of no width, or no height, is cast to a line, which has a length but no perimeter
+        step = f"GREATEST(ST_Perimeter({box}), ST_Length({box})) / 128"
+        sql = f"Box2D(ST_Transform(ST_Segmentize({box}, {step}), {self.target_srid}))"
+        return sql, (*params, *params, *params)
 
 
 class CurveToLine(GeomOutputGeoFunc):

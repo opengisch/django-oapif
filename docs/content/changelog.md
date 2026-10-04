@@ -79,6 +79,7 @@ Please report anything that breaks in the [issues](https://github.com/opengisch/
 - The schema gives the position of each property, which QGIS orders the fields of a layer by, instead of alphabetically.
 - The members a collection has no value for, such as its `description` or `extent`, are left out instead of being `null`, which OGC API - Features does not allow.
 - `/collections` and `/collections/{collectionId}` no longer fail with a server error when the model of a collection has no `objects` manager.
+- `/collections` and `/collections/{collectionId}` no longer fail with a server error when the features of a collection stored in a CRS other than EPSG:4326 lie on one horizontal or vertical line, such as two points side by side, as they did in the 2.0 betas.
 
 ### Performance
 
