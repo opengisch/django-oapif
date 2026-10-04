@@ -890,6 +890,24 @@ class TestOutputFormat(TestCase):
                 else:
                     self.assertEqual(feature["geometry"], None)
 
+    def test_empty_point_is_served(self):
+        # served with empty coordinates, which the Point schema used to refuse, failing the whole page with a 500
+        empty = {"type": "Point", "coordinates": []}
+        for collection, model in (("tests.point_2056_empty", Point_2056_Empty), ("tests.geometry_2056", Geometry_2056)):
+            with self.subTest(collection=collection):
+                point = model.objects.create(geom="SRID=2056;POINT EMPTY")
+                url = f"{collections_url}/{collection}/items"
+
+                items = self.client.get(url)
+                item = self.client.get(f"{url}/{point.pk}")
+
+                self.assertEqual(items.status_code, 200)
+                self.assertEqual([feature["geometry"] for feature in items.json()["features"]], [empty])
+                self.assertEqual(item.status_code, 200)
+                self.assertEqual(item.json()["geometry"], empty)
+                for page_url in (url, f"{url}/{point.pk}"):
+                    self.assertEqual(self.client.get(page_url, {"f": "html"}).status_code, 200)
+
     @patch("django_oapif.collections.ARROW_AVAILABLE", False)
     def test_arrow_without_the_extra_is_not_acceptable(self):
         url = f"{collections_url}/tests.point_2056_10fields/items"
@@ -2554,6 +2572,21 @@ class TestWriteGeometries(TestCase):
         line = {"type": "LineString", "coordinates": [[2508500.0, 1152000.0, 1.0], [2508600.0, 1152100.0, 2.0]]}
 
         self.assert_round_trip("tests.geometryz_2056", {"linestring": line})
+
+    def test_empty_point_is_written(self):
+        # as it is served, with empty coordinates, which the Point schema used to refuse
+        point = {"type": "Point", "coordinates": []}
+        for collection, model in (
+            ("tests.point_2056_10fields", Point_2056_10fields),
+            ("tests.geometry_2056", Geometry_2056),
+        ):
+            with self.subTest(collection=collection):
+                response = self.post(collection, point)
+
+                self.assertEqual(response.status_code, 201)
+                self.assertEqual(response.json()["geometry"], point)
+                stored = model.objects.get(pk=response.json()["id"]).geom
+                self.assertEqual((stored.geom_type, stored.empty), ("Point", True))
 
     def test_invalid_geometry_is_a_client_error(self):
         # GEOS refuses a ring that is not closed, which used to be a 500
