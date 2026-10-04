@@ -13,16 +13,16 @@ from django.contrib.auth.models import User
 from django.contrib.gis.db.models import Extent
 from django.contrib.gis.db.models.functions import Transform
 from django.core.management import call_command
-from django.db import connection
+from django.db import connection, models
 from django.db.models import FloatField, Func, Max, Min
 from django.test import RequestFactory
 from django.test.testcases import TestCase
-from django.test.utils import CaptureQueriesContext
+from django.test.utils import CaptureQueriesContext, isolate_apps
 from django_oapif import jsonfg
 from django_oapif.collections import writes_curves
 from django_oapif.crs import CRS, CRS84_SRID
 from django_oapif.geojson import CircularString, Coordinate2D
-from django_oapif.handler import ARROW_AVAILABLE, AnonReadOnlyCollection, json_schema_pattern
+from django_oapif.handler import ARROW_AVAILABLE, AllowAnyCollection, AnonReadOnlyCollection, json_schema_pattern
 from django_oapif_tests.tests.oapif import oapif
 from django_oapif_tests.tests.models import (
     Arc_2056_10fields,
@@ -326,6 +326,53 @@ class TestBasicAuth(TestCase):
             ]
         }
         self.assertEqual(post_to_items.json(), expected_error)
+
+    def test_foreign_key_to_a_model_without_objects(self):
+        # Django gives no "objects" to a model whose managers all have other names, and the key was looked up with
+        # it: writes failed with a 500
+        self.client.force_login(user=self.demo_editor)
+        first, second = Point_2056_10fields.objects.all()[:2]
+        url = f"{collections_url}/tests.layerwithforeignkey/items"
+        feature = {"type": "Feature", "geometry": None, "properties": {"point": str(first.pk)}}
+
+        # standing for such a model
+        with patch.object(Point_2056_10fields, "objects", None):
+            created = self.client.post(url, feature, headers=headers, content_type="application/json")
+            feature["properties"]["point"] = str(second.pk)
+            replaced = self.client.put(
+                f"{url}/{created.json()['id']}", feature, headers=headers, content_type="application/json"
+            )
+
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(replaced.status_code, 200)
+        self.assertEqual(LayerWithForeignKey.objects.get(pk=created.json()["id"]).point, second)
+
+    @isolate_apps("django_oapif_tests.tests")
+    def test_foreign_key_to_another_field_is_written_as_it_is_served(self):
+        # served as the value of the field it references, the key was looked up as a primary key: that value was
+        # refused, or linked the row whose primary key it is. No model of the tests has such a key, hence this one
+        class Coded(models.Model):
+            class Meta:
+                app_label = "tests"
+
+            id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+            code = models.UUIDField(unique=True, default=uuid.uuid4)
+            parent = models.ForeignKey("self", to_field="code", null=True, on_delete=models.CASCADE)
+
+        with connection.schema_editor() as editor:
+            editor.create_model(Coded)
+        referenced = Coded.objects.create()
+        # the row whose primary key is the code of the referenced one
+        Coded.objects.create(id=referenced.code)
+        collection = AllowAnyCollection(Coded)
+        url = f"{collections_url}/{collection.id}/items"
+        feature = {"type": "Feature", "geometry": None, "properties": {"parent": str(referenced.code)}}
+
+        with patch.dict(oapif.collections, {collection.id: collection}):
+            response = self.client.post(url, feature, headers=headers, content_type="application/json")
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Coded.objects.get(pk=response.json()["id"]).parent, referenced)
 
     def test_file_field(self):
         obj = LayerWithFile.objects.create(file="foo/bar.txt")

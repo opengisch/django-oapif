@@ -70,6 +70,8 @@ Please report anything that breaks in the [issues](https://github.com/opengisch/
 - Invalid geometries, such as polygons with unclosed rings, and errors raised by validators now return `422`, instead of a server error.
 - LineString coordinates are checked against the dimension of the column, like those of the other geometry types.
 - Geometry fields declared with `dim=3` accept and serve Z coordinates.
+- `POST`, `PUT` and `PATCH` no longer fail with a server error when a foreign key references a model that has no `objects` manager.
+- A foreign key to another field than the primary key, with `to_field`, is written as it is served: the value of that field. It was looked up as a primary key, so the value read was refused, or linked the row whose primary key it is.
 - The schema of a collection is served, and linked from the collection, as `application/schema+json`, as Part 5 requires, instead of `application/json`.
 - Decimals are described in the schema as the strings they are served as. They had no type, and QGIS made no field of them.
 - Read-only properties are marked `readOnly` in the schema, so QGIS no longer lets them be edited, only to have the write rejected.
