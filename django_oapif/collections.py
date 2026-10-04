@@ -386,7 +386,9 @@ def get_related_object_or_raise(
     ])
 
 
-def get_collection_response(request: HttpRequest, collection: OapifCollection, uri_prefix: str = ""):
+def get_collection_response(
+    request: HttpRequest, collection: OapifCollection, uri_prefix: str = "", *, with_extent: bool = True
+):
     """
     The description of a collection, its links resolved against the path of the request: that of the collection,
     or with `uri_prefix="collections/"` that of the list of collections.
@@ -441,6 +443,7 @@ def get_collection_response(request: HttpRequest, collection: OapifCollection, u
         response.crs = [crs.uri() for crs in collection.supported_crs()]
         if storage_crs := collection.storage_crs():
             response.storageCrs = storage_crs.uri()
+    if geom and with_extent:
         # the rows the collection serves, which may be fewer than those of its model
         rows = collection.get_queryset(request)
         if collection.srid == CRS84_SRID:
@@ -468,6 +471,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
     # ninja would write the members a collection has no value for as null, which OGC API - Features does not allow
     @router.get("", response=OAPIFCollections, operation_id="get_collections", exclude_none=True)
     def list_collections(request: HttpRequest):
+        html = accepts_html(request)
         response = OAPIFCollections(
             links=[
                 OAPIFLink(
@@ -479,12 +483,13 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
                 html_link(replace_query_param(request, f="html"), "this document as HTML"),
             ],
             collections=[
-                get_collection_response(request, collection, uri_prefix="collections/")
+                # the page shows no extent, which takes a query per collection
+                get_collection_response(request, collection, uri_prefix="collections/", with_extent=not html)
                 for collection in collections.values()
                 if collection.has_view_permission(request)
             ],
         )
-        if accepts_html(request):
+        if html:
             return html_response(request, "collections.html", {"collections": response.collections}, title=title)
         return response
 
