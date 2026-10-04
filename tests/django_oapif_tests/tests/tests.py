@@ -11,7 +11,8 @@ from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.contrib.gis.db.models import Extent
-from django.contrib.gis.db.models.functions import Transform
+from django.contrib.gis.db.models.functions import NumPoints, Transform
+from django.contrib.gis.geos import LineString
 from django.core.management import call_command
 from django.db import connection, models
 from django.db.models import FloatField, Func, Max, Min
@@ -22,7 +23,13 @@ from django_oapif import jsonfg
 from django_oapif.collections import writes_curves
 from django_oapif.crs import CRS, CRS84_SRID
 from django_oapif.geojson import CircularString, Coordinate2D
-from django_oapif.handler import ARROW_AVAILABLE, AllowAnyCollection, AnonReadOnlyCollection, json_schema_pattern
+from django_oapif.handler import (
+    ARROW_AVAILABLE,
+    AllowAnyCollection,
+    AnonReadOnlyCollection,
+    json_schema_pattern,
+    reprojected,
+)
 from django_oapif_tests.tests.oapif import oapif
 from django_oapif_tests.tests.models import (
     Arc_2056_10fields,
@@ -1684,6 +1691,24 @@ class TestCrs(TestCase):
                 self.assertGreaterEqual(xmax, exact[2])
                 self.assertGreaterEqual(ymax, exact[3])
 
+    def test_bbox_follows_its_reprojected_edges(self):
+        # the edges of a CRS84 box across Switzerland curve once reprojected, over 2 km away from the lines between
+        # its reprojected corners: the point just inside its south edge was missed, and the one just outside its
+        # north edge returned
+        inside = Point_2056_Empty.objects.create(geom="SRID=4326;POINT(8.2 45.81)")
+        Point_2056_Empty.objects.create(geom="SRID=4326;POINT(8.2 47.81)")
+
+        response = self.client.get(f"{collections_url}/tests.point_2056_empty/items?bbox=5.9,45.8,10.5,47.8")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([feature["id"] for feature in response.json()["features"]], [str(inside.pk)])
+
+    def test_bbox_of_a_single_point_is_accepted(self):
+        # the polygon of the box lies on a single point, which ST_Segmentize refuses to densify by a step of 0
+        response = self.client.get(f"{collections_url}/tests.point_2056_empty/items?bbox=8.2,46,8.2,46")
+
+        self.assertEqual(response.status_code, 200)
+
     def test_advertised_crs_are_accepted(self):
         collection_response = self.client.get(f"{collections_url}/tests.point_2056_10fields")
 
@@ -2915,6 +2940,29 @@ class TestFilter(TestCase):
             ),
             **{"filter-crs": crs_2056},
         )
+
+    def test_spatial_literals_follow_their_reprojected_edges(self):
+        # reprojected along their edges, as a bbox is: the point just inside the south edge of this box used to be
+        # missed, and the one just outside its north edge matched
+        Point_2056_Empty.objects.create(geom="SRID=4326;POINT(8.2 45.81)", field_str_9="inside")
+        Point_2056_Empty.objects.create(geom="SRID=4326;POINT(8.2 47.81)", field_str_9="outside")
+
+        self.assert_matches(
+            (
+                ("S_INTERSECTS(geom,BBOX(5.9,45.8,10.5,47.8))", ["inside"]),
+                ("S_INTERSECTS(geom,POLYGON((5.9 45.8,10.5 45.8,10.5 47.8,5.9 47.8,5.9 45.8)))", ["inside"]),
+            ),
+            collection="tests.point_2056_empty",
+        )
+
+    def test_spatial_literals_of_many_edges_gain_few_points(self):
+        # anyone can send a filter: densified by their extent rather than their length, a zigzag in a URL of a few
+        # kilobytes would make PostgreSQL compare every feature with thousands of points
+        zigzag = LineString([(6 + i / 100, 46 + i % 2) for i in range(300)], srid=4326)
+
+        points = Point_2056_10fields.objects.values_list(NumPoints(reprojected(zigzag, 2056)), flat=True).first()
+
+        self.assertLessEqual(points, len(zigzag) + 256)
 
     def test_filter_and_bbox_both_apply(self):
         self.assertEqual(self.matches("field_int >= 1", bbox="8.4,47.3,8.7,47.5"), ["b"])
