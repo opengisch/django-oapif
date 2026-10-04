@@ -1371,6 +1371,26 @@ class TestCrs(TestCase):
         self.assertGreaterEqual(xmax, exact[2])
         self.assertGreaterEqual(ymax, exact[3])
 
+    def test_extent_covers_only_the_rows_the_collection_serves(self):
+        # a collection filtering its rows, such as one serving each user their own, used to give the extent of
+        # every row of its model
+        url = f"{collections_url}/tests.point_2056_empty"
+        for x, y in ((2600000, 1200000), (2601000, 1201000)):
+            Point_2056_Empty.objects.create(geom=f"SRID=2056;POINT({x} {y})", field_str_0="served")
+        served_extent = self.client.get(url).json()["extent"]
+        Point_2056_Empty.objects.create(geom="SRID=2056;POINT(2700000 1100000)", field_str_0="filtered out")
+        collection = oapif.collections["tests.point_2056_empty"]
+        get_queryset = collection.get_queryset
+
+        def served(request):
+            return get_queryset(request).filter(field_str_0="served")
+
+        with patch.object(collection, "get_queryset", served):
+            response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["extent"], served_extent)
+
     def test_advertised_crs_are_accepted(self):
         collection_response = self.client.get(f"{collections_url}/tests.point_2056_10fields")
 

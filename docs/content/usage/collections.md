@@ -65,7 +65,7 @@ Django's `ModelAdmin` are:
 
 | Method                                                                          | Returns                                                                             |
 |---------------------------------------------------------------------------------|-------------------------------------------------------------------------------------|
-| `get_queryset(request)`                                                         | The rows of the collection, those it serves, changes and deletes.                   |
+| `get_queryset(request)`                                                         | The rows the collection serves, changes and deletes, and computes its extent from.  |
 | `get_fields(request, obj=None)`                                                 | The fields served as properties, `fields` by default.                               |
 | `get_exclude(request, obj=None)`                                                | The fields not served, `exclude` by default.                                        |
 | `get_readonly_fields(request, obj=None)`                                        | The fields not accepted in writes: `readonly_fields`, generated fields and files.   |

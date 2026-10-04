@@ -74,6 +74,7 @@ Please report anything that breaks in the [issues](https://github.com/opengisch/
 - The conformance declaration lists the returnables and receivables class of Part 5, which the collections already met by linking their schema.
 - The `$id` of a schema is its URI without the query parameters of the request, such as `f=json`.
 - The schema gives the position of each property, which QGIS orders the fields of a layer by, instead of alphabetically.
+- The extent of a collection is computed from the rows its [`get_queryset()`](usage/collections.md#hooks) returns, instead of every row of the model. A collection serving each user their own features gave them the extent of everyone's.
 
 ### Performance
 
