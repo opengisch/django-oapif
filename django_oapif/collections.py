@@ -313,6 +313,22 @@ def primary_keys(collection: OapifCollection) -> set[str]:
     return {name for key in keys for name in (key.name, key.attname)}
 
 
+def validate_new_key_or_raise(collection: OapifCollection, item: Model) -> None:
+    """
+    Refuse to create an item under the key of an existing row, of its model or of one it inherits from. Django saves
+    an item whose key has no default, such as an AutoField, over that row, even one the collection hides, and one
+    whose key has a default fails on the duplicate.
+    """
+    tables = (collection.model, *collection.opts.get_parent_list())
+    links = [link for table in tables for link in table._meta.parents.values() if link]
+    # not item.pk alone: the one of a model inheriting from another is the link to its parent, which a collection
+    # may leave out of writes and still take the key of the parent, and a parent without a key takes the one of the
+    # link, which is not the key of a child that has its own
+    keys = {getattr(item, field.attname) for field in (*(table._meta.pk for table in tables), *links)} - {None}
+    if any(table._base_manager.filter(pk__in=keys).exists() for table in tables):
+        raise HttpError(409, "A feature with this id already exists")
+
+
 @cache
 def writes_curves() -> bool:
     """Whether curves can be written: it takes GEOS 3.13, and a Django whose GEOS bindings know them."""
@@ -680,6 +696,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         item = collection.model(**item_properties)
         if not collection.has_add_permission(request, item):
             raise AuthorizationError()
+        validate_new_key_or_raise(collection, item)
         collection.save_model(request, item, False)
         item = collection.query(request, DEFAULT_CRS).get(pk=item.pk)
         # in JSON-FG for a curve, which ninja would take for GeoJSON

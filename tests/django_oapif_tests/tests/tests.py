@@ -33,6 +33,7 @@ from django_oapif_tests.tests.models import (
     LayerWithForeignKey,
     LayerWithOrdering,
     LayerWithVariousTypes,
+    NoGeom_10fields,
     Point_2056_10fields,
     Point_2056_Empty,
 )
@@ -172,6 +173,65 @@ class TestBasicAuth(TestCase):
                 other.refresh_from_db()
                 self.assertEqual((target.field_str_0, target.geom.coords), ("changed", (2600500.0, 1200500.0)))
                 self.assertEqual(other.field_str_0, "other")
+
+    def test_post_refuses_the_id_of_an_existing_feature(self):
+        # a POST with the id of a feature was saved over it when the key has no default, as an AutoField, even over
+        # one its collection hides, and failed with a 500 when the key has one
+        self.client.force_login(user=self.demo_editor)
+        shown = LayerWithOrdering.objects.create(name="shown")
+        hidden = LayerWithOrdering.objects.create(name="hidden")
+        no_geom = NoGeom_10fields.objects.create()
+        collection = oapif.collections["tests.layerwithordering"]
+        get_queryset = collection.get_queryset
+
+        def served(request):
+            return get_queryset(request).exclude(pk=hidden.pk)
+
+        with patch.object(collection, "get_queryset", served):
+            for collection_id, properties in (
+                ("tests.layerwithordering", {"id": shown.pk, "name": "changed"}),
+                ("tests.layerwithordering", {"id": hidden.pk, "name": "changed"}),
+                ("tests.nogeom_10fields", {"id": str(no_geom.pk), "field_str_0": "changed"}),
+            ):
+                with self.subTest(collection=collection_id, id=properties["id"]):
+                    url = f"{collections_url}/{collection_id}/items"
+                    feature = {"type": "Feature", "geometry": None, "properties": properties}
+
+                    response = self.client.post(url, feature, headers=headers, content_type="application/json")
+
+                    self.assertEqual(response.status_code, 409)
+        self.assertEqual(sorted(LayerWithOrdering.objects.values_list("name", flat=True)), ["hidden", "shown"])
+        # a fresh id is still the one of the feature created
+        fresh = str(uuid.uuid4())
+        feature = {"type": "Feature", "geometry": None, "properties": {"id": fresh}}
+        url = f"{collections_url}/tests.nogeom_10fields/items"
+        response = self.client.post(url, feature, headers=headers, content_type="application/json")
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["id"], fresh)
+        # a user who may not add is refused first, and does not learn from a 409 that the id exists
+        self.client.force_login(user=self.demo_viewer)
+        feature = {"type": "Feature", "geometry": None, "properties": {"id": shown.pk, "name": "changed"}}
+        url = f"{collections_url}/tests.layerwithordering/items"
+        response = self.client.post(url, feature, headers=headers, content_type="application/json")
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_refuses_the_id_of_an_existing_parent_row(self):
+        # a collection leaving the link to the parent out of writes still takes the key of the parent row, which was
+        # not checked: one without a default was saved over that row, and a UUID, as here, failed with a 500
+        self.client.force_login(user=self.demo_editor)
+        point = Point_2056_10fields.objects.create(geom="SRID=2056;POINT(2600000 1200000)")
+        collection = oapif.collections["tests.point_2056_empty"]
+        url = f"{collections_url}/tests.point_2056_empty/items"
+        feature = {
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [2600500.0, 1200500.0]},
+            "properties": {"id": str(point.pk)},
+        }
+
+        with patch.object(collection, "readonly_fields", ("point_2056_10fields_ptr",)):
+            response = self.client.post(url, feature, headers=headers, content_type="application/json")
+
+        self.assertEqual(response.status_code, 409)
 
     def test_unknown_property_is_rejected_after_a_read(self):
         self.client.force_login(user=self.demo_editor)

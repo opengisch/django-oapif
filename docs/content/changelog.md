@@ -16,6 +16,7 @@ Please report anything that breaks in the [issues](https://github.com/opengisch/
 
 - **Deleting a feature now requires the delete permission.** 1.x checked the view permission, so anyone who could read a feature could also delete it. Upgrade, or check your permissions on 1.x if deleting matters to you.
 - **The extent of a collection no longer covers the features its [`get_queryset()`](usage/collections.md#hooks) hides.** 1.x and the 2.0 betas computed it from every row of the model, so a collection serving each user their own features gave them the extent of everyone's, whose corners can be the coordinates of someone else's feature. Upgrade if that matters to you.
+- **A `POST` no longer overwrites the feature whose id it carries.** 1.x and the 2.0 betas saved it over that feature when the primary key has no default, like the `id` Django gives a model, so anyone who could add features could change any of them, even those they could not see. It is now refused with a `409 Conflict`, instead of a server error when the key has a default, such as a UUID. Upgrade, or on 1.x give the add permission only to users who may change every feature.
 
 ### Upgrading from 2.0.0-beta1
 
