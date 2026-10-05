@@ -406,10 +406,12 @@ def get_collection_response(request: HttpRequest, collection: OapifCollection):
         response.crs = [crs.uri() for crs in collection.supported_crs()]
         if storage_crs := collection.storage_crs():
             response.storageCrs = storage_crs.uri()
+        # the rows the collection serves, which may be fewer than those of its model
+        rows = collection.get_queryset(request)
         if collection.srid == CRS84_SRID:
-            extent = collection.model.objects.aggregate(extent=Extent(geom))["extent"]
+            extent = rows.aggregate(extent=Extent(geom))["extent"]
         else:
-            box = collection.model.objects.aggregate(extent=ReprojectedExtent(geom, collection.srid, CRS84_SRID))
+            box = rows.aggregate(extent=ReprojectedExtent(geom, collection.srid, CRS84_SRID))
             extent = parse_box2d(box["extent"]) if box["extent"] else None
         if extent:
             response.extent = OAPIFExtent(spatial=OAPIFSpatialExtent(bbox=[extent], crs=CRS84_URI))
