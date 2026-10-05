@@ -15,11 +15,11 @@ except ImportError:
 
 __all__ = [
     "OAPIF",
-    "OapifCollection",
     "AllowAnyCollection",
     "AnonReadOnlyCollection",
     "AuthenticatedCollection",
     "AuthenticatedOrReadOnlyCollection",
+    "OapifCollection",
     "__version__",
     "__version_tuple__",
 ]

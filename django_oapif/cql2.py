@@ -64,7 +64,7 @@ class Transformer(cql2_text.CQLTransformer):
     def SINGLE_QUOTED(self, token):
         # CQL2 escapes a quote as '' or \', and the other backslashes are left for LIKE, where they escape the next
         # character
-        return re.sub(r"''|\\(.)", lambda m: "'" if m[0] == "''" or m[1] == "'" else m[0], token[1:-1], flags=re.S)
+        return re.sub(r"''|\\(.)", lambda m: "'" if m[0] == "''" or m[1] == "'" else m[0], token[1:-1], flags=re.DOTALL)
 
     @v_args(inline=True)
     def bbox(self, *coordinates):

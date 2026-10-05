@@ -64,9 +64,11 @@ DATABASES = {
 
 from django.contrib.gis.db import models
 
+
 class TestModel(models.Model):
     name = models.CharField(max_length=10)
     geom = models.PointField(srid=2056)
+
 
 class OtherTestModel(models.Model):
     id = models.CharField(max_length=10, primary_key=True)

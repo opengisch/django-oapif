@@ -9,6 +9,7 @@ class Parent(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     geom = models.PointField(srid=4326)
 
+
 class Child(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     geom = models.PointField(srid=4326)

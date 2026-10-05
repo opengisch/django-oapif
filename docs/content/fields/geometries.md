@@ -46,8 +46,10 @@ GeoDjango has no field for curves: declare a `GeometryField` of the type of the 
 ```python
 from django.contrib.gis.db import models
 
+
 class CircularStringField(models.GeometryField):
     geom_type = "CIRCULARSTRING"
+
 
 class Arc(models.Model):
     geom = CircularStringField(srid=2056)
