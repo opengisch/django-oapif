@@ -15,6 +15,7 @@ Please report anything that breaks in the [issues](https://github.com/opengisch/
 ### Security
 
 - **Deleting a feature now requires the delete permission.** 1.x checked the view permission, so anyone who could read a feature could also delete it. Upgrade, or check your permissions on 1.x if deleting matters to you.
+- **The extent of a collection no longer covers the features its [`get_queryset()`](usage/collections.md#hooks) hides.** 1.x and the 2.0 betas computed it from every row of the model, so a collection serving each user their own features gave them the extent of everyone's, whose corners can be the coordinates of someone else's feature. Upgrade if that matters to you.
 
 ### Upgrading from 2.0.0-beta1
 
@@ -45,6 +46,7 @@ Please report anything that breaks in the [issues](https://github.com/opengisch/
 
 - `query()` now annotates `_oapif_geometry` with WKB, instead of a GeoJSON dictionary. This only matters if you override `query()` or read that annotation.
 - The CRS a collection offers now come from two new hooks, `storage_crs()` and `supported_crs()`.
+- `get_queryset()` also gives the extent of a collection, so `/collections` calls it too, for every collection the user may view: one that fails for a user, an anonymous one for instance, now fails their list of collections too, and not only the items of that collection.
 
 ### New
 
@@ -74,6 +76,7 @@ Please report anything that breaks in the [issues](https://github.com/opengisch/
 - The conformance declaration lists the returnables and receivables class of Part 5, which the collections already met by linking their schema.
 - The `$id` of a schema is its URI without the query parameters of the request, such as `f=json`.
 - The schema gives the position of each property, which QGIS orders the fields of a layer by, instead of alphabetically.
+- `/collections` and `/collections/{collectionId}` no longer fail with a server error when the model of a collection has no `objects` manager.
 
 ### Performance
 
