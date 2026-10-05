@@ -430,7 +430,8 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
             raise AuthorizationError()
         return collection
 
-    @router.get("", response=OAPIFCollections, operation_id="get_collections")
+    # ninja would write the members a collection has no value for as null, which OGC API - Features does not allow
+    @router.get("", response=OAPIFCollections, operation_id="get_collections", exclude_none=True)
     def list_collections(request: HttpRequest):
         response = OAPIFCollections(
             links=[
@@ -456,6 +457,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         "/{collection_id}",
         response=OAPIFCollection,
         operation_id="get_collection",
+        exclude_none=True,
     )
     def get_collection(request, collection_id: str):
         collection = get_collection_by_id(collection_id, request)

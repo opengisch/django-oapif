@@ -1495,6 +1495,22 @@ class TestCrs(TestCase):
         items = self.client.get(f"{collections_url}/tests.nogeom_10fields/items?limit=1&crs={crs_base}/EPSG/0/3857")
         self.assertEqual(items.status_code, 200)
 
+    def test_collection_leaves_out_the_members_it_has_no_value_for(self):
+        # they used to be null, which OGC API - Features does not allow
+        listed = {collection["id"]: collection for collection in self.client.get(collections_url).json()["collections"]}
+        for collection_id, members in (
+            ("tests.point_2056_10fields", {"crs", "storageCrs", "extent"}),
+            ("tests.point_2056_empty", {"crs", "storageCrs"}),
+            ("tests.nogeom_10fields", set()),
+        ):
+            with self.subTest(collection=collection_id):
+                response = self.client.get(f"{collections_url}/{collection_id}")
+
+                self.assertEqual(response.status_code, 200)
+                for collection in (response.json(), listed[collection_id]):
+                    self.assertEqual([name for name, value in collection.items() if value is None], [])
+                    self.assertEqual(collection.keys() & {"description", "crs", "storageCrs", "extent"}, members)
+
 
 class TestCircularString(TestCase):
     """A CircularString is a sequence of arcs, so any odd number of at least 3 points is valid."""
