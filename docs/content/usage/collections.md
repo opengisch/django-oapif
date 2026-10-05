@@ -25,6 +25,7 @@ To configure a collection, subclass `OapifCollection`, or one of the classes of
 ```python
 from django_oapif import OapifCollection
 
+
 @oapif.register(Building)
 class BuildingCollection(OapifCollection):
     id = "buildings"

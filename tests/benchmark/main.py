@@ -133,7 +133,8 @@ def time_cases(
 
 def summarize(rows: list[dict]) -> pl.DataFrame:
     return (
-        pl.DataFrame(rows)
+        pl
+        .DataFrame(rows)
         .group_by(KEY)
         .agg(
             # the median, which one slow request does not move, is what the servers are compared on

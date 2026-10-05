@@ -62,6 +62,7 @@ so that its methods take precedence over those of `ModelAdmin` and `OapifCollect
 from django.db.models import Model
 from django.http import HttpRequest
 
+
 class MyModelPermissionsMixin[M: Model]:
     def has_view_permission(self, request: HttpRequest, obj: M | None = None) -> bool:
         return my_custom_view_permission()
@@ -83,9 +84,9 @@ from django.contrib import admin
 from .models import MyModel
 from .permissions import MyModelPermissionsMixin
 
+
 @admin.register(MyModel)
-class MyModelAdmin(MyModelPermissionsMixin, admin.ModelAdmin):
-    ...
+class MyModelAdmin(MyModelPermissionsMixin, admin.ModelAdmin): ...
 ```
 
 ```python
@@ -97,7 +98,7 @@ from .permissions import MyModelPermissionsMixin
 
 oapif = OAPIF()
 
+
 @oapif.register(MyModel)
-class MyModelHandler(MyModelPermissionsMixin, OapifCollection):
-    ...
+class MyModelHandler(MyModelPermissionsMixin, OapifCollection): ...
 ```
