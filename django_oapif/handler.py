@@ -391,6 +391,16 @@ class OapifCollection[M: Model]:
             qs = qs.order_by(*ordering)
         return qs
 
+    def resolve_item_id(self, request: HttpRequest, item_id: str) -> str:
+        """
+        Hook for sending the id of an item, as a URL or a foreign key referencing it gives it, to the row to read
+        or write.
+
+        A collection whose rows are replaced, such as versions, can send the id of a replaced row to the row
+        replacing it: a client like QGIS keeps writing to the id it read.
+        """
+        return item_id
+
     def get_ordering(self, request) -> tuple:
         """
         Hook for specifying field ordering.
