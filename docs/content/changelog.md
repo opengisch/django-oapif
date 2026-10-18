@@ -73,6 +73,7 @@ Please report anything that breaks in the [issues](https://github.com/opengisch/
 - Unknown properties in `POST` and `PUT` are always rejected. After a `GET`, they used to be dropped silently.
 - Invalid geometries, such as polygons with unclosed rings, and errors raised by validators now return `422`, instead of a server error.
 - A write that leaves a feature out of the rows of [`get_queryset()`](usage/collections.md#hooks), such as one moved out of the area of the user, now returns a `201` with its `Location` for a `POST`, and a `204` for a `PUT` or `PATCH`, without the feature. It used to be saved and answered with a server error, which a client could take for a failure and send again, or, with `ATOMIC_REQUESTS`, refused with one.
+- A `PUT` or `PATCH` whose [`save_model()`](usage/collections.md#hooks) saves the change on another row, as a collection keeping versions does, answers with that row, which `save_model()` leaves the key of on the item. It answered with the row of the URL, unchanged.
 - LineString coordinates are checked against the dimension of the column, like those of the other geometry types.
 - Geometry fields declared with `dim=3` accept and serve Z coordinates.
 - `POST`, `PUT` and `PATCH` no longer fail with a server error when a foreign key references a model that has no `objects` manager.

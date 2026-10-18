@@ -302,6 +302,37 @@ class TestBasicAuth(TestCase):
                 item.refresh_from_db()
                 self.assertEqual(item.field_str_0, "published")
 
+    def test_feature_saved_on_another_row_is_answered_with_it(self):
+        # a collection keeping versions saves a change on a new row, leaving its key on the item: the row of the URL
+        # was answered, unchanged
+        self.client.force_login(user=self.demo_editor)
+        collection = oapif.collections["tests.point_2056_10fields"]
+
+        def save_as_a_new_row(request, obj, change):
+            obj.pk = uuid.uuid4()
+            obj._state.adding = True
+            obj.save()
+
+        for method in (self.client.put, self.client.patch):
+            with self.subTest(method=method.__name__):
+                item = Point_2056_10fields.objects.create(geom="SRID=2056;POINT(2600000 1200000)", field_str_0="v1")
+                url = f"{collections_url}/tests.point_2056_10fields/items/{item.pk}"
+                feature = {
+                    "type": "Feature",
+                    "geometry": {"type": "Point", "coordinates": [2600000.0, 1200000.0]},
+                    "properties": {"field_str_0": "v2"},
+                }
+
+                with patch.object(collection, "save_model", save_as_a_new_row):
+                    response = method(url, feature, headers=headers, content_type="application/json")
+
+                self.assertEqual(response.status_code, 200)
+                version = Point_2056_10fields.objects.get(pk=response.json()["id"])
+                self.assertNotEqual(version.pk, item.pk)
+                self.assertEqual((version.field_str_0, response.json()["properties"]["field_str_0"]), ("v2", "v2"))
+                item.refresh_from_db()
+                self.assertEqual(item.field_str_0, "v1")
+
     def test_unknown_property_is_rejected_after_a_read(self):
         self.client.force_login(user=self.demo_editor)
         url = f"{collections_url}/tests.point_2056_10fields/items"

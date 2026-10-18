@@ -791,7 +791,8 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         if geom_field := collection.geometry_field:
             setattr(item, geom_field, geometry_to_save(feature.geometry, crs))
         collection.save_model(request, item, True)
-        item = collection.query(request, DEFAULT_CRS).filter(pk=item_id).first()
+        # by the key save_model leaves on the item, which may have saved the change on another row
+        item = collection.query(request, DEFAULT_CRS).filter(pk=item.pk).first()
         if item is None:
             # the change took it out of the rows the collection serves
             return HttpResponse(status=204)
@@ -830,7 +831,8 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         if (geom_field := collection.geometry_field) and "geometry" in feature.model_fields_set:
             setattr(item, geom_field, geometry_to_save(feature.geometry, crs))
         collection.save_model(request, item, True)
-        item = collection.query(request, DEFAULT_CRS).filter(pk=item_id).first()
+        # by the key save_model leaves on the item, which may have saved the change on another row
+        item = collection.query(request, DEFAULT_CRS).filter(pk=item.pk).first()
         if item is None:
             # the change took it out of the rows the collection serves
             return HttpResponse(status=204)
