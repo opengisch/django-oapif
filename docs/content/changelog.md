@@ -21,6 +21,7 @@ Please report anything that breaks in the [issues](https://github.com/opengisch/
 
 ### Upgrading from 2.0.0-beta1
 
+- **The JSON-FG profiles are written with their URIs in the OGC register**, such as `http://www.opengis.net/def/profile/OGC/0/jsonfg`, in the links and the `Link` headers, instead of with `ogc`, as the 2.0 betas wrote them. Requests may still use either. QGIS 4.2 and earlier only know them with `ogc`, and no longer list JSON-FG among the formats of a collection: a layer asks for it with `profile=jsonfg` in its URL instead.
 - **Curves are no longer served in `geometry`**, which GeoJSON does not allow, and which GeoJSON readers such as QGIS dropped. A request for them in GeoJSON is refused with a `406`, which links them in JSON-FG, with the curves in `place`, and in GeoJSON, linearized: ask for one or the other with `profile=jsonfg` or `linearize=true`. QGIS 3 asks for the linearized curves with `?linearize=true` in the URL of its connection. The features without curves are unchanged. See [curves](fields/geometries.md#curves).
 
 ### Upgrading from 1.x

@@ -9,9 +9,9 @@ from enum import StrEnum
 from math import sqrt
 from struct import pack, unpack_from
 
-# the prefix of the profile URIs: the OGC register has them under "OGC", but QGIS only knows them under "ogc", as
-# ldproxy first published them
-PROFILES = "http://www.opengis.net/def/profile/ogc/0/"
+# the prefix of the profile URIs, as the OGC register writes them. Requests may also write "ogc", as ldproxy first
+# published them and QGIS 4.2 and earlier only know them: a profile is parsed lowercased
+PROFILES = "http://www.opengis.net/def/profile/OGC/0/"
 PROFILE_URI = re.compile(r"^https?://www\.opengis\.net/def/profile/ogc/0/")
 
 

@@ -1998,7 +1998,7 @@ class TestJsonFg(TestCase):
         "http://www.opengis.net/spec/json-fg-1/1.0/conf/core",
         "http://www.opengis.net/spec/json-fg-1/1.0/conf/circular-arcs",
     ]
-    JSONFG = "http://www.opengis.net/def/profile/ogc/0/jsonfg"
+    JSONFG = "http://www.opengis.net/def/profile/OGC/0/jsonfg"
 
     @classmethod
     def setUpTestData(cls):
@@ -2099,10 +2099,11 @@ class TestJsonFg(TestCase):
         for params, accept in (
             ({"profile": "jsonfg"}, "application/geo+json"),
             ({"profile": self.JSONFG}, "application/geo+json"),
-            # as the OGC register writes it
-            ({"profile": self.JSONFG.replace("/ogc/", "/OGC/")}, "application/geo+json"),
+            # as ldproxy first wrote it, and QGIS 4.2 and earlier know it
+            ({"profile": self.JSONFG.replace("/OGC/", "/ogc/")}, "application/geo+json"),
             ({"profile": "flatgeobuf,jsonfg"}, "application/geo+json"),
             ({}, f'application/geo+json; profile="{self.JSONFG}"'),
+            ({}, f'application/geo+json; profile="{self.JSONFG.replace("/OGC/", "/ogc/")}"'),
             # and not taken for another type than the one it goes with
             ({}, f'application/geo+json; profile="{self.JSONFG}", text/html;q=0.1'),
         ):
@@ -2339,7 +2340,7 @@ class TestJsonFg(TestCase):
 
     def test_responses_link_their_profile(self):
         # as Part 5 wants: GeoJSON, but for JSON-FG asked for, and the linearized curves are GeoJSON
-        rfc7946 = "http://www.opengis.net/def/profile/ogc/0/rfc7946"
+        rfc7946 = "http://www.opengis.net/def/profile/OGC/0/rfc7946"
         points = f"{collections_url}/tests.point_2056_10fields/items"
         arcs = f"{collections_url}/tests.arc_2056_10fields/items"
         for url, params, profile in (

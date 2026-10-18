@@ -65,7 +65,7 @@ geometry, or with one that is not theirs. Its body links the two:
 {
   "detail": "GeoJSON cannot carry curves: ask for them in JSON-FG, with profile=jsonfg, or linearized, with linearize=true",
   "links": [
-    {"rel": "alternate", "type": "application/geo+json", "profile": ["http://www.opengis.net/def/profile/ogc/0/jsonfg"], "href": "https://example.com/oapif/collections/my_app.arc/items?profile=jsonfg", "title": "This document as JSON-FG"},
+    {"rel": "alternate", "type": "application/geo+json", "profile": ["http://www.opengis.net/def/profile/OGC/0/jsonfg"], "href": "https://example.com/oapif/collections/my_app.arc/items?profile=jsonfg", "title": "This document as JSON-FG"},
     {"rel": "alternate", "type": "application/geo+json", "href": "https://example.com/oapif/collections/my_app.arc/items?linearize=true", "title": "This document as GeoJSON, the curves linearized"}
   ]
 }
@@ -130,12 +130,12 @@ The `CompoundCurve`, `CurvePolygon`, `MultiCurve` and `MultiSurface` geometries 
 `geometries`. A JSON-FG reader, such as GDAL since its 3.12, reads the curves as they are.
 
 A request asks for JSON-FG with the `profile` query parameter of OGC API - Features - Part 5, by the name of
-the profile, `jsonfg`, or by its URI, `http://www.opengis.net/def/profile/ogc/0/jsonfg`, or with the `profile`
+the profile, `jsonfg`, or by its URI, `http://www.opengis.net/def/profile/OGC/0/jsonfg`, or with the `profile`
 parameter of the media type it accepts:
 
 ```bash
 curl "https://example.com/oapif/collections/my_app.arc/items?profile=jsonfg"
-curl -H 'Accept: application/geo+json; profile="http://www.opengis.net/def/profile/ogc/0/jsonfg"' \
+curl -H 'Accept: application/geo+json; profile="http://www.opengis.net/def/profile/OGC/0/jsonfg"' \
   "https://example.com/oapif/collections/my_app.arc/items"
 ```
 
@@ -144,11 +144,12 @@ API does not know is ignored, rather than failing the request. The response has 
 `application/geo+json` in either profile, and links its profile in its `Link` header:
 
 ```http
-Link: <http://www.opengis.net/def/profile/ogc/0/jsonfg>; rel="profile"
+Link: <http://www.opengis.net/def/profile/OGC/0/jsonfg>; rel="profile"
 ```
 
-The OGC register writes the URIs with `OGC`, and QGIS only knows them with `ogc`: the API takes both, and gives
-those of QGIS.
+The URIs are those of the OGC register, with `OGC`. The API also takes them with `ogc`, as ldproxy first published
+them. QGIS 4.2 and earlier only know them that way: they do not list JSON-FG among the formats of a collection,
+and a layer asks for it with `profile=jsonfg` in its URL instead.
 
 Any collection can be asked for in JSON-FG, and not only curves. JSON-FG gives `geometry` in CRS84: in another
 CRS, the geometries are all in `place`.
@@ -157,7 +158,7 @@ A collection with a geometry links its items in JSON-FG, before its link to GeoJ
 links of Features 1.1:
 
 ```json
-{"rel": "items", "type": "application/geo+json", "profile": ["http://www.opengis.net/def/profile/ogc/0/jsonfg"], "href": "https://example.com/oapif/collections/my_app.arc/items?profile=jsonfg", "title": "Collection items as JSON-FG"}
+{"rel": "items", "type": "application/geo+json", "profile": ["http://www.opengis.net/def/profile/OGC/0/jsonfg"], "href": "https://example.com/oapif/collections/my_app.arc/items?profile=jsonfg", "title": "Collection items as JSON-FG"}
 ```
 
 The links of a page of items to the other pages have the profile it was asked for, and are in its `Link` header
