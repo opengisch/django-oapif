@@ -128,9 +128,8 @@ class TestStack(unittest.TestCase):
         f.setGeometry(QgsPoint(2345678.0, 1234567.0))
         f["text_mandatory_field"] = None
 
-        with self.assertRaises(QgsEditError) as ctx:
-            with edit(layer):
-                layer.addFeature(f)
+        with self.assertRaises(QgsEditError) as ctx, edit(layer):
+            layer.addFeature(f)
 
         self.assertEqual(
             str(ctx.exception),

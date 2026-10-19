@@ -11,8 +11,8 @@ It will terminate with exit code:
 - 2 if the current result is ** below ** the baseline.
 """
 
-import json
 import argparse
+import json
 from enum import Enum
 from itertools import islice
 from os import path

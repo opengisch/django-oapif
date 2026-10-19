@@ -19,18 +19,6 @@ from django.db.models import FloatField, Func, Max, Min
 from django.test import RequestFactory
 from django.test.testcases import TestCase
 from django.test.utils import CaptureQueriesContext, isolate_apps
-from django_oapif import jsonfg
-from django_oapif.collections import writes_curves
-from django_oapif.crs import CRS, CRS84_SRID
-from django_oapif.geojson import CircularString, Coordinate2D
-from django_oapif.handler import (
-    ARROW_AVAILABLE,
-    AllowAnyCollection,
-    AnonReadOnlyCollection,
-    json_schema_pattern,
-    reprojected,
-)
-from django_oapif_tests.tests.oapif import oapif
 from django_oapif_tests.tests.models import (
     Arc_2056_10fields,
     Geometry_2056,
@@ -44,11 +32,24 @@ from django_oapif_tests.tests.models import (
     Point_2056_10fields,
     Point_2056_Empty,
 )
+from django_oapif_tests.tests.oapif import oapif
 from ninja import Schema
 from ninja.errors import ValidationError as NinjaValidationError
 from ninja.responses import NinjaJSONEncoder
 from pydantic import AfterValidator
 from pydantic import ValidationError as PydanticValidationError
+
+from django_oapif import jsonfg
+from django_oapif.collections import writes_curves
+from django_oapif.crs import CRS, CRS84_SRID
+from django_oapif.geojson import CircularString, Coordinate2D
+from django_oapif.handler import (
+    ARROW_AVAILABLE,
+    AllowAnyCollection,
+    AnonReadOnlyCollection,
+    json_schema_pattern,
+    reprojected,
+)
 
 try:  # Arrow is an optional extra, and its tests are skipped without it
     import pyarrow as pa
@@ -1003,7 +1004,7 @@ class TestOutputFormat(TestCase):
             delay=datetime.timedelta(hours=2),
         )
         LayerWithVariousTypes.objects.create(data=["x", {"kind": "é"}], ip="::1")
-        LayerWithVariousTypes.objects.create(amount=decimal.Decimal("-3"), delay=datetime.timedelta(0))
+        LayerWithVariousTypes.objects.create(amount=decimal.Decimal(-3), delay=datetime.timedelta(0))
         url = f"{collections_url}/tests.layerwithvarioustypes/items"
         arrow_headers = {"Accept": "application/vnd.apache.arrow.stream"}
 
@@ -1971,12 +1972,11 @@ class TestCircularString(TestCase):
 
     def test_arc_of_even_or_too_few_points_is_rejected(self):
         for count in (1, 2, 4, 12):
-            with self.subTest(points=count):
-                with self.assertRaises(PydanticValidationError):
-                    CircularString[Coordinate2D](
-                        type="CircularString",
-                        coordinates=[(float(i), 0.0) for i in range(count)],
-                    )
+            with self.subTest(points=count), self.assertRaises(PydanticValidationError):
+                CircularString[Coordinate2D](
+                    type="CircularString",
+                    coordinates=[(float(i), 0.0) for i in range(count)],
+                )
 
     def test_arc_lengths_are_published(self):
         # the validator does not show in the OpenAPI document, so the lengths of JSON-FG are listed there
