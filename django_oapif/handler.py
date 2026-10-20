@@ -702,7 +702,8 @@ class OapifCollection[M: Model]:
         for props in properties.values():
             if (geom_format := props.get("format", "")).startswith("geometry-"):
                 geojson_type = GEOJSON_SCHEMAS.get(geom_format.removeprefix("geometry-"), "Geometry")
-                // $ref is not in the standard anymore, but old client (QGIS < 4.4) still rely on this, could be dropped in the future
+                # $ref is not in the standard anymore, but old clients (QGIS < 4.4) still rely on it: it could be
+                # dropped in the future
                 props["$ref"] = f"https://geojson.org/schema/{geojson_type}.json"
         return {
             "$schema": schema["$schema"],
