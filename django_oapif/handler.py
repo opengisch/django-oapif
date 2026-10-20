@@ -1,5 +1,6 @@
 import json
 import re
+from copy import copy
 from datetime import date, datetime, time
 from functools import cache, cached_property
 from types import NoneType, UnionType, new_class
@@ -11,6 +12,7 @@ from django.contrib.gis.db.models import Extent, GeometryField
 from django.contrib.gis.db.models.functions import AsWKB, GeomOutputGeoFunc, IsEmpty, Transform
 from django.contrib.gis.geos import GEOSGeometry
 from django.contrib.gis.geos import Polygon as GEOSPolygon
+from django.core.exceptions import FieldDoesNotExist, FieldError, ImproperlyConfigured
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import (
     BaseValidator,
@@ -25,6 +27,7 @@ from django.db.models import (
     DateTimeField,
     DurationField,
     EmailField,
+    Field as ModelField,
     FileField,
     ForeignKey,
     Func,
@@ -43,6 +46,7 @@ from django.db.models import (
 from django.http import HttpRequest
 from ninja import Field, ModelSchema, Schema
 from ninja.errors import ValidationError
+from ninja.orm.fields import get_schema_field, title_if_lower
 from ninja.schema import NinjaGenerateJsonSchema
 from pydantic import ConfigDict, TypeAdapter, field_serializer
 from pydantic import ValidationError as PydanticValidationError
@@ -596,61 +600,9 @@ class OapifCollection[M: Model]:
 
         required_fields = set(schema.get("required", []))
         for field_name, field_props in schema["properties"].items():
-            if not (types := field_props.get("anyOf")):
-                continue
-            # Optional fields are represented as a AnyOf union of their actual type and None
-            # We patch this as it is unnecessary considering optional fields are already infered
-            # from the list of required ones
-            if field_name not in required_fields:
-                types = [member for member in types if member != {"type": "null"}]
-            # A property taking several types, like a decimal a number or a string, is described as it is
-            # served: Part 5 wants a type for every property, and QGIS makes no field of one without
-            if len(types) > 1:
-                annotation = properties_schema.model_fields[field_name].annotation
-                served = TypeAdapter(annotation).json_schema(mode="serialization")
-                types = [member for member in served.get("anyOf", [served]) if member != {"type": "null"}]
-            if len(types) == 1:
-                del field_props["anyOf"]
-                field_props.update(types[0])
-
-        for field_name, field_props in schema["properties"].items():
-            field = self.opts.get_field(field_name)
-            # the values of the choices, as they are served: their labels have no keyword in Part 5
-            if choices := field.flatchoices:
-                adapter = TypeAdapter(properties_schema.model_fields[field_name].annotation)
-                field_props["enum"] = [adapter.dump_python(value, mode="json") for value, _label in choices]
-            # the formats of JSON Schema, files being served as the path their storage gives, and IP addresses
-            # instead of pydantic's own format, which JSON Schema has none of for both versions
-            if isinstance(field, URLField):
-                field_props["format"] = "uri"
-            elif isinstance(field, EmailField):
-                field_props["format"] = "email"
-            elif isinstance(field, FileField):
-                field_props["format"] = "uri-reference"
-            elif isinstance(field, GenericIPAddressField):
-                if ip_format := {"ipv4": "ipv4", "ipv6": "ipv6"}.get(field.protocol.lower()):
-                    field_props["format"] = ip_format
-                else:
-                    field_props.pop("format", None)
-            # the strictest bounds, the validators of integers including the range of their column
-            if field_props.get("type") in ("integer", "number"):
-                if minimums := limit_values(field.validators, MinValueValidator):
-                    field_props["minimum"] = max(minimums)
-                if maximums := limit_values(field.validators, MaxValueValidator):
-                    field_props["maximum"] = min(maximums)
-            if field_props.get("type") == "string":
-                if minimums := limit_values(field.validators, MinLengthValidator):
-                    field_props["minLength"] = max(minimums)
-                if maximums := limit_values(field.validators, MaxLengthValidator):
-                    field_props["maxLength"] = min(maximums)
-                # JSON Schema takes a single pattern, and no flags: the one of URLs, which ignores case, is left out
-                patterns = [
-                    v.regex.pattern
-                    for v in field.validators
-                    if isinstance(v, RegexValidator) and not v.inverse_match and not v.regex.flags & ~re.UNICODE
-                ]
-                if len(patterns) == 1:
-                    field_props["pattern"] = json_schema_pattern(patterns[0])
+            annotation = properties_schema.model_fields[field_name].annotation
+            flatten_types(field_props, annotation, field_name in required_fields)
+            describe_field(self.opts.get_field(field_name), field_props, annotation)
 
         # the primary key identifies the features
         if (pk_props := schema["properties"].get(self.opts.pk.name)) is not None:
@@ -663,15 +615,10 @@ class OapifCollection[M: Model]:
 
         if geom_field := self.geometry_field:
             geom_field = cast("GeometryField", self.model._meta.get_field(self.geometry_field))
-            geom_type = geom_field.geom_type.lower()
-            geom_type = geom_type.removesuffix("m")
-            geom_type = geom_type.removesuffix("z")
-            if geom_type == "geometry":
-                geom_type = "any"
             schema["properties"][geom_field.name] = {
                 "title": "geometry",
                 "x-ogc-role": "primary-geometry",
-                "format": f"geometry-{geom_type}",
+                "format": geometry_format(geom_field),
             }
         # QGIS orders the fields by their position, and alphabetically without one
         for position, field_props in enumerate(schema["properties"].values(), start=1):
@@ -688,21 +635,76 @@ class OapifCollection[M: Model]:
         fields = without(self.get_fields(request), self.get_exclude(request))
         return (*fields, self.geometry_field) if self.geometry_field else fields
 
+    def queryable_fields(self, request: HttpRequest, query: QuerySet) -> dict[str, ModelField]:
+        """
+        The field each queryable is typed and filtered by. A queryable is a field of the model, or a property that
+        `query()` annotates on the queryset, typed by the field its annotation outputs. Any other name is an error
+        of the collection.
+        """
+        fields: dict[str, ModelField] = {}
+        for name in self.get_queryables(request):
+            try:
+                fields[name] = self.opts.get_field(name)
+                continue
+            except FieldDoesNotExist:
+                pass
+            try:
+                fields[name] = query.query.annotations[name].output_field
+            except KeyError as e:
+                raise ImproperlyConfigured(
+                    f"The queryable '{name}' of the collection {self.id} is neither a field of its model nor a "
+                    "property its query() annotates"
+                ) from e
+            except FieldError as e:
+                raise ImproperlyConfigured(
+                    f"The queryable '{name}' of the collection {self.id} is annotated without an output_field: {e}"
+                ) from e
+        return fields
+
+    def field_json_schema(self, name: str, field: ModelField) -> dict:
+        """
+        The schema of the property `name` served from `field`, optional, as the schema of the features describes
+        one.
+        """
+        if field.verbose_name is None:
+            # the field an expression outputs is bound to no model, which would have named it, and may be shared
+            field = copy(field)
+            field.verbose_name = name.replace("_", " ")
+        if isinstance(field, GeometryField):
+            return {"title": title_if_lower(field.verbose_name), "format": geometry_format(field)}
+        python_type, info = get_schema_field(field, optional=True)
+        namespace = {"__module__": __name__, "__annotations__": {"value": python_type}, "value": info}
+        schema = type("PropertySchema", (Schema,), namespace).model_json_schema(
+            by_alias=False, schema_generator=NinjaGenerateJsonSchema
+        )
+        props = schema["properties"]["value"]
+        flatten_types(props, python_type, required=False)
+        describe_field(field, props, python_type)
+        return props
+
     def get_queryables_schema(self, request: HttpRequest) -> dict:
         """
-        The schema of the queryables, the one of the features restricted to them. The geometry also refers to its
+        The schema of the queryables, the one of the features restricted to them. A geometry also refers to its
         GeoJSON schema: QGIS only recognizes a geometry queryable by it, and would filter them itself otherwise.
         """
         queryables = self.get_queryables(request)
         schema = self.get_json_schema(request)
         properties = {name: value for name, value in schema["properties"].items() if name in queryables}
-        if (geom_field := self.geometry_field) in properties:
-            geom_type = properties[geom_field]["format"].removeprefix("geometry-")
-            geojson_type = GEOJSON_SCHEMAS.get(geom_type, "Geometry")
-            properties[geom_field] = {
-                **properties[geom_field],
-                "$ref": f"https://geojson.org/schema/{geojson_type}.json",
-            }
+        # the queryables the features serve no property of, annotated by query() or left out of the fields:
+        # described by their field, after the served ones
+        if missing := [name for name in queryables if name not in properties]:
+            fields = self.queryable_fields(request, self.query(request, CRS84))
+            for position, name in enumerate(missing, start=len(schema["properties"]) + 1):
+                props = properties[name] = self.field_json_schema(name, fields[name])
+                props["x-ogc-propertySeq"] = position
+                if name == self.opts.pk.name:
+                    props["x-ogc-role"] = "id"
+        for props in properties.values():
+            if (geom_format := props.get("format", "")).startswith("geometry-"):
+                geojson_type = GEOJSON_SCHEMAS.get(geom_format.removeprefix("geometry-"), "Geometry")
+                # $ref is not in the standard anymore, but old clients (QGIS < 4.4) still rely on it: it could be
+                # dropped in the future
+                props["$ref"] = f"https://geojson.org/schema/{geojson_type}.json"
         return {
             "$schema": schema["$schema"],
             "type": "object",
@@ -961,6 +963,70 @@ class AuthenticatedOrReadOnlyCollection[M: Model](AuthenticatedCollection):
 
     def has_view_permission(self, _request: HttpRequest, _obj: M | None = None) -> bool:
         return True
+
+
+def geometry_format(field: GeometryField) -> str:
+    """The format of a geometry property, by the type of its column: `geometry-point`, or `geometry-any`."""
+    geom_type = field.geom_type.lower().removesuffix("m").removesuffix("z")
+    return f"geometry-{'any' if geom_type == 'geometry' else geom_type}"
+
+
+def flatten_types(props: dict, annotation, required: bool) -> None:
+    """
+    Describe a property by the type it is served as. pydantic writes an optional field as a union of its type and
+    null, which the required properties tell already, and a decimal as a number or a string: Part 5 wants a type
+    for every property, and QGIS makes no field of one without.
+    """
+    if not (types := props.get("anyOf")):
+        return
+    if not required:
+        types = [member for member in types if member != {"type": "null"}]
+    if len(types) > 1:
+        served = TypeAdapter(annotation).json_schema(mode="serialization")
+        types = [member for member in served.get("anyOf", [served]) if member != {"type": "null"}]
+    if len(types) == 1:
+        del props["anyOf"]
+        props.update(types[0])
+
+
+def describe_field(field: ModelField, props: dict, annotation) -> None:
+    """Complete the schema of a property with what its field tells: its choices, its format and its bounds."""
+    # the values of the choices, as they are served: their labels have no keyword in Part 5
+    if choices := field.flatchoices:
+        adapter = TypeAdapter(annotation)
+        props["enum"] = [adapter.dump_python(value, mode="json") for value, _label in choices]
+    # the formats of JSON Schema, files being served as the path their storage gives, and IP addresses
+    # instead of pydantic's own format, which JSON Schema has none of for both versions
+    if isinstance(field, URLField):
+        props["format"] = "uri"
+    elif isinstance(field, EmailField):
+        props["format"] = "email"
+    elif isinstance(field, FileField):
+        props["format"] = "uri-reference"
+    elif isinstance(field, GenericIPAddressField):
+        if ip_format := {"ipv4": "ipv4", "ipv6": "ipv6"}.get(field.protocol.lower()):
+            props["format"] = ip_format
+        else:
+            props.pop("format", None)
+    # the strictest bounds, the validators of integers including the range of their column
+    if props.get("type") in ("integer", "number"):
+        if minimums := limit_values(field.validators, MinValueValidator):
+            props["minimum"] = max(minimums)
+        if maximums := limit_values(field.validators, MaxValueValidator):
+            props["maximum"] = min(maximums)
+    if props.get("type") == "string":
+        if minimums := limit_values(field.validators, MinLengthValidator):
+            props["minLength"] = max(minimums)
+        if maximums := limit_values(field.validators, MaxLengthValidator):
+            props["maxLength"] = min(maximums)
+        # JSON Schema takes a single pattern, and no flags: the one of URLs, which ignores case, is left out
+        patterns = [
+            v.regex.pattern
+            for v in field.validators
+            if isinstance(v, RegexValidator) and not v.inverse_match and not v.regex.flags & ~re.UNICODE
+        ]
+        if len(patterns) == 1:
+            props["pattern"] = json_schema_pattern(patterns[0])
 
 
 class AnonReadOnlyCollection[M: Model](OapifCollection):
