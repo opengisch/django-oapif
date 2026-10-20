@@ -82,5 +82,17 @@ class BuildingCollection(OapifCollection):
         return ("name", "floors", "geom")
 ```
 
-The queryables are among the fields of the collection: a property that is not exposed cannot be filtered on,
-and neither can the fields of a related model.
+`get_queryables()` can name any field of the model, served or not, but not a field of a related model by its
+lookup. A property that `query()` annotates, from a related model for instance, is a queryable once
+`get_queryables()` names it: a filter takes the type of the field its annotation outputs, and the queryables
+document describes it by that field, whether or not the features serve it:
+
+```python
+@oapif.register(Building)
+class BuildingCollection(OapifCollection):
+    def query(self, request, crs, bbox=None, bbox_crs=None):
+        return super().query(request, crs, bbox, bbox_crs).annotate(street=F("address__street"))
+
+    def get_queryables(self, request):
+        return (*super().get_queryables(request), "street")
+```

@@ -13,6 +13,7 @@ from django.contrib.auth.models import User
 from django.contrib.gis.db.models import Extent
 from django.contrib.gis.db.models.functions import NumPoints, Transform
 from django.contrib.gis.geos import LineString
+from django.core.exceptions import ImproperlyConfigured
 from django.core.management import call_command
 from django.db import connection, models
 from django.db.models import FloatField, Func, Max, Min
@@ -3051,6 +3052,73 @@ class TestFilter(TestCase):
         response = self.get("field_int = 1", **{"filter-lang": "cql2-json"})
 
         self.assertEqual(response.status_code, 422)
+
+
+class TestQueryableFields(TestCase):
+    """A queryable the model has no field of, annotated from a related model, typed by the field it comes from."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.features = {}
+        for label in ("a", "b", None):
+            point = Point_2056_10fields.objects.create(field_str_9=label, geom="SRID=2056;POINT(2600000 1200000)")
+            cls.features[label] = LayerWithForeignKey.objects.create(point=point)
+
+    def get(self, filter_expr: str, collection: str = "tests.layerwithforeignkey_point"):
+        return self.client.get(f"{collections_url}/{collection}/items", {"filter": filter_expr})
+
+    def matches(self, filter_expr: str) -> list[str]:
+        response = self.get(filter_expr)
+        self.assertEqual(response.status_code, 200, response.content)
+        return sorted(feature["id"] for feature in response.json()["features"])
+
+    def test_filter_on_a_queryable_of_a_related_model(self):
+        self.assertEqual(self.matches("point_label = 'a'"), [str(self.features["a"].pk)])
+
+    def test_filter_on_the_geometry_of_a_related_model(self):
+        everything = sorted(str(feature.pk) for feature in self.features.values())
+        self.assertEqual(self.matches("S_INTERSECTS(point_geom, BBOX(7, 46, 8, 48))"), everything)
+
+    def test_null_is_no_match_of_a_negation(self):
+        self.assertEqual(self.matches("NOT point_label = 'a'"), [str(self.features["b"].pk)])
+        self.assertEqual(self.matches("point_label IS NULL"), [str(self.features[None].pk)])
+
+    def test_the_queryables_document_describes_it(self):
+        response = self.client.get(f"{collections_url}/tests.layerwithforeignkey_point/queryables")
+
+        self.assertEqual(response.status_code, 200)
+        schema = response.json()
+        properties = schema["properties"]
+        self.assertEqual(
+            properties["point_label"], {"title": "Field 9", "maxLength": 255, "type": "string", "x-ogc-propertySeq": 3}
+        )
+        # the field an expression outputs is bound to no model: the queryable names it
+        self.assertEqual(properties["point_label_length"]["title"], "Point Label Length")
+        self.assertEqual(properties["point_label_length"]["type"], "integer")
+        self.assertEqual(
+            properties["point_geom"],
+            {
+                "title": "Geometry",
+                "format": "geometry-point",
+                "$ref": "https://geojson.org/schema/Point.json",
+                "x-ogc-propertySeq": 5,
+            },
+        )
+        self.assertFalse(schema["additionalProperties"])
+
+    def test_the_lookup_of_the_related_field_is_no_queryable(self):
+        self.assertEqual(self.get("point__field_str_9 = 'a'").status_code, 400)
+
+    def test_a_queryable_that_is_neither_is_an_error_of_the_collection(self):
+        collection = oapif.collections["tests.layerwithforeignkey_point"]
+        misspelt = (*collection.get_queryables(None), "point_lable")
+        for resource in ("items?filter=point_lable%3D'a'", "queryables"):
+            with (
+                self.subTest(resource=resource),
+                patch.object(collection, "get_queryables", return_value=misspelt),
+                self.assertRaises(ImproperlyConfigured),
+            ):
+                self.client.get(f"{collections_url}/tests.layerwithforeignkey_point/{resource}")
 
 
 class TestConformance(TestCase):

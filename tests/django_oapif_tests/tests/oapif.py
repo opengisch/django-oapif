@@ -1,3 +1,5 @@
+from django.db.models import F
+from django.db.models.functions import Length
 from django_oapif import OAPIF
 from django_oapif.auth import BasicAuth, DjangoAuth
 from django_oapif.handler import AnonReadOnlyCollection, OapifCollection
@@ -49,3 +51,27 @@ oapif.register_collection(LayerWithConstraints, AnonReadOnlyCollection)
 class Point_2056_10fieldsSubsetCollection(AnonReadOnlyCollection):
     id = "tests.point_2056_10fields_subset"
     fields = ("field_int", "field_str_0")
+
+
+@oapif.register(LayerWithForeignKey)
+class LayerWithForeignKeyPointCollection(AnonReadOnlyCollection):
+    """
+    Filtered on properties of its point that `query()` annotates: its label, a field of the related model, the
+    length of it, an expression, and its geometry.
+    """
+
+    id = "tests.layerwithforeignkey_point"
+
+    def query(self, request, crs, bbox=None, bbox_crs=None):
+        return (
+            super()
+            .query(request, crs, bbox, bbox_crs)
+            .annotate(
+                point_label=F("point__field_str_9"),
+                point_label_length=Length("point__field_str_9"),
+                point_geom=F("point__geom"),
+            )
+        )
+
+    def get_queryables(self, request):
+        return (*super().get_queryables(request), "point_label", "point_label_length", "point_geom")

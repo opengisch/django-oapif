@@ -249,7 +249,7 @@ def filter_or_raise(
     queryable, but also one comparing a property with a value of another type, which Django finds out as it builds
     the lookups.
     """
-    fields = {name: collection.opts.get_field(name) for name in collection.get_queryables(request)}
+    fields = collection.queryable_fields(request, query)
     try:
         return query.filter(cql2.to_q(filter_expr, fields, filter_crs.srid))
     except DjangoValidationError as e:
