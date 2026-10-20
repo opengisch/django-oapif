@@ -34,7 +34,7 @@ JSON-FG, with the `profile` of the link:
 {
   "id": "my_app.building",
   "links": [
-    {"rel": "items", "type": "application/geo+json", "profile": ["http://www.opengis.net/def/profile/ogc/0/jsonfg"], "href": "https://example.com/oapif/collections/my_app.building/items?profile=jsonfg", "title": "Collection items as JSON-FG"},
+    {"rel": "items", "type": "application/geo+json", "profile": ["http://www.opengis.net/def/profile/OGC/0/jsonfg"], "href": "https://example.com/oapif/collections/my_app.building/items?profile=jsonfg", "title": "Collection items as JSON-FG"},
     {"rel": "items", "type": "application/geo+json", "href": "https://example.com/oapif/collections/my_app.building/items", "title": "Collection items"},
     {"rel": "items", "type": "application/vnd.apache.arrow.stream", "href": "https://example.com/oapif/collections/my_app.building/items", "title": "Collection items as GeoArrow"},
     ...
