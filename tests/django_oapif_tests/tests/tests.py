@@ -9,6 +9,7 @@ from typing import Annotated
 from unittest import skipIf, skipUnless
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.gis.db.models import Extent
 from django.contrib.gis.db.models.functions import NumPoints, Transform
@@ -17,10 +18,13 @@ from django.core.exceptions import ImproperlyConfigured
 from django.core.management import call_command
 from django.db import connection, models
 from django.db.models import FloatField, Func, Max, Min
-from django.test import RequestFactory
+from django.middleware.csrf import CSRF_SECRET_LENGTH
+from django.test import Client, RequestFactory
 from django.test.testcases import TestCase
 from django.test.utils import CaptureQueriesContext, isolate_apps
-from django_oapif import jsonfg
+from django.utils.crypto import get_random_string
+from django_oapif import OAPIF, jsonfg
+from django_oapif.auth import DjangoAuth
 from django_oapif.collections import writes_curves
 from django_oapif.crs import CRS, CRS84_SRID
 from django_oapif.geojson import CircularString, Coordinate2D
@@ -618,6 +622,48 @@ class TestBasicAuth(TestCase):
         self.assertEqual(item.json(), feature)
         self.assertEqual(items.status_code, 200)
         self.assertIn(feature, items.json()["features"])
+
+
+class TestSessionCsrf(TestCase):
+    """The CSRF checks of Django, which the test client skips unless asked to."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("populate_users")
+
+        cls.demo_editor = User.objects.get(username="demo_editor")
+
+    def setUp(self):
+        self.client = Client(enforce_csrf_checks=True)
+
+    def post(self, collection_id: str, **extra_headers):
+        feature = {"type": "Feature", "geometry": None, "properties": {"field_str_0": "csrf"}}
+        url = f"{collections_url}/{collection_id}/items"
+        return self.client.post(url, feature, headers={**headers, **extra_headers}, content_type="application/json")
+
+    def test_anonymous_write_needs_no_token(self):
+        # without a session, there is nothing to forge: it was refused for want of the token
+        collection = AllowAnyCollection(NoGeom_10fields)
+
+        with patch.dict(oapif.collections, {collection.id: collection}):
+            response = self.post(collection.id)
+
+        self.assertEqual(response.status_code, 201)
+
+    def test_session_write_needs_the_token(self):
+        self.client.force_login(user=self.demo_editor)
+        token = get_random_string(CSRF_SECRET_LENGTH)
+        self.client.cookies[settings.CSRF_COOKIE_NAME] = token
+
+        refused = self.post("tests.nogeom_10fields")
+        created = self.post("tests.nogeom_10fields", **{"X-CSRFToken": token})
+
+        self.assertEqual(refused.status_code, 403)
+        self.assertEqual(created.status_code, 201)
+
+    def test_default_auth_is_the_session(self):
+        # NOT_SET, the default of auth, was passed on to Ninja: no auth ran, so no write of a session needed the token
+        self.assertEqual([type(auth) for auth in OAPIF().api.auth], [DjangoAuth])
 
 
 class TestSchema(TestCase):

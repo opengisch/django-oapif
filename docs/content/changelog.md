@@ -18,6 +18,7 @@ Please report anything that breaks in the [issues](https://github.com/opengisch/
 - **The extent of a collection no longer covers the features its [`get_queryset()`](usage/collections.md#hooks) hides.** 1.x and the 2.0 betas computed it from every row of the model, so a collection serving each user their own features gave them the extent of everyone's, whose corners can be the coordinates of someone else's feature. Upgrade if that matters to you.
 - **A `POST` no longer overwrites the feature whose id it carries.** 1.x and the 2.0 betas saved it over that feature when the primary key has no default, like the `id` Django gives a model, so anyone who could add features could change any of them, even those they could not see. It is now refused with a `409 Conflict`, instead of a server error when the key has a default, such as a UUID. Upgrade, or on 1.x give the add permission only to users who may change every feature.
 - **A [foreign key](fields/foreign-keys.md) can no longer reference a feature that [`get_queryset()`](usage/collections.md#hooks) hides from the user.** 1.x and the 2.0 betas accepted the key of any row of the referenced model, so a user could link a feature to someone else's, in a collection serving each user their own features, and tell from a `201` or a `422` which keys exist. Upgrade if that matters to you.
+- **A write with a session needs the CSRF token of Django, with the default `auth` too.** 1.x and the 2.0 betas ran no authentication when `OAPIF()` was given no `auth`, so they skipped the check of `DjangoAuth`, and a page could make the browser of a logged-in user write features as that user. The default `SameSite=Lax` of the session cookie kept other sites out, but not the pages of the same site, such as another subdomain. Upgrade, or on 1.x pass `auth=[DjangoAuth()]`. A page of the site that writes with the session must send the token, as Django forms do.
 
 ### Upgrading from 2.0.0-beta1
 
@@ -92,6 +93,7 @@ Please report anything that breaks in the [issues](https://github.com/opengisch/
 - `/collections` and `/collections/{collectionId}` no longer fail with a server error when the features of a collection stored in a CRS other than EPSG:4326 lie on one horizontal or vertical line, such as two points side by side, as they did in the 2.0 betas.
 - The links of the collections of `/collections` keep `collections/` in their path when the request has a query, such as an API key or `f=json`: they answered `404`, and GDAL found no feature. Those of a collection whose id ends in `collections` no longer have it twice.
 - A `bbox`, and the geometries of a `filter`, in a CRS other than the storage one, such as CRS84, are reprojected along their edges. Only their corners were, so across Switzerland a box missed features up to 2.6 km inside its edges, and returned others as far outside them.
+- An anonymous write no longer needs the CSRF token of Django, which guards the writes of a session: `DjangoAuth` refused it with a `403`, even in a collection that lets anyone write, such as [`AllowAnyCollection`](api.md#django_oapif.AllowAnyCollection).
 
 ### Performance
 

@@ -20,5 +20,12 @@ class DjangoAuth(APIKeyCookie):
 
     param_name: str = settings.SESSION_COOKIE_NAME
 
+    def __call__(self, request: HttpRequest) -> Any | None:
+        # The CSRF token guards the writes of a session: an anonymous request has none to forge. It was refused for
+        # want of the token, even by a collection that lets anyone write.
+        if not request.user.is_authenticated:
+            return request.user
+        return super().__call__(request)
+
     def authenticate(self, request: HttpRequest, key: str | None) -> Any | None:
         return request.user
