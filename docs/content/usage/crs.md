@@ -63,6 +63,7 @@ Override `supported_crs()` to offer other CRS:
 from django_oapif import OapifCollection
 from django_oapif.crs import CRS
 
+
 @oapif.register(Building)
 class BuildingCollection(OapifCollection):
     def supported_crs(self):
