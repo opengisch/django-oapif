@@ -307,7 +307,7 @@ def get_item_or_404(collection: OapifCollection, request: HttpRequest, item_id: 
     query = collection.get_queryset(request)
     if geom_field := collection.geometry_field:
         query = query.defer(geom_field)
-    return get_object_or_404(query, pk=item_id)
+    return get_object_or_404(query, pk=collection.resolve_item_id(request, item_id))
 
 
 def primary_keys(collection: OapifCollection) -> set[str]:
@@ -370,12 +370,17 @@ def get_related_object_or_raise(
     """
     The row a foreign key references, by the value of the field it references, which the key is served as. A
     reference has to be to a feature that its collections serve the user: any row would let them link to one hidden
-    from them, such as someone else's, and tell which exist. Another key takes any row of its model.
+    from them, such as someone else's, and tell which exist. It is the id of that feature, which its collection
+    resolves as it does the id of a URL. Another key takes any row of its model.
     """
-    lookup = {field.target_field.name: value}
-    querysets = [other.get_queryset(request) for other in referenced_collections(request, field, collections)]
-    for queryset in querysets or [field.related_model._default_manager]:
-        if (row := queryset.filter(**lookup).first()) is not None:
+    others = referenced_collections(request, field, collections)
+    for other in others:
+        row = other.get_queryset(request).filter(pk=other.resolve_item_id(request, str(value))).first()
+        if row is not None:
+            return row
+    if not others:
+        row = field.related_model._default_manager.filter(**{field.target_field.name: value}).first()
+        if row is not None:
             return row
     raise ValidationError([
         {
@@ -667,6 +672,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
     ):
         collection = get_collection_by_id(collection_id, request)
         validate_crs_or_raise(collection, crs, "crs")
+        item_id = collection.resolve_item_id(request, item_id)
         html = accepts_html(request)
         arrow = not html and accepts_geoarrow(request)
         profile = None if html or arrow else requested_profile(request, profile)
@@ -791,7 +797,8 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         if geom_field := collection.geometry_field:
             setattr(item, geom_field, geometry_to_save(feature.geometry, crs))
         collection.save_model(request, item, True)
-        item = collection.query(request, DEFAULT_CRS).filter(pk=item_id).first()
+        # by the key save_model leaves on the item, which may have saved the change on another row
+        item = collection.query(request, DEFAULT_CRS).filter(pk=item.pk).first()
         if item is None:
             # the change took it out of the rows the collection serves
             return HttpResponse(status=204)
@@ -830,7 +837,8 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         if (geom_field := collection.geometry_field) and "geometry" in feature.model_fields_set:
             setattr(item, geom_field, geometry_to_save(feature.geometry, crs))
         collection.save_model(request, item, True)
-        item = collection.query(request, DEFAULT_CRS).filter(pk=item_id).first()
+        # by the key save_model leaves on the item, which may have saved the change on another row
+        item = collection.query(request, DEFAULT_CRS).filter(pk=item.pk).first()
         if item is None:
             # the change took it out of the rows the collection serves
             return HttpResponse(status=204)
