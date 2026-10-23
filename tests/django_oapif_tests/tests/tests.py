@@ -23,7 +23,8 @@ from django.test import Client, RequestFactory
 from django.test.testcases import TestCase
 from django.test.utils import CaptureQueriesContext, isolate_apps
 from django.utils.crypto import get_random_string
-from django_oapif import jsonfg
+from django_oapif import OAPIF, jsonfg
+from django_oapif.auth import DjangoAuth
 from django_oapif.collections import writes_curves
 from django_oapif.crs import CRS, CRS84_SRID
 from django_oapif.geojson import CircularString, Coordinate2D
@@ -659,6 +660,10 @@ class TestSessionCsrf(TestCase):
 
         self.assertEqual(refused.status_code, 403)
         self.assertEqual(created.status_code, 201)
+
+    def test_default_auth_is_the_session(self):
+        # NOT_SET, the default of auth, was passed on to Ninja: no auth ran, so no write of a session needed the token
+        self.assertEqual([type(auth) for auth in OAPIF().api.auth], [DjangoAuth])
 
 
 class TestSchema(TestCase):
