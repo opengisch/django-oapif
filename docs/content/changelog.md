@@ -92,6 +92,7 @@ Please report anything that breaks in the [issues](https://github.com/opengisch/
 - `/collections` and `/collections/{collectionId}` no longer fail with a server error when the features of a collection stored in a CRS other than EPSG:4326 lie on one horizontal or vertical line, such as two points side by side, as they did in the 2.0 betas.
 - The links of the collections of `/collections` keep `collections/` in their path when the request has a query, such as an API key or `f=json`: they answered `404`, and GDAL found no feature. Those of a collection whose id ends in `collections` no longer have it twice.
 - A `bbox`, and the geometries of a `filter`, in a CRS other than the storage one, such as CRS84, are reprojected along their edges. Only their corners were, so across Switzerland a box missed features up to 2.6 km inside its edges, and returned others as far outside them.
+- An anonymous write no longer needs the CSRF token of Django, which guards the writes of a session: `DjangoAuth` refused it with a `403`, even in a collection that lets anyone write, such as [`AllowAnyCollection`](api.md#django_oapif.AllowAnyCollection).
 
 ### Performance
 
