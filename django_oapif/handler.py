@@ -393,11 +393,14 @@ class OapifCollection[M: Model]:
 
     def resolve_item_id(self, request: HttpRequest, item_id: str) -> str:
         """
-        Hook for sending the id of an item, as a URL or a foreign key referencing it gives it, to the row to read
-        or write.
+        Hook for mapping an item id sent by a client to the primary key of the row it stands for.
 
-        A collection whose rows are replaced, such as versions, can send the id of a replaced row to the row
-        replacing it: a client like QGIS keeps writing to the id it read.
+        The id comes from an item URL (`/items/{itemId}`) or from a foreign key referencing this collection in a
+        write. By default it is returned unchanged.
+
+        A collection whose rows get replaced, such as versions, can return the key of the current row for the id
+        of a replaced one: a client like QGIS keeps sending the id it read, even after a newer version replaced
+        that row.
         """
         return item_id
 
