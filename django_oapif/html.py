@@ -11,6 +11,18 @@ from django_oapif.utils import replace_query_param
 
 HTML_MEDIA_TYPE = "text/html"
 VERSION = version("django-oapif")
+# the path parameters of the API's own routes, which its root takes none of
+PATH_PARAMETERS = {"collection_id", "item_id"}
+
+
+def root_url(request: HttpRequest) -> str:
+    """
+    The root of the API the request reached, under a URL that may take arguments of its own, such as
+    `<str:dataset>/oapif/`: those of the request but the ones of the API's routes.
+    """
+    match = request.resolver_match
+    kwargs = {name: value for name, value in match.kwargs.items() if name not in PATH_PARAMETERS}
+    return reverse(f"{match.namespace}:api-root", kwargs=kwargs)
 
 
 def html_response(request: HttpRequest, template: str, context: dict[str, Any], *, title: str) -> HttpResponse:
@@ -23,7 +35,7 @@ def html_response(request: HttpRequest, template: str, context: dict[str, Any], 
         f"django_oapif/{template}",
         {
             "api_title": title,
-            "root_url": reverse(f"{request.resolver_match.namespace}:api-root"),
+            "root_url": root_url(request),
             "json_url": replace_query_param(request, f="json"),
             "version": VERSION,
             **context,
