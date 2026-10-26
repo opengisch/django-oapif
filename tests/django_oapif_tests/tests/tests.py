@@ -1342,6 +1342,18 @@ class TestHtml(TestCase):
                 self.assertEqual(response["Content-Type"], self.HTML)
                 self.assertVariesOnAccept(response)
 
+    def test_the_pages_link_their_root_under_a_url_with_arguments(self):
+        # the root was reversed without the arguments of the URL the API is under, and failed
+        root = "/views/some-view/oapif/"
+        for url in self.urls():
+            url = url.replace("/oapif/", root, 1)
+            with self.subTest(url=url):
+                response = self.client.get(url, headers=self.BROWSER)
+
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, f'href="{root}"')
+                self.assertNotContains(response, 'href="/oapif/"')
+
     def test_other_clients_get_the_json(self):
         # the JSON stays the default, for a client that accepts any type or does not say, but for the curves,
         # which GeoJSON refuses
