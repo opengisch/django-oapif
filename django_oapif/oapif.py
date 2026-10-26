@@ -106,7 +106,8 @@ class OAPIF:
             docs_decorator=docs_decorator,
             servers=servers,
             urls_namespace=urls_namespace,
-            auth=auth or [DjangoAuth()],
+            # NOT_SET is truthy: passed on, it left the API without auth, so no write of a session needed the CSRF token
+            auth=[DjangoAuth()] if auth is NOT_SET or not auth else auth,
             throttle=throttle,
             renderer=renderer,
             parser=parser,
