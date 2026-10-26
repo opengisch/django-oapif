@@ -10,8 +10,7 @@ from uuid import UUID
 from django.contrib.auth import get_permission_codename
 from django.contrib.gis.db.models import Extent, GeometryField
 from django.contrib.gis.db.models.functions import AsWKB, GeomOutputGeoFunc, IsEmpty, Transform
-from django.contrib.gis.geos import GEOSGeometry
-from django.contrib.gis.geos import Polygon as GEOSPolygon
+from django.contrib.gis.geos import GEOSGeometry, Polygon as GEOSPolygon
 from django.core.exceptions import FieldDoesNotExist, FieldError, ImproperlyConfigured
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import (
@@ -48,8 +47,7 @@ from ninja import Field, ModelSchema, Schema
 from ninja.errors import ValidationError
 from ninja.orm.fields import get_schema_field, title_if_lower
 from ninja.schema import NinjaGenerateJsonSchema
-from pydantic import ConfigDict, TypeAdapter, field_serializer
-from pydantic import ValidationError as PydanticValidationError
+from pydantic import ConfigDict, TypeAdapter, ValidationError as PydanticValidationError, field_serializer
 from pydantic.config import ExtraValues
 
 from django_oapif import jsonfg
@@ -142,7 +140,7 @@ def json_schema_type(annotation: Any) -> str | None:
     """The JSON type a property of this annotation is serialized to, if it has a single one."""
     try:
         return TypeAdapter(annotation).json_schema(mode="serialization").get("type")
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
 
 
@@ -302,7 +300,7 @@ class OapifCollection[M: Model]:
                 self.srid = geometry_fields[0].srid  # type: ignore
                 self.geometry_field = geometry_fields[0].name
             elif len(geometry_fields) > 1:
-                raise Exception(
+                raise ImproperlyConfigured(
                     f"Model {model} has more than one geometry field. Please use the `geometry_field` parameter to configure one."
                 )
         elif geometry_field := getattr(cls, "geometry_field", None):
@@ -311,7 +309,7 @@ class OapifCollection[M: Model]:
                 self.srid = field.srid
                 self.geometry_field = field.name
             else:
-                raise Exception(f"Field {field} of model {model} is not a GeometryField.")
+                raise ImproperlyConfigured(f"Field {field} of model {model} is not a GeometryField.")
 
         self.fields = getattr(
             cls,
@@ -480,7 +478,7 @@ class OapifCollection[M: Model]:
         geom_field = cast("GeometryField", self.model._meta.get_field(self.geometry_field))
         return geom_field.geom_type.startswith(tuple(LINEARIZED))
 
-    @cache
+    @cache  # noqa: B019 the collections live as long as the app
     def get_geometry_schema(self, linearized: bool = False) -> type[Geometry] | None:
         """
         The schema of the geometries of the collection, or with `linearized` of the GeoJSON geometries that curves
@@ -796,9 +794,11 @@ class OapifCollection[M: Model]:
         for name, field in properties_schema.model_fields.items():
             annotation = field.annotation
             # a nullable property is the union of its type and None
-            if get_origin(annotation) in (Union, UnionType):
-                if len(optional := [arg for arg in get_args(annotation) if arg is not NoneType]) == 1:
-                    annotation = optional[0]
+            if (
+                get_origin(annotation) in (Union, UnionType)
+                and len(optional := [arg for arg in get_args(annotation) if arg is not NoneType]) == 1
+            ):
+                annotation = optional[0]
             if (arrow_type := ARROW_TYPES.get(annotation)) is not None:
                 fields.append(pa.field(name, arrow_type))
                 sources[name] = "python"
@@ -896,7 +896,7 @@ class OapifCollection[M: Model]:
         "place", "geometry" being then null.
         """
         if geometry is None or (crs == CRS84 and jsonfg.is_geojson(geometry)):
-            geometry, place = geometry, None
+            place = None
         else:
             geometry, place = None, geometry
         return schema(type="Feature", id=str(obj.pk), geometry=geometry, place=place, properties=obj, **members)

@@ -11,9 +11,9 @@ It will terminate with exit code:
 - 2 if the current result is ** below ** the baseline.
 """
 
-import json
 import argparse
-from enum import Enum
+import json
+from enum import IntEnum
 from itertools import islice
 from os import path
 from sys import exit
@@ -22,7 +22,7 @@ from typing import NamedTuple
 from lxml import etree  # type: ignore
 
 
-class Cmp(str, Enum):
+class Cmp(IntEnum):
     EQUAL = 0
     BETTER = 1
     WORSE = 2

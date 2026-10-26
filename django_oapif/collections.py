@@ -6,8 +6,7 @@ from urllib.parse import quote
 from django.contrib.gis.db.models import Extent
 from django.contrib.gis.geos import GEOSException, GEOSGeometry
 from django.contrib.gis.geos.libgeos import geos_version_tuple
-from django.core.exceptions import FieldError
-from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.exceptions import FieldError, ValidationError as DjangoValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import ForeignKey, Model, QuerySet
 from django.http import HttpRequest, HttpResponse
@@ -15,8 +14,7 @@ from django.shortcuts import get_object_or_404
 from django.utils.cache import patch_vary_headers
 from ninja import Header, Query, Router, Schema
 from ninja.errors import AuthorizationError, HttpError, ValidationError
-from pydantic import TypeAdapter
-from pydantic import ValidationError as PydanticValidationError
+from pydantic import TypeAdapter, ValidationError as PydanticValidationError
 
 from django_oapif import cql2, jsonfg
 from django_oapif.crs import CRS, CRS84_SRID, CRS84_URI, BBox

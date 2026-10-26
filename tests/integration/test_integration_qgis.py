@@ -128,9 +128,8 @@ class TestStack(unittest.TestCase):
         f.setGeometry(QgsPoint(2345678.0, 1234567.0))
         f["text_mandatory_field"] = None
 
-        with self.assertRaises(QgsEditError) as ctx:
-            with edit(layer):
-                layer.addFeature(f)
+        with self.assertRaises(QgsEditError) as ctx, edit(layer):
+            layer.addFeature(f)
 
         # the version of pydantic in the URL of its error changes
         error_message = str(ctx.exception)
@@ -213,8 +212,10 @@ class TestStack(unittest.TestCase):
             '"field_int" IN (1, 2, 3) OR "field_int" BETWEEN 100 AND 110',
             '"field_str_1" IS NULL',
             # in the CRS of the layer, which QGIS sends as the filter-crs
-            "intersects_bbox($geometry, geom_from_wkt('POLYGON((2508500 1152000, 2510000 1152000, "
-            "2510000 1153500, 2508500 1153500, 2508500 1152000))'))",
+            (
+                "intersects_bbox($geometry, geom_from_wkt('POLYGON((2508500 1152000, 2510000 1152000, "
+                "2510000 1153500, 2508500 1153500, 2508500 1152000))'))"
+            ),
         ):
             with self.subTest(expression=expression):
                 layer = QgsVectorLayer(uri.uri(), "point", "OAPIF")
