@@ -133,7 +133,8 @@ def time_cases(
 
 def summarize(rows: list[dict]) -> pl.DataFrame:
     return (
-        pl.DataFrame(rows)
+        pl
+        .DataFrame(rows)
         .group_by(KEY)
         .agg(
             # the median, which one slow request does not move, is what the servers are compared on
@@ -173,15 +174,19 @@ def write_markdown(summary_df: pl.DataFrame, features: dict[str, int], base_name
     lines = [
         "## ⏱️ Benchmark",
         "",
-        f"`/items` response time in ms, median of {ITERATIONS} requests after a warm-up one. The collections are"
-        " stored in EPSG:2056, and reprojected to be served in CRS84.",
+        (
+            f"`/items` response time in ms, median of {ITERATIONS} requests after a warm-up one. The collections are"
+            " stored in EPSG:2056, and reprojected to be served in CRS84."
+        ),
     ]
     if compared:
         lines += [
             "",
-            f"Compared with the `django_oapif` of {base_name}, served on the same runner and data, a request to each"
-            f" in turn: 🟢 faster and 🔴 slower by more than {THRESHOLD:.0%}, as timed again with"
-            f" {RETIME_ITERATIONS} requests. The rows where every case is within {THRESHOLD:.0%} are left out.",
+            (
+                f"Compared with the `django_oapif` of {base_name}, served on the same runner and data, a request to"
+                f" each in turn: 🟢 faster and 🔴 slower by more than {THRESHOLD:.0%}, as timed again with"
+                f" {RETIME_ITERATIONS} requests. The rows where every case is within {THRESHOLD:.0%} are left out."
+            ),
         ]
         if len(compared) < (summary_df["server"] == "head").sum():
             lines[-1] += " The cases it does not serve, or not in the same format, are not compared."

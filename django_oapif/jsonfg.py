@@ -6,7 +6,7 @@ declares.
 
 import re
 from enum import StrEnum
-from math import sqrt
+from math import isnan, sqrt
 from struct import pack, unpack_from
 
 # the prefix of the profile URIs, as the OGC register writes them. Requests may also write "ogc", as ldproxy first
@@ -144,7 +144,7 @@ def _geom(buf, off, bounds=None):
 
     if kind == "pt":
         pts, off = _coords(buf, off, 1, dim, e)
-        empty = all(v != v for v in pts[0])  # POINT EMPTY is encoded as NaNs
+        empty = all(isnan(v) for v in pts[0])  # POINT EMPTY is encoded as NaNs
         if bounds is not None and not empty:
             x, y = pts[0][:2]
             bounds.append((x, y, x, y))

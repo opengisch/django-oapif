@@ -1,3 +1,4 @@
+from itertools import pairwise
 from typing import Annotated, Any, Literal
 
 from ninja import Field, Schema
@@ -76,7 +77,7 @@ class CompoundCurve[C: Coordinate](GeometryBase):
 
 def joined_arcs[T: list](parts: T) -> T:
     """The parts of a CircularString must follow one another, to be joined back without changing the curve."""
-    for previous, part in zip(parts, parts[1:]):
+    for previous, part in pairwise(parts):
         if not previous.coordinates or not part.coordinates or previous.coordinates[-1] != part.coordinates[0]:
             raise PydanticCustomError("circularstring_parts", "each part must start on the last point of the previous")
     return parts

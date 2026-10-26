@@ -57,4 +57,7 @@ extend-exclude = [
 lint.pydocstyle.convention = "google"
 lint.fixable = ["ALL"]
 lint.extend-select = ["UP"]
+# ninja parameters are declared with Query() and Header() defaults, Django options with class attributes
+lint.extend-ignore = ["B008", "RUF012"]
+lint.isort.combine-as-imports = true
 format.preview = true
