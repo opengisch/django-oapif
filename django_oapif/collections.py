@@ -53,6 +53,9 @@ ACCEPTED_TYPES = [
 
 DEFAULT_CRS = CRS("OGC", CRS84_SRID)
 PROFILE_DESCRIPTION = "GeoJSON profile: rfc7946 for GeoJSON, the default, or jsonfg for JSON-FG, which has the curves"
+CODELIST_PROFILE_DESCRIPTION = (
+    "Profile of the codelists: codelist-inline, the only one served, which a request for another one gets too"
+)
 LINEARIZE_DESCRIPTION = (
     "Whether GeoJSON has the curves linearized, in the CRS asked for, instead of refusing them. Not with the "
     "jsonfg profile, which has the curves as they are"
@@ -527,7 +530,13 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         "/{collection_id}/schema",
         operation_id="get_collection_schema",
     )
-    def get_schema(request: HttpRequest, collection_id: str):
+    def get_schema(
+        request: HttpRequest,
+        collection_id: str,
+        # the profile query parameter of Part 5, which the profiles for codelists ask a schema to take, but unread:
+        # it serves the one profile it has, as Part 5 lets it, without failing a request for another
+        profile: str | None = Query(None, description=CODELIST_PROFILE_DESCRIPTION),
+    ):
         collection = get_collection_by_id(collection_id, request)
         schema = collection.get_json_schema(request)
         schema["$id"] = request.build_absolute_uri(request.path)
@@ -541,7 +550,12 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         "/{collection_id}/queryables",
         operation_id="get_collection_queryables",
     )
-    def get_queryables(request: HttpRequest, collection_id: str):
+    def get_queryables(
+        request: HttpRequest,
+        collection_id: str,
+        # as the schema
+        profile: str | None = Query(None, description=CODELIST_PROFILE_DESCRIPTION),
+    ):
         collection = get_collection_by_id(collection_id, request)
         schema = collection.get_queryables_schema(request)
         schema["$id"] = request.build_absolute_uri(request.path)
