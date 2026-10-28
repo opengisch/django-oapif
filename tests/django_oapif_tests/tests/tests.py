@@ -820,6 +820,24 @@ class TestSchema(TestCase):
 
                 self.assertEqual(response.headers["Link"], profile)
 
+    def test_schemas_serve_their_codelists_inline_whatever_profile_is_asked_for(self):
+        # the profile query parameter of the profiles for codelists, which a schema may answer with its one profile
+        inline = '<http://www.opengis.net/def/profile/OGC/0/codelist-inline>; rel="profile"'
+        for resource in ("schema", "queryables"):
+            for profile in (
+                "codelist-inline",
+                "codelists-ref",
+                "http://www.opengis.net/def/profile/OGC/0/codelist-ref",
+                "codelist-ref,codelist-inline",
+            ):
+                with self.subTest(resource=resource, profile=profile):
+                    url = f"{collections_url}/tests.layerwithconstraints/{resource}"
+                    response = self.client.get(url, {"profile": profile})
+
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(response.headers["Link"], inline)
+                    self.assertIn("oneOf", response.json()["properties"]["kind"])
+
     def test_schema_numeric_bounds(self):
         url = f"{collections_url}/tests.layerwithconstraints/schema"
         properties = self.client.get(url).json()["properties"]
@@ -3394,6 +3412,17 @@ class TestConformance(TestCase):
         self.assertIn({"$ref": "#/components/parameters/limit"}, parameters)
         # and in its place: declared inline as well, the operation would have it twice
         self.assertNotIn("limit", [parameter.get("name") for parameter in parameters])
+
+    def test_openapi_declares_the_profile_parameter_of_the_schemas(self):
+        # which the conformance test of the profiles for codelists asks the schemas to take
+        paths = self.client.get("/oapif/openapi.json").json()["paths"]
+        for resource in ("schema", "queryables"):
+            with self.subTest(resource=resource):
+                parameters = paths[f"/oapif/collections/{{collection_id}}/{resource}"]["get"]["parameters"]
+                (profile,) = [parameter for parameter in parameters if parameter.get("name") == "profile"]
+
+                self.assertEqual(profile["in"], "query")
+                self.assertFalse(profile.get("required", False))
 
     def test_openapi_describes_the_jsonfg_members_of_writes_only(self):
         # the requests used to be described with the schema of the responses, which do not have them
