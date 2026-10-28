@@ -44,6 +44,9 @@ def create_conformance_router(*, title: str):
                 # the profile query parameter, which Part 5 now specifies under the name of Common Part 3, as
                 # ldproxy declares it
                 "http://www.opengis.net/spec/ogcapi-common-3/1.0/conf/profile-parameter",
+                # the profiles for codelists, also under the name of Common Part 3: the schemas give the choices of the
+                # fields as inline codelists
+                "http://www.opengis.net/spec/ogcapi-common-3/1.0/conf/profile-codelists",
                 # JSON-FG, which serves the curves in "place", in the GeoJSON profile that parameter asks for
                 "http://www.opengis.net/spec/json-fg-1/1.0/conf/core",
                 "http://www.opengis.net/spec/json-fg-1/1.0/conf/circular-arcs",

@@ -16,12 +16,14 @@ from django.contrib.gis.db.models.functions import NumPoints, Transform
 from django.contrib.gis.geos import LineString
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management import call_command
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import connection, models
 from django.db.models import FloatField, Func, Max, Min
 from django.middleware.csrf import CSRF_SECRET_LENGTH
-from django.test import Client, RequestFactory
+from django.test import Client, RequestFactory, modify_settings
 from django.test.testcases import TestCase
 from django.test.utils import CaptureQueriesContext, isolate_apps
+from django.utils import translation
 from django.utils.crypto import get_random_string
 from django_oapif_tests.tests.models import (
     Arc_2056_10fields,
@@ -51,6 +53,7 @@ from django_oapif.handler import (
     ARROW_AVAILABLE,
     AllowAnyCollection,
     AnonReadOnlyCollection,
+    describe_field,
     json_schema_pattern,
     reprojected,
 )
@@ -776,13 +779,46 @@ class TestSchema(TestCase):
 
                 self.assertEqual(response.json()["$id"], f"http://testserver{url}")
 
-    def test_schema_choices_are_an_enum(self):
-        url = f"{collections_url}/tests.layerwithconstraints/schema"
-        properties = self.client.get(url).json()["properties"]
+    def test_schema_choices_are_an_inline_codelist(self):
+        # the codelist-inline profile of Part 5: the const of each value, as it is served, titled with its label, and
+        # still the type QGIS makes a field of, in the queryables too
+        kind = [{"const": "house", "title": "House"}, {"const": "shed", "title": "Shed"}]
+        level = [{"const": 1, "title": "Low"}, {"const": 2, "title": "High"}]
+        for resource in ("schema", "queryables"):
+            with self.subTest(resource=resource):
+                url = f"{collections_url}/tests.layerwithconstraints/{resource}"
+                properties = self.client.get(url).json()["properties"]
 
-        self.assertEqual(properties["kind"]["enum"], ["house", "shed"])
-        self.assertEqual(properties["level"]["enum"], [1, 2])
-        self.assertNotIn("enum", properties["score"])
+                self.assertEqual((properties["kind"]["oneOf"], properties["level"]["oneOf"]), (kind, level))
+                self.assertEqual((properties["kind"]["type"], properties["level"]["type"]), ("string", "integer"))
+                self.assertNotIn("enum", properties["kind"])
+                self.assertNotIn("oneOf", properties["score"])
+
+    @modify_settings(MIDDLEWARE={"append": "django.middleware.locale.LocaleMiddleware"})
+    def test_schema_choices_are_titled_in_the_language_of_the_request(self):
+        # the labels are left lazy, to be translated as the schema is dumped. LocaleMiddleware leaves the language of
+        # the request active, which the tests that follow must not be in
+        self.addCleanup(translation.deactivate)
+        url = f"{collections_url}/tests.layerwithconstraints/schema"
+        answer = self.client.get(url, headers={"Accept-Language": "de"}).json()["properties"]["answer"]
+
+        self.assertEqual([code["title"] for code in answer["oneOf"]], ["Ja", "Nein", "Unbekannt"])
+
+    def test_schema_choices_are_titled_with_strings(self):
+        # JSON Schema wants a string as a title, and Django leaves a label as it is given
+        props = {}
+        describe_field(models.IntegerField(choices=[(1, 1)]), props, int)
+
+        self.assertEqual(json.loads(json.dumps(props, cls=DjangoJSONEncoder))["oneOf"], [{"const": 1, "title": "1"}])
+
+    def test_schemas_link_the_profile_of_their_codelists(self):
+        # in their headers, as Part 5 recommends
+        profile = '<http://www.opengis.net/def/profile/OGC/0/codelist-inline>; rel="profile"'
+        for resource in ("schema", "queryables"):
+            with self.subTest(resource=resource):
+                response = self.client.get(f"{collections_url}/tests.layerwithconstraints/{resource}")
+
+                self.assertEqual(response.headers["Link"], profile)
 
     def test_schema_numeric_bounds(self):
         url = f"{collections_url}/tests.layerwithconstraints/schema"
@@ -1417,11 +1453,28 @@ class TestHtml(TestCase):
 
         self.assertEqual(rows["id"]["Role"], "id")
         self.assertEqual(rows["kind"]["Default"], '"house"')
-        self.assertEqual(rows["kind"]["Constraints"], 'maxLength 10 enum ["house", "shed"]')
+        self.assertEqual(
+            rows["kind"]["Constraints"],
+            'maxLength 10 oneOf [{"const": "house", "title": "House"}, {"const": "shed", "title": "Shed"}]',
+        )
         self.assertEqual(rows["score"]["Constraints"], "minimum 0 maximum 10")
         self.assertEqual(rows["code"]["Constraints"], "maxLength 5 minLength 2 pattern ^[A-Z]+$")
         self.assertEqual(rows["website"]["Type"], "string (uri)")
         self.assertEqual(rows["address"]["Type"], "string (ipv4)")
+
+    @modify_settings(MIDDLEWARE={"append": "django.middleware.locale.LocaleMiddleware"})
+    def test_schema_pages_show_the_choices_in_the_language_of_the_request(self):
+        # their labels are lazy, which the pages write as the JSON does. LocaleMiddleware leaves the language of the
+        # request active, which the tests that follow must not be in
+        self.addCleanup(translation.deactivate)
+        codes = [("yes", "Ja"), ("no", "Nein"), ("unknown", "Unbekannt")]
+        one_of = ", ".join(f'{{"const": "{code}", "title": "{title}"}}' for code, title in codes)
+        for resource in ("schema", "queryables"):
+            with self.subTest(resource=resource):
+                url = f"{collections_url}/tests.layerwithconstraints/{resource}"
+                page = self.client.get(url, headers={**self.BROWSER, "Accept-Language": "de"}).content.decode()
+
+                self.assertEqual(properties_table(page)["answer"]["Constraints"], f"maxLength 7 oneOf [{one_of}]")
 
     def test_schema_page_shows_the_read_only_properties(self):
         rows = properties_table(self.page(f"{collections_url}/tests.layerwithfile/schema"))
@@ -3287,6 +3340,12 @@ class TestConformance(TestCase):
             "http://www.opengis.net/spec/ogcapi-features-5/1.0/conf/feature-references",
         ):
             self.assertIn(uri, conforms_to)
+
+    def test_codelist_profiles_are_declared(self):
+        # the schemas give the choices of the fields as inline codelists
+        conforms_to = self.client.get("/oapif/conformance").json()["conformsTo"]
+
+        self.assertIn("http://www.opengis.net/spec/ogcapi-common-3/1.0/conf/profile-codelists", conforms_to)
 
     def test_jsonfg_is_declared(self):
         conforms_to = self.client.get("/oapif/conformance").json()["conformsTo"]

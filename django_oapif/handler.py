@@ -43,6 +43,7 @@ from django.db.models import (
     When,
 )
 from django.http import HttpRequest
+from django.utils.functional import lazystr
 from ninja import Field, ModelSchema, Schema
 from ninja.errors import ValidationError
 from ninja.orm.fields import get_schema_field, title_if_lower
@@ -1004,10 +1005,14 @@ def flatten_types(props: dict, annotation, required: bool) -> None:
 
 def describe_field(field: ModelField, props: dict, annotation) -> None:
     """Complete the schema of a property with what its field tells: its choices, its format and its bounds."""
-    # the values of the choices, as they are served: their labels have no keyword in Part 5
+    # the choices as an inline codelist, in the "codelist-inline" profile of Part 5: a schema for each, its value as
+    # it is served as its "const", and its label as its "title", left lazy for the schema to be dumped in the language
+    # of the request, and a string, which JSON Schema wants and Django leaves a label as it is given
     if choices := field.flatchoices:
         adapter = TypeAdapter(annotation)
-        props["enum"] = [adapter.dump_python(value, mode="json") for value, _label in choices]
+        props["oneOf"] = [
+            {"const": adapter.dump_python(value, mode="json"), "title": lazystr(label)} for value, label in choices
+        ]
     # the formats of JSON Schema, files being served as the path their storage gives, and IP addresses
     # instead of pydantic's own format, which JSON Schema has none of for both versions
     if isinstance(field, URLField):

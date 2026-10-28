@@ -42,6 +42,8 @@ ARROW_STREAM_MEDIA_TYPE = "application/vnd.apache.arrow.stream"
 GEOJSON_MEDIA_TYPE = "application/geo+json"
 JSON_MEDIA_TYPE = "application/json"
 SCHEMA_MEDIA_TYPE = "application/schema+json"
+# the profile of Part 5 the schemas give the choices of the fields in
+CODELIST_INLINE_PROFILE = "http://www.opengis.net/def/profile/OGC/0/codelist-inline"
 
 ACCEPTED_TYPES = [
     JSON_MEDIA_TYPE,
@@ -161,6 +163,18 @@ def geojson_response(geojson: Schema, crs: CRS) -> HttpResponse:
 def arrow_response(stream, crs: CRS) -> HttpResponse:
     response = HttpResponse(stream.getvalue().to_pybytes(), content_type=ARROW_STREAM_MEDIA_TYPE)
     response["Content-Crs"] = crs.uri_header()
+    patch_vary_headers(response, ["Accept"])
+    return response
+
+
+def schema_response(schema: dict) -> HttpResponse:
+    """
+    A schema, whose titles are the verbose names of the fields and the labels of their choices, which ninja and
+    Django leave lazy when they are translated. Part 5 recommends its headers to link the profile of its codelists.
+    """
+    response = HttpResponse(json.dumps(schema, cls=DjangoJSONEncoder), content_type=SCHEMA_MEDIA_TYPE)
+    response["Link"] = f'<{CODELIST_INLINE_PROFILE}>; rel="profile"'
+    # the same URL serves an HTML page to a browser
     patch_vary_headers(response, ["Accept"])
     return response
 
@@ -521,11 +535,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         if accepts_html(request):
             context = {"collection": collection, "properties": schema_properties(schema)}
             return html_response(request, "schema.html", context, title=title)
-        # the titles are the verbose names of the fields, which ninja leaves lazy when they are translated
-        response = HttpResponse(json.dumps(schema, cls=DjangoJSONEncoder), content_type=SCHEMA_MEDIA_TYPE)
-        # the same URL serves an HTML page to a browser
-        patch_vary_headers(response, ["Accept"])
-        return response
+        return schema_response(schema)
 
     @router.get(
         "/{collection_id}/queryables",
@@ -538,9 +548,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         if accepts_html(request):
             context = {"collection": collection, "properties": schema_properties(schema)}
             return html_response(request, "queryables.html", context, title=title)
-        response = HttpResponse(json.dumps(schema, cls=DjangoJSONEncoder), content_type=SCHEMA_MEDIA_TYPE)
-        patch_vary_headers(response, ["Accept"])
-        return response
+        return schema_response(schema)
 
     @router.get(
         "/{collection_id}/items",
