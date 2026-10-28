@@ -95,4 +95,6 @@ The labels are written in the language Django activates for the request, as the 
 `LocaleMiddleware`, the one its `Accept-Language` header asks for. The [queryables](../usage/filtering.md#queryables)
 give the choices the same way. Both link the profile in a `Link` header,
 `<http://www.opengis.net/def/profile/OGC/0/codelist-inline>; rel="profile"`, and the conformance declaration lists
-the class of the profiles for codelists.
+the class of the profiles for codelists. They take the `profile` query parameter that class asks of them, and serve the
+inline codelists whatever profile it names, as Part 5 lets a schema with a single profile do: a request for
+`codelist-ref` gets them too, and no error.
