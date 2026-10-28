@@ -23,9 +23,10 @@ As the same URL serves both, the responses carry a `Vary: Accept` header.
 
 The pages of the schema and of the queryables of a collection have a row for each property, with all that its
 JSON Schema says of it: its title and description, its type and format, its role, whether it is required or
-read-only, its default, and its constraints, such as its bounds, length, pattern and choices. A foreign key
-links the collections it references. A keyword without a column of its own is listed with the constraints,
-including one that a collection adds to its schema.
+read-only, its default, and its constraints, such as its bounds, length, pattern and
+[choices](../fields/index.md#choices), with their labels. A foreign key links the collections it references. A
+keyword without a column of its own is listed with the constraints, including one that a collection adds to its
+schema.
 
 ## Maps
 

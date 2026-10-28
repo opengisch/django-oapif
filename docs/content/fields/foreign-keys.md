@@ -66,7 +66,7 @@ The reverse relations, the children of a parent here, are not served.
 ## Schema
 
 The [schema](index.md#schema) of the collection gives the property the `reference` role of
-[Part 5](https://docs.ogc.org/DRAFTS/23-058r1.html), with the collections of the referenced model that the user may
+[Part 5](https://docs.ogc.org/is/23-058r2/23-058r2.html), with the collections of the referenced model that the user may
 view in `x-ogc-collectionId`: a single id, or a list when the model has several collections.
 
 ```json
