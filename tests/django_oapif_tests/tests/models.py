@@ -221,6 +221,10 @@ class LayerWithConstraints(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     kind = models.CharField(max_length=10, choices=[("house", "House"), ("shed", "Shed")], default="house")
     level = models.IntegerField(choices=[(1, "Low"), (2, "High")], null=True, blank=True)
+    # labelled lazily, as in real models, with labels the catalog of Django translates, the tests having none
+    answer = models.CharField(
+        max_length=7, choices=[("yes", _("Yes")), ("no", _("No")), ("unknown", _("Unknown"))], null=True, blank=True
+    )
     score = models.IntegerField(validators=[MinValueValidator(0), MaxValueValidator(10)], default=0)
     code = models.CharField(
         max_length=5, validators=[MinLengthValidator(2), RegexValidator(r"^[A-Z]+$")], null=True, blank=True

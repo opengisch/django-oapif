@@ -2,6 +2,7 @@ import json
 from importlib.metadata import version
 from typing import Any
 
+from django.core.serializers.json import DjangoJSONEncoder
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.urls import reverse
@@ -47,10 +48,13 @@ def html_response(request: HttpRequest, template: str, context: dict[str, Any], 
 
 
 def as_text(value: Any) -> str:
-    """A property value as a page shows it: strings as they are, and the other values as in the JSON."""
+    """
+    A property value as a page shows it: strings as they are, and the other values as in the JSON, with their lazy
+    strings, such as the labels of the choices in a schema, in the language of the request.
+    """
     if value is None:
         return ""
-    return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+    return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, cls=DjangoJSONEncoder)
 
 
 def schema_type(schema: dict) -> str:

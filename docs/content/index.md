@@ -29,17 +29,17 @@ oapif.register_collection(Building)
 
 The API declares these conformance classes:
 
-| Standard                                                                                                                 | Conformance classes                                                                                        |
-|--------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------|
-| OGC API - Common - Part 1: Core                                                                                          | Core, JSON, Landing page                                                                                   |
-| OGC API - Common - Part 2: Geospatial data                                                                               | Collections                                                                                                |
-| [OGC API - Features - Part 1: Core](https://docs.ogc.org/is/17-069r4/17-069r4.html)                                      | Core, GeoJSON, OpenAPI 3.1                                                                                 |
-| [OGC API - Features - Part 2: Coordinate Reference Systems by Reference](https://docs.ogc.org/is/18-058r1/18-058r1.html) | Coordinate Reference Systems by Reference                                                                  |
-| [OGC API - Features - Part 3: Filtering](https://docs.ogc.org/is/19-079r2/19-079r2.html)                                 | Queryables, Filter, Features Filter                                                                        |
-| [Common Query Language (CQL2)](https://docs.ogc.org/is/21-065r2/21-065r2.html)                                           | Basic CQL2, Advanced comparison operators, Case-insensitive comparison, Basic spatial functions, CQL2 Text |
-| [OGC API - Features - Part 4: Create, Replace, Update and Delete](https://docs.ogc.org/DRAFTS/20-002r1.html)             | Create/Replace/Delete, Update, Features                                                                    |
-| [OGC API - Features - Part 5: Schemas](https://docs.ogc.org/DRAFTS/23-058r1.html)                                        | Core roles for features, Feature references, Returnables and receivables, Schemas, Profile query parameter |
-| [OGC Features and Geometries JSON - Part 1: Core](https://docs.ogc.org/is/21-045r1/21-045r1.html)                        | Core, Circular arcs, GeoJSON profiles, JSON-FG in Web APIs                                                 |
+| Standard                                                                                                                 | Conformance classes                                                                                                                |
+|--------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|
+| OGC API - Common - Part 1: Core                                                                                          | Core, JSON, Landing page                                                                                                           |
+| OGC API - Common - Part 2: Geospatial data                                                                               | Collections                                                                                                                        |
+| [OGC API - Features - Part 1: Core](https://docs.ogc.org/is/17-069r4/17-069r4.html)                                      | Core, GeoJSON, OpenAPI 3.1                                                                                                         |
+| [OGC API - Features - Part 2: Coordinate Reference Systems by Reference](https://docs.ogc.org/is/18-058r1/18-058r1.html) | Coordinate Reference Systems by Reference                                                                                          |
+| [OGC API - Features - Part 3: Filtering](https://docs.ogc.org/is/19-079r2/19-079r2.html)                                 | Queryables, Filter, Features Filter                                                                                                |
+| [Common Query Language (CQL2)](https://docs.ogc.org/is/21-065r2/21-065r2.html)                                           | Basic CQL2, Advanced comparison operators, Case-insensitive comparison, Basic spatial functions, CQL2 Text                         |
+| [OGC API - Features - Part 4: Create, Replace, Update and Delete](https://docs.ogc.org/DRAFTS/20-002r1.html)             | Create/Replace/Delete, Update, Features                                                                                            |
+| [OGC API - Features - Part 5: Schemas](https://docs.ogc.org/is/23-058r2/23-058r2.html)                                   | Core roles for features, Feature references, Returnables and receivables, Schemas, Profile query parameter, Profiles for codelists |
+| [OGC Features and Geometries JSON - Part 1: Core](https://docs.ogc.org/is/21-045r1/21-045r1.html)                        | Core, Circular arcs, GeoJSON profiles, JSON-FG in Web APIs                                                                         |
 
 OpenAPI 3.1 is a class of the 1.1 draft of Part 1, as the published standards only have one for OpenAPI 3.0:
 see [conformance](contributing/conformance.md#openapi-31).

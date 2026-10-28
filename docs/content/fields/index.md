@@ -45,9 +45,10 @@ change the feature of the URL.
 ## Schema
 
 `/collections/{collectionId}/schema` returns the [JSON Schema](https://json-schema.org/) of the features of a
-collection, as defined by [OGC API - Features - Part 5](https://docs.ogc.org/DRAFTS/23-058r1.html): the type and
-format of each property, its bounds, length, pattern and choices, its position, the required and read-only ones,
-the primary key, with the `id` role, and the geometry, with the `primary-geometry` role and its type as `format`:
+collection, as defined by [OGC API - Features - Part 5](https://docs.ogc.org/is/23-058r2/23-058r2.html): the type and
+format of each property, its bounds, length, pattern and [choices](#choices), its position, the required and
+read-only ones, the primary key, with the `id` role, and the geometry, with the `primary-geometry` role and its type
+as `format`:
 
 ```json
 {
@@ -73,3 +74,25 @@ the primary key, with the `id` role, and the geometry, with the `primary-geometr
 ```
 
 A foreign key has the `reference` role, see [foreign keys](foreign-keys.md#schema).
+
+### Choices
+
+The choices of a field are given as an inline codelist, in the `codelist-inline` profile of Part 5: its property
+keeps its type, and has a `oneOf` with a schema for each choice, whose `const` is the value, as it is served, and
+whose `title` is the label:
+
+```json
+"kind": {
+  "title": "Kind",
+  "type": "string",
+  "maxLength": 10,
+  "oneOf": [{"const": "house", "title": "House"}, {"const": "shed", "title": "Shed"}],
+  "x-ogc-propertySeq": 3
+}
+```
+
+The labels are written in the language Django activates for the request, as the titles of the properties are: with
+`LocaleMiddleware`, the one its `Accept-Language` header asks for. The [queryables](../usage/filtering.md#queryables)
+give the choices the same way. Both link the profile in a `Link` header,
+`<http://www.opengis.net/def/profile/OGC/0/codelist-inline>; rel="profile"`, and the conformance declaration lists
+the class of the profiles for codelists.
