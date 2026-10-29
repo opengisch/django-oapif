@@ -34,6 +34,8 @@ docker compose exec django python manage.py test
 # integration tests
 docker compose --profile testing_integration up -d
 docker compose run integration_tests
+# and in QGIS 3.44, until it is dropped (an amd64 image: DOCKER_DEFAULT_PLATFORM=linux/amd64 on arm64)
+QGIS_IMAGE=qgis/qgis:3.44-noble docker compose run integration_tests
 ```
 
 ### Writing curves

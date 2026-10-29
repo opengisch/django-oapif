@@ -38,7 +38,10 @@ services:
     command: ["/bin/sh", "-c", "/build/run/run.sh"]
 
   integration_tests:
-    image: qgis/qgis:3.44-noble
+    # headless QGIS, for amd64 and arm64: master, as no release reads the registered URIs of the JSON-FG profiles yet.
+    # QGIS_IMAGE replaces it, with qgis/qgis:3.44-noble until QGIS 3 is dropped
+    image: ${QGIS_IMAGE:-qgis/qgis-slim:nightly}
+    # an X display for the qgis/qgis images, qgis-slim renders offscreen
     command: sh -c 'xvfb-run python3 -m unittest discover'
     tty: true
     volumes:
