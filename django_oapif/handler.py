@@ -403,6 +403,16 @@ class OapifCollection[M: Model]:
         """
         return item_id
 
+    def get_related_queryset(self, request: HttpRequest, field: ForeignKey) -> QuerySet:
+        """
+        Hook for the rows a foreign key of a written feature may take when it references no collection the user may
+        view, such as a key to a model without one. By default any row of its model.
+
+        As the queryset of `formfield_for_foreignkey` in the Django admin, it can keep fewer, such as those of the
+        user: another key is refused, as a reference to a feature that is not served.
+        """
+        return field.related_model._default_manager.all()
+
     def get_ordering(self, request) -> tuple:
         """
         Hook for specifying field ordering.

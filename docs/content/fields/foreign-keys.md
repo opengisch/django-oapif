@@ -56,7 +56,9 @@ Writes take the same primary key, in `POST`, `PUT` and `PATCH`. A key that refer
 So is a key with the [`reference` role](#schema) to a row that the collections it references do not serve the user:
 a user cannot link a feature to one that [`get_queryset()`](../usage/collections.md#hooks) hides from them, such as
 someone else's, nor tell it from a row that does not exist. A key that a `PUT` or a `PATCH` writes back unchanged is
-kept, though, even if its row is no longer served. A key without the role may reference any row of its model.
+kept, though, even if its row is no longer served. A key without the role may reference any row of its model, or
+those [`get_related_queryset()`](../usage/collections.md#hooks) keeps, such as the rows of the user, as the
+queryset of `formfield_for_foreignkey()` does in the Django admin.
 
 A key with the role is the id of a feature, which the collections it references resolve with
 [`resolve_item_id()`](../usage/collections.md#hooks), as they do the id of a URL.
