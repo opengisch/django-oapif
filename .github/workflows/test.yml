@@ -37,11 +37,16 @@ jobs:
           - name: tests (Django 6.0)
             compose_file: tests/docker-compose.yml:tests/docker-compose.dev.yml:tests/docker-compose.django.yml
             django: "6.0"
+          # QGIS 3, until it is dropped: the other entries get the nightly of qgis-slim
+          - name: tests (QGIS 3.44)
+            compose_file: tests/docker-compose.yml:tests/docker-compose.dev.yml
+            qgis: qgis/qgis:3.44-noble
     env:
       DOCKER_BUILDKIT: 1
       COMPOSE_DOCKER_CLI_BUILD: 1
       COMPOSE_FILE: ${{ matrix.compose_file }}
       DJANGO_VERSION: ${{ matrix.django }}
+      QGIS_IMAGE: ${{ matrix.qgis }}
 
     steps:
     - uses: actions/checkout@v7
