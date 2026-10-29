@@ -391,15 +391,19 @@ def get_related_object_or_raise(
     served as. A reference has to be to a feature that its collections serve the user: any row would let them link to
     one hidden from them, such as someone else's, and tell which exist. It is the id of that feature, which its
     collection resolves as it does the id of a URL. Another key takes a row the collection gives it, any row of its
-    model unless `get_related_queryset` keeps fewer.
+    model unless `get_related_queryset` keeps fewer. Either way, the row has to meet the `limit_choices_to` of the
+    key, which the Django admin applies on top of its queryset too.
     """
+    limit = field.get_limit_choices_to()
     others = referenced_collections(request, field, collections)
     for other in others:
-        row = other.get_queryset(request).filter(pk=other.resolve_item_id(request, str(value))).first()
+        rows = other.get_queryset(request).complex_filter(limit)
+        row = rows.filter(pk=other.resolve_item_id(request, str(value))).first()
         if row is not None:
             return row
     if not others:
-        row = collection.get_related_queryset(request, field).filter(**{field.target_field.name: value}).first()
+        rows = collection.get_related_queryset(request, field).complex_filter(limit)
+        row = rows.filter(**{field.target_field.name: value}).first()
         if row is not None:
             return row
     raise ValidationError([

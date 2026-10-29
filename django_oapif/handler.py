@@ -409,7 +409,8 @@ class OapifCollection[M: Model]:
         view, such as a key to a model without one. By default any row of its model.
 
         As the queryset of `formfield_for_foreignkey` in the Django admin, it can keep fewer, such as those of the
-        user: another key is refused, as one to a row that does not exist.
+        user: another key is refused, as one to a row that does not exist. The `limit_choices_to` of the key applies on
+        top, as it does in the admin.
         """
         return field.related_model._default_manager.all()
 

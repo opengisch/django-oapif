@@ -58,7 +58,8 @@ a user cannot link a feature to one that [`get_queryset()`](../usage/collections
 someone else's, nor tell it from a row that does not exist. A key that a `PUT` or a `PATCH` writes back unchanged is
 kept, though, even if its row is no longer served. A key without the role may reference any row of its model, or
 those [`get_related_queryset()`](../usage/collections.md#hooks) keeps, such as the rows of the user, as the
-queryset of `formfield_for_foreignkey()` does in the Django admin.
+queryset of `formfield_for_foreignkey()` does in the Django admin. Either way, the row has to meet the
+`limit_choices_to` of the key, as the admin and `full_clean()` require.
 
 A key with the role is the id of a feature, which the collections it references resolve with
 [`resolve_item_id()`](../usage/collections.md#hooks), as they do the id of a URL.

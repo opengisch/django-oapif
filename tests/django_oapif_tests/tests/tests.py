@@ -537,6 +537,30 @@ class TestBasicAuth(TestCase):
         self.assertEqual(refused.status_code, 422)
         self.assertEqual(refused.json()["detail"][0]["msg"], "Foreign key not found")
 
+    def test_foreign_key_takes_only_the_rows_its_limit_choices_to_keeps(self):
+        # the key was looked up without them, which the Django admin and full_clean() apply: a write linked a row the
+        # model rules out, whether the key references collections the user may view or not
+        self.client.force_login(user=self.demo_editor)
+        first, second = Point_2056_10fields.objects.all()[:2]
+        url = f"{collections_url}/tests.layerwithforeignkey/items"
+        remote_field = LayerWithForeignKey._meta.get_field("point").remote_field
+        hidden = [
+            patch.object(oapif.collections[collection_id], "has_view_permission", return_value=False)
+            for collection_id in ("tests.point_2056_10fields", "tests.point_2056_10fields_subset")
+        ]
+
+        def post(key):
+            feature = {"type": "Feature", "geometry": None, "properties": {"point": str(key)}}
+            return self.client.post(url, feature, headers=headers, content_type="application/json").status_code
+
+        with patch.object(remote_field, "limit_choices_to", {"pk": first.pk}):
+            referenced = [post(first.pk), post(second.pk)]
+            with hidden[0], hidden[1]:
+                unreferenced = [post(first.pk), post(second.pk)]
+
+        self.assertEqual(referenced, [201, 422])
+        self.assertEqual(unreferenced, [201, 422])
+
     @isolate_apps("django_oapif_tests.tests")
     def test_foreign_key_to_another_field_is_written_as_it_is_served(self):
         # served as the value of the field it references, the key was looked up as a primary key: that value was
