@@ -380,21 +380,30 @@ def geometry_to_save(geometry, crs: CRS) -> GEOSGeometry | None:
 
 
 def get_related_object_or_raise(
-    request: HttpRequest, field: ForeignKey, value: Any, collections: dict[str, OapifCollection]
+    request: HttpRequest,
+    collection: OapifCollection,
+    field: ForeignKey,
+    value: Any,
+    collections: dict[str, OapifCollection],
 ):
     """
-    The row a foreign key references, by the value of the field it references, which the key is served as. A
-    reference has to be to a feature that its collections serve the user: any row would let them link to one hidden
-    from them, such as someone else's, and tell which exist. It is the id of that feature, which its collection
-    resolves as it does the id of a URL. Another key takes any row of its model.
+    The row a foreign key of the collection references, by the value of the field it references, which the key is
+    served as. A reference has to be to a feature that its collections serve the user: any row would let them link to
+    one hidden from them, such as someone else's, and tell which exist. It is the id of that feature, which its
+    collection resolves as it does the id of a URL. Another key takes a row the collection gives it, any row of its
+    model unless `get_related_queryset` keeps fewer. Either way, the row has to meet the `limit_choices_to` of the
+    key, which the Django admin applies on top of its queryset too.
     """
+    limit = field.get_limit_choices_to()
     others = referenced_collections(request, field, collections)
     for other in others:
-        row = other.get_queryset(request).filter(pk=other.resolve_item_id(request, str(value))).first()
+        rows = other.get_queryset(request).complex_filter(limit)
+        row = rows.filter(pk=other.resolve_item_id(request, str(value))).first()
         if row is not None:
             return row
     if not others:
-        row = field.related_model._default_manager.filter(**{field.target_field.name: value}).first()
+        rows = collection.get_related_queryset(request, field).complex_filter(limit)
+        row = rows.filter(**{field.target_field.name: value}).first()
         if row is not None:
             return row
     raise ValidationError([
@@ -741,7 +750,9 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         for field, value in item_properties.items():
             if value is not None and field in collection.foreign_key_fields:
                 foreign_key = collection.opts.get_field(field)
-                item_properties[field] = get_related_object_or_raise(request, foreign_key, value, collections)
+                item_properties[field] = get_related_object_or_raise(
+                    request, collection, foreign_key, value, collections
+                )
         if (geom_field := collection.geometry_field) and feature.geometry:
             item_properties[geom_field] = geometry_to_save(feature.geometry, crs)
         item = collection.model(**item_properties)
@@ -812,7 +823,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
                 # written back as it was read, a key is kept: its row may have left those the user is served since
                 if value == getattr(item, foreign_key.attname):
                     continue
-                value = get_related_object_or_raise(request, foreign_key, value, collections)
+                value = get_related_object_or_raise(request, collection, foreign_key, value, collections)
             setattr(item, field, value)
         if geom_field := collection.geometry_field:
             setattr(item, geom_field, geometry_to_save(feature.geometry, crs))
@@ -852,7 +863,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
                     # written back as it was read, a key is kept: its row may have left those the user is served since
                     if value == getattr(item, foreign_key.attname):
                         continue
-                    value = get_related_object_or_raise(request, foreign_key, value, collections)
+                    value = get_related_object_or_raise(request, collection, foreign_key, value, collections)
                 setattr(item, field, value)
         if (geom_field := collection.geometry_field) and "geometry" in feature.model_fields_set:
             setattr(item, geom_field, geometry_to_save(feature.geometry, crs))

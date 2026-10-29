@@ -72,6 +72,7 @@ Django's `ModelAdmin` are:
 | `get_readonly_fields(request, obj=None)`                                        | The fields not accepted in writes: `readonly_fields`, generated fields and files.                             |
 | `get_ordering(request)`                                                         | The order of the features.                                                                                    |
 | `resolve_item_id(request, item_id)`                                             | The key of the row an item id stands for, in a URL or a foreign key, the id itself by default.                |
+| `get_related_queryset(request, field)`                                          | The rows a [foreign key](../fields/foreign-keys.md) without the reference role may take, all by default.      |
 | `get_queryables(request)`                                                       | The properties the features can be [filtered](filtering.md#queryables) on.                                    |
 | `save_model(request, obj, change)`                                              | Saves a created or changed row.                                                                               |
 | `delete_model(request, obj)`                                                    | Deletes a row.                                                                                                |
