@@ -1,4 +1,7 @@
-import requests
+import json
+from urllib.parse import urlencode
+from urllib.request import urlopen
+
 from osgeo import gdal
 from qgis.core import (
     Qgis,
@@ -29,6 +32,12 @@ COLLECTIONS_URL = "http://django:8000/oapif/collections"
 POINTS_URL = "http://django:8000/oapif/collections/tests.point_2056_10fields"
 
 
+def get_json(url, **params):
+    """The JSON of a GET, which raises on an error status: qgis-slim has no requests."""
+    with urlopen(f"{url}?{urlencode(params)}" if params else url) as response:
+        return json.load(response)
+
+
 class TestStack(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -38,20 +47,16 @@ class TestStack(unittest.TestCase):
         cls.password = "123"
 
     def test_endpoint_ok(self):
-        root_response = requests.get(ROOT_URL)
-        collections_response = requests.get(COLLECTIONS_URL)
-        points_response = requests.get(POINTS_URL)
-
-        self.assertEqual(root_response.status_code, 200)
-        self.assertEqual(collections_response.status_code, 200)
-        self.assertEqual(points_response.status_code, 200)
+        for url in (ROOT_URL, COLLECTIONS_URL, POINTS_URL):
+            with urlopen(url) as response:
+                self.assertEqual(response.status, 200)
 
     def test_collection_exists(self):
-        res = requests.get(COLLECTIONS_URL).json()
+        res = get_json(COLLECTIONS_URL)
         self.assertTrue("tests.point_2056_10fields" in [collection["id"] for collection in res["collections"]])
 
     def test_many_points(self):
-        points = requests.get(POINTS_URL).json()
+        points = get_json(POINTS_URL)
         self.assertTrue(len(points) > 1)
 
     def test_load_layer(self):
@@ -257,10 +262,11 @@ class TestStack(unittest.TestCase):
         self.assertEqual(layer.crs().authid(), "EPSG:2056")
         feature = next(layer.getFeatures())
         # the points GeoJSON has, in the storage CRS
-        served = requests.get(
+        served = get_json(
             f"{COLLECTIONS_URL}/tests.curvepolygon_2056/items/{feature['id']}",
-            params={"crs": "http://www.opengis.net/def/crs/EPSG/0/2056", "linearize": "true"},
-        ).json()
+            crs="http://www.opengis.net/def/crs/EPSG/0/2056",
+            linearize="true",
+        )
         ring = feature.geometry().constGet().exteriorRing()
         self.assertEqual([[point.x(), point.y()] for point in ring.points()], served["geometry"]["coordinates"][0])
         # the rounded corner, linearized
@@ -279,7 +285,7 @@ class TestStack(unittest.TestCase):
         self.assertTrue(layer.isValid())
 
         features = list(layer.getFeatures())
-        self.assertEqual(len(features), requests.get(f"{POINTS_URL}/items").json()["numberMatched"])
+        self.assertEqual(len(features), get_json(f"{POINTS_URL}/items")["numberMatched"])
         self.assertEqual(layer.crs().authid(), "EPSG:2056")
         # in "place", in the storage CRS
         point = features[0].geometry().asPoint()
@@ -294,4 +300,6 @@ class TestStack(unittest.TestCase):
 
         self.assertTrue(layer.isValid())
         self.assertEqual(layer.wkbType(), QgsWkbTypes.CurvePolygon)
-        self.assertTrue(next(layer.getFeatures()).geometry().constGet().hasCurvedSegments())
+        # held, as constGet points into the geometry, which a temporary would free
+        geometry = next(layer.getFeatures()).geometry()
+        self.assertTrue(geometry.constGet().hasCurvedSegments())

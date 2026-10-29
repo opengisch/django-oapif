@@ -38,8 +38,9 @@ services:
     command: ["/bin/sh", "-c", "/build/run/run.sh"]
 
   integration_tests:
-    image: qgis/qgis:3.44-noble
-    command: sh -c 'xvfb-run python3 -m unittest discover'
+    # headless QGIS, for amd64 and arm64: master, as no release reads the registered URIs of the JSON-FG profiles yet
+    image: qgis/qgis-slim:nightly
+    command: python3 -m unittest discover
     tty: true
     volumes:
       - ./integration:/integration
