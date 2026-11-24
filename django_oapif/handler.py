@@ -433,9 +433,9 @@ class OapifCollection[M: Model]:
 
         The id comes from an item URL (`/items/{itemId}`), from a foreign key referencing this collection in a
         write, or from a filter comparing the primary key, or such a foreign key, with `=`, `<>` or `IN`, once for
-        each literal. By default it is returned unchanged. An id that stands for no row, or that is malformed, such
-        as a literal of a filter, is returned unchanged too, rather than raising: the lookup then finds no row, or
-        refuses the id.
+        each literal. By default it is returned unchanged. An id that stands for no row may raise `Http404` or
+        `DoesNotExist`, or resolve to None: its URL then answers a 404, and a filter matches no feature with it. An
+        id returned unchanged, such as a malformed one, is compared as it is, as a collection without the hook does.
 
         A collection whose rows get replaced, such as versions, can return the key of the current row for the id
         of a replaced one: a client like QGIS keeps sending the id it read, even after a newer version replaced

@@ -6,10 +6,10 @@ from urllib.parse import quote
 from django.contrib.gis.db.models import Extent
 from django.contrib.gis.geos import GEOSException, GEOSGeometry
 from django.contrib.gis.geos.libgeos import geos_version_tuple
-from django.core.exceptions import FieldError, ValidationError as DjangoValidationError
+from django.core.exceptions import FieldError, ObjectDoesNotExist, ValidationError as DjangoValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import ForeignKey, Model, QuerySet
-from django.http import HttpRequest, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils.cache import patch_vary_headers
 from ninja import Header, Query, Router, Schema
@@ -282,9 +282,7 @@ def filter_or_raise(
     fields = collection.queryable_fields(request, query)
     ids = dict.fromkeys(primary_keys(collection), collection) | references
     resolvers = {
-        name: partial(other.resolve_item_id, request)
-        for name, other in ids.items()
-        if overrides(other, "resolve_item_id")
+        name: partial(filter_key, other, request) for name, other in ids.items() if overrides(other, "resolve_item_id")
     }
     try:
         return query.filter(cql2.to_q(filter_expr, fields, filter_crs.srid, resolvers))
@@ -292,6 +290,21 @@ def filter_or_raise(
         raise HttpError(400, f"Invalid filter: {' '.join(e.messages)}")
     except (cql2.FilterError, FieldError, ValueError, TypeError) as e:
         raise HttpError(400, f"Invalid filter: {e}")
+
+
+def filter_key(collection: OapifCollection, request: HttpRequest, literal: Any) -> Any:
+    """
+    The key a literal of a filter stands for, compared with an id that `collection` serves, by its
+    `resolve_item_id()`, as the id of a URL. None for an id that stands for no row: one it raises a 404 or a
+    `DoesNotExist` for, as one written for the URLs may, or resolves to None. An id it returns unchanged is the
+    literal, of its type, which Django converts as it does on any collection: 1.0 for 1.
+    """
+    item_id = str(literal)
+    try:
+        key = collection.resolve_item_id(request, item_id)
+    except (Http404, ObjectDoesNotExist):
+        return None
+    return literal if key == item_id else key
 
 
 def take_jsonfg_members_or_raise(feature: GenericFeatureInput | GenericFeaturePatch, crs: CRS) -> None:

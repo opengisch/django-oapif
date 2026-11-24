@@ -18,7 +18,8 @@ from django.core.exceptions import ImproperlyConfigured
 from django.core.management import call_command
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import connection, models
-from django.db.models import FloatField, Func, Max, Min
+from django.db.models import FloatField, Func, Max, Min, Q
+from django.http import Http404
 from django.middleware.csrf import CSRF_SECRET_LENGTH
 from django.test import Client, RequestFactory, modify_settings
 from django.test.testcases import TestCase
@@ -44,7 +45,7 @@ from ninja.errors import ValidationError as NinjaValidationError
 from ninja.responses import NinjaJSONEncoder
 from pydantic import AfterValidator, ValidationError as PydanticValidationError
 
-from django_oapif import OAPIF, jsonfg
+from django_oapif import OAPIF, cql2, jsonfg
 from django_oapif.auth import DjangoAuth
 from django_oapif.collections import writes_curves
 from django_oapif.crs import CRS, CRS84_SRID
@@ -787,6 +788,48 @@ class TestServedItemIds(TestCase):
                 features = self.items("tests.layerwithforeignkey", filter=filter_expr)
 
                 self.assertEqual(list(features), [str(feature) for feature in expected])
+
+    def test_a_filter_matches_no_feature_with_an_id_of_no_row(self):
+        # as a hook written for the URLs answers it: by a 404, a DoesNotExist, or None
+        feature_id, other_id = str(served_id(None, self.feature.pk)), str(served_id(None, self.feature_of_other.pk))
+        collection = oapif.collections["tests.layerwithforeignkey"]
+        for unknown in (Http404(), LayerWithForeignKey.DoesNotExist(), None):
+
+            def resolve_item_id(request, item_id, unknown=unknown):
+                if item_id != "unknown":
+                    return resolved_id(request, item_id)
+                if unknown is None:
+                    return None
+                raise unknown
+
+            for filter_expr, expected in (
+                ("id = 'unknown'", set()),
+                (f"id IN ('{feature_id}', 'unknown')", {feature_id}),
+                ("id <> 'unknown'", {feature_id, other_id}),
+            ):
+                with self.subTest(unknown=unknown, filter=filter_expr):
+                    with patch.object(collection, "resolve_item_id", resolve_item_id):
+                        features = self.items("tests.layerwithforeignkey", filter=filter_expr)
+
+                    self.assertEqual(set(features), expected)
+
+    def test_an_id_of_no_row_is_no_null_key(self):
+        # = NULL would match the features without a key
+        point = LayerWithForeignKey._meta.get_field("point")
+
+        q = cql2.to_q("point = 'unknown'", {"point": point}, CRS84_SRID, {"point": lambda literal: None})
+
+        self.assertEqual(q, Q(point__in=[]))
+
+    def test_an_id_resolved_unchanged_is_compared_as_the_literal(self):
+        # as Django takes it on a collection without the hook: 1.0 for 1
+        row = LayerWithOrdering.objects.create(name="row")
+        collection = oapif.collections["tests.layerwithordering"]
+
+        with patch.object(collection, "resolve_item_id", lambda request, item_id: item_id):
+            features = self.items("tests.layerwithordering", filter=f"id = {row.pk}.0")
+
+        self.assertEqual(list(features), [str(row.pk)])
 
     def test_a_collection_with_hooks_of_its_own(self):
         # the patched hooks of the other tests are functions of the instances, which are no methods of a subclass

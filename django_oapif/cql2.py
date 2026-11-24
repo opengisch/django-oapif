@@ -141,10 +141,10 @@ def describe(operand) -> str:
 class Translator:
     """
     Translates a parsed filter to Django lookups, on the given fields, its geometries being in the given SRID. The
-    properties of `ids` are ids, which each resolves to the key it stands for.
+    properties of `ids` are ids, which each resolves to the key a literal stands for, None for no row.
     """
 
-    def __init__(self, fields: dict[str, Field], srid: int, ids: dict[str, Callable[[str], object]]) -> None:
+    def __init__(self, fields: dict[str, Field], srid: int, ids: dict[str, Callable[[object], object]]) -> None:
         self.fields = fields
         self.srid = srid
         self.ids = ids
@@ -202,8 +202,8 @@ class Translator:
             return Q(**{f"{prop.name}__{lookup}": F(other.name)}), [prop, other]
         value = self.literal(rhs)
         # = and <>: the other comparisons compare the keys, which ids need not follow the order of
-        if lookup == "exact":
-            value = self.key(prop, value)
+        if lookup == "exact" and prop.name in self.ids:
+            return self.keys(prop, [value])
         return Q(**{f"{prop.name}__{lookup}": value}), [prop]
 
     def like(self, lhs, pattern) -> tuple[Q, list[Property]]:
@@ -218,7 +218,10 @@ class Translator:
             strings = [self.string(item.value if isinstance(item, CaseInsensitive) else item) for item in items]
             return reduce(or_, (Q(**{f"{prop.name}__iexact": string}) for string in strings)), [prop]
         prop = self.scalar_property(lhs)
-        return Q(**{f"{prop.name}__in": [self.key(prop, self.literal(item)) for item in items]}), [prop]
+        literals = [self.literal(item) for item in items]
+        if prop.name in self.ids:
+            return self.keys(prop, literals)
+        return Q(**{f"{prop.name}__in": literals}), [prop]
 
     def spatial(self, lookup: str, lhs, rhs) -> tuple[Q, list[Property]]:
         if not isinstance(lhs, Property):
@@ -290,10 +293,14 @@ class Translator:
             raise FilterError(f"Expected a literal, not {describe(operand)}")
         return operand
 
-    def key(self, prop: Property, value):
-        """A literal compared with a property: the key it stands for if `ids` resolves the property, else itself."""
-        resolve = self.ids.get(prop.name)
-        return value if resolve is None else resolve(str(value))
+    def keys(self, prop: Property, literals: list) -> tuple[Q, list[Property]]:
+        """
+        An id property equal to one of the literals: to one of the keys they stand for. An id that stands for no row,
+        which `ids` resolves to None, matches no feature, where `= NULL` would match those without a key.
+        """
+        resolve = self.ids[prop.name]
+        keys = [key for literal in literals if (key := resolve(literal)) is not None]
+        return Q(**{f"{prop.name}__in": keys}), [prop]
 
     def string(self, operand) -> str:
         if not isinstance(operand, str):
@@ -301,10 +308,11 @@ class Translator:
         return operand
 
 
-def to_q(text: str, fields: dict[str, Field], srid: int, ids: dict[str, Callable[[str], object]] | None = None) -> Q:
+def to_q(text: str, fields: dict[str, Field], srid: int, ids: dict[str, Callable[[object], object]] | None = None) -> Q:
     """
     The lookups of a CQL2 text filter, on the given fields, its geometries being in the given SRID. `ids` resolves the
-    literals an id property is equal to, or in, to the keys they stand for, by the name of the property.
+    literals an id property is equal to, or in, to the keys they stand for, None for an id that stands for no row, by
+    the name of the property.
     """
     try:
         return Translator(fields, srid, ids or {}).condition(parse(text))
