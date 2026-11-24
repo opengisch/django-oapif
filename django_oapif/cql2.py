@@ -291,7 +291,7 @@ class Translator:
         return operand
 
     def key(self, prop: Property, value):
-        """A literal compared with a property, or the key it stands for if the property is an id."""
+        """A literal compared with a property: the key it stands for if `ids` resolves the property, else itself."""
         resolve = self.ids.get(prop.name)
         return value if resolve is None else resolve(str(value))
 

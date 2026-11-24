@@ -44,8 +44,8 @@ would not.
 The primary key and the [foreign keys](../fields/foreign-keys.md#schema) with the `reference` role are ids. Compared
 with `=`, `<>` or `IN`, an id is taken to the key it stands for by
 [`resolve_item_id()`](collections.md#hooks) of its collection, or of the first collection the key references, so that
-a filter takes the ids the features are served with. The other comparisons, and a property compared with another,
-compare the keys.
+a filter takes the ids the features are served with. The other comparisons, such as `<`, `BETWEEN`, `LIKE` and those
+with `CASEI`, and a property compared with another, compare the keys.
 
 In `LIKE`, `%` stands for any characters, `_` for a single one, and a backslash makes the next character an
 ordinary one: `'100\%'` matches `100%`. A quote in a string is written twice, `'Route d''Oron'`.

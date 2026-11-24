@@ -101,7 +101,19 @@ keys takes them back to the keys. A collection keeping versions, for instance, c
 the one it replaced, which a client like QGIS then keeps as the same feature, with its open forms. The ids are those
 of the features, of the primary key property, of the foreign keys referencing the collection, through the first
 collection they reference, of the `Location` of a feature created, and of the URLs of the items. A filter takes them
-with `=`, `<>` and `IN`, on the primary key or on a foreign key: its other comparisons, such as `<` or `LIKE`, and a
-property compared with another, compare the keys.
+with `=`, `<>` and `IN`, on the primary key or on a foreign key: its other comparisons, such as `<`, `LIKE` or those
+with `CASEI`, and a property compared with another, compare the keys.
+
+- **One id, one key**: an id stands for one key only, among all the keys a collection serves, those of its features
+  as those of the foreign keys referencing it, and `resolve_item_id()` is the inverse of `serve_item_id()`: a filter
+  resolves each id to one key.
+- **The type of the key**: a served id is validated as the key is, so it has its type, such as a UUID for a
+  `UUIDField`. One that does not validate, such as a string that is no UUID, answers a server error on a read, and a
+  `422` when it is written back.
+- **Malformed ids**: `resolve_item_id()` returns an id that stands for no row, or that is malformed, unchanged, rather
+  than raising: a filter passes it each of its literals.
+- **Each row**: `serve_item_id()` runs for each row served and each foreign key referencing the collection,
+  `resolve_item_id()` for each id of a URL, a write or a filter. A collection that looks them up keeps them on the
+  request, rather than querying for each row.
 
 The [API reference](../api.md#django_oapif.OapifCollection) lists them all.

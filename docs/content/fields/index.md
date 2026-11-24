@@ -6,25 +6,25 @@ The fields of a model are the properties of its features, except its geometry fi
 ## Properties
 
 Every field is served as a property, the primary key included, in the order the model declares them,
-unless the [options](../usage/collections.md#options) of the collection choose others. The primary key is also the `id` of the feature, as a string. Reverse relations are not served.
+unless the [options](../usage/collections.md#options) of the collection choose others. The primary key is also the `id` of the feature, as a string. Both are the key by default: see [`serve_item_id()`](../usage/collections.md#hooks). Reverse relations are not served.
 
 The values are written as JSON:
 
-| Field                                               | Property                                                                   |
-|-----------------------------------------------------|----------------------------------------------------------------------------|
-| `BooleanField`                                      | boolean                                                                    |
-| `IntegerField`, and the other integer fields        | integer                                                                    |
-| `FloatField`                                        | number                                                                     |
-| `DecimalField`                                      | string: `"1.50"`                                                           |
-| `CharField`, `TextField`, and the other text fields | string                                                                     |
-| `UUIDField`, `GenericIPAddressField`                | string                                                                     |
-| `DateField`                                         | string: `"2026-09-28"`                                                     |
-| `DateTimeField`                                     | string, to the millisecond: `"2026-09-28T12:34:56.789Z"`                   |
-| `TimeField`                                         | string, to the millisecond: `"12:34:56.789"`                               |
-| `DurationField`                                     | string, in ISO 8601: `"P1DT02H00M03S"`                                     |
-| `JSONField`                                         | the JSON value                                                             |
-| `ForeignKey`                                        | the primary key of the referenced row, see [foreign keys](foreign-keys.md) |
-| `FileField`, `ImageField`                           | the URL of the file, see [files](files.md)                                 |
+| Field                                               | Property                                                                              |
+|-----------------------------------------------------|---------------------------------------------------------------------------------------|
+| `BooleanField`                                      | boolean                                                                               |
+| `IntegerField`, and the other integer fields        | integer                                                                               |
+| `FloatField`                                        | number                                                                                |
+| `DecimalField`                                      | string: `"1.50"`                                                                      |
+| `CharField`, `TextField`, and the other text fields | string                                                                                |
+| `UUIDField`, `GenericIPAddressField`                | string                                                                                |
+| `DateField`                                         | string: `"2026-09-28"`                                                                |
+| `DateTimeField`                                     | string, to the millisecond: `"2026-09-28T12:34:56.789Z"`                              |
+| `TimeField`                                         | string, to the millisecond: `"12:34:56.789"`                                          |
+| `DurationField`                                     | string, in ISO 8601: `"P1DT02H00M03S"`                                                |
+| `JSONField`                                         | the JSON value                                                                        |
+| `ForeignKey`                                        | the primary key of the referenced row by default, see [foreign keys](foreign-keys.md) |
+| `FileField`, `ImageField`                           | the URL of the file, see [files](files.md)                                            |
 
 Dates, times and durations are written as Django's `DjangoJSONEncoder` writes them.
 

@@ -53,7 +53,8 @@ The links of the page are in its `Link` header as well, with the number of featu
 }
 ```
 
-The `id` of a feature is its primary key, as a string. Its `geometry` and `properties` are described in
+The `id` of a feature is its primary key, as a string, by default: see
+[`serve_item_id()`](../usage/collections.md#hooks). Its `geometry` and `properties` are described in
 [fields](../fields/index.md).
 
 Both responses give the CRS of their coordinates in a `Content-Crs` header, and their GeoJSON profile in a

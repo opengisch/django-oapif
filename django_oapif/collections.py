@@ -26,7 +26,14 @@ from django_oapif.geojson import (
     GenericFeaturePatch,
     JsonFgDocument,
 )
-from django_oapif.handler import ARROW_AVAILABLE, OapifCollection, ReprojectedExtent, parse_box2d
+from django_oapif.handler import (
+    ARROW_AVAILABLE,
+    OapifCollection,
+    ReprojectedExtent,
+    overrides,
+    parse_box2d,
+    primary_keys,
+)
 from django_oapif.html import HTML_MEDIA_TYPE, as_text, html_response, schema_properties
 from django_oapif.jsonfg import Profile
 from django_oapif.schema import (
@@ -268,11 +275,16 @@ def filter_or_raise(
     The items matching a CQL2 filter. A filter that cannot be applied is a client error: one naming what is not a
     queryable, but also one comparing a property with a value of another type, which Django finds out as it builds
     the lookups. The ids of the features, and those the foreign keys of `references` are served as, are resolved to
-    the keys they stand for, by the collection that serves them.
+    the keys they stand for by the collection that serves them, when it has its own `resolve_item_id()`: the other
+    literals are compared as they are.
     """
     fields = collection.queryable_fields(request, query)
     ids = dict.fromkeys(primary_keys(collection), collection) | references
-    resolvers = {name: partial(other.resolve_item_id, request) for name, other in ids.items()}
+    resolvers = {
+        name: partial(other.resolve_item_id, request)
+        for name, other in ids.items()
+        if overrides(other, "resolve_item_id")
+    }
     try:
         return query.filter(cql2.to_q(filter_expr, fields, filter_crs.srid, resolvers))
     except DjangoValidationError as e:
@@ -329,11 +341,15 @@ def get_references(
 def written_back(
     request: HttpRequest, item: Model, field: ForeignKey, value: Any, references: dict[str, OapifCollection]
 ) -> bool:
-    """Whether a foreign key of a written feature is the one of the row, as its collection serves it."""
+    """
+    Whether a foreign key of a written feature is the one of the row, as its collection serves it: compared as the
+    ids are, as strings, when the collection serves other ids than the keys, and as the key otherwise.
+    """
     key = getattr(item, field.attname)
-    if key is not None and (other := references.get(field.name)) is not None:
-        key = other.serve_item_id(request, key)
-    return key is not None and str(value) == str(key)
+    other = references.get(field.name)
+    if key is None or other is None or not overrides(other, "serve_item_id"):
+        return value == key
+    return str(value) == str(other.serve_item_id(request, key))
 
 
 def add_references(
@@ -355,16 +371,6 @@ def get_item_or_404(collection: OapifCollection, request: HttpRequest, item_id: 
     if geom_field := collection.geometry_field:
         query = query.defer(geom_field)
     return get_object_or_404(query, pk=collection.resolve_item_id(request, item_id))
-
-
-def primary_keys(collection: OapifCollection) -> set[str]:
-    """
-    The primary key of the model, and those of the models it inherits from. An item to replace or update is
-    the one of the URL: taking its key from the payload would save another row, even a copy of it, as the
-    input schema gives a key with a default a fresh value.
-    """
-    keys = [collection.opts.pk, *(parent._meta.pk for parent in collection.opts.get_parent_list())]
-    return {name for key in keys for name in (key.name, key.attname)}
 
 
 def validate_new_key_or_raise(collection: OapifCollection, item: Model) -> None:
@@ -795,7 +801,9 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
             raise AuthorizationError()
         validate_new_key_or_raise(collection, item)
         collection.save_model(request, item, False)
-        location = request.build_absolute_uri(f"items/{collection.serve_item_id(request, item.pk)}")
+        location = request.build_absolute_uri(
+            f"items/{quote(str(collection.serve_item_id(request, item.pk)), safe='')}"
+        )
         item = collection.query(request, DEFAULT_CRS).filter(pk=item.pk).first()
         if item is None:
             # saved out of the rows the collection serves, such as out of the area of the user: Part 4 lets the

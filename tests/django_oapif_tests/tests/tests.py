@@ -681,8 +681,21 @@ def served_id(request, pk) -> uuid.UUID:
 
 
 def resolved_id(request, item_id: str) -> str:
-    """The key of an id that `served_id()` serves."""
-    return str(uuid.UUID(int=(uuid.UUID(item_id).int - 1) % 2**128))
+    """The key of an id that `served_id()` serves, or a malformed id unchanged."""
+    try:
+        return str(uuid.UUID(int=(uuid.UUID(item_id).int - 1) % 2**128))
+    except ValueError:
+        return item_id
+
+
+class ServingCollection(AnonReadOnlyCollection):
+    """A collection serving its rows under the ids of `served_id()`, by hooks of its own."""
+
+    def serve_item_id(self, request, pk):
+        return served_id(request, pk)
+
+    def resolve_item_id(self, request, item_id):
+        return resolved_id(request, item_id)
 
 
 class TestServedItemIds(TestCase):
@@ -765,11 +778,38 @@ class TestServedItemIds(TestCase):
             (f"point = '{point_id}'", [feature_id]),
             (f"point IN ('{point_id}', '{uuid.uuid4()}')", [feature_id]),
             (f"point <> '{point_id}'", [served_id(None, self.feature_of_other.pk)]),
+            # the other comparisons compare the keys
+            (f"id >= '{self.feature.pk}' AND id <= '{self.feature.pk}'", [feature_id]),
+            (f"id LIKE '{self.feature.pk}'", [feature_id]),
+            (f"CASEI(id) = CASEI('{self.feature.pk}')", [feature_id]),
         ):
             with self.subTest(filter=filter_expr):
                 features = self.items("tests.layerwithforeignkey", filter=filter_expr)
 
                 self.assertEqual(list(features), [str(feature) for feature in expected])
+
+    def test_a_collection_with_hooks_of_its_own(self):
+        # the patched hooks of the other tests are functions of the instances, which are no methods of a subclass
+        feature_id, point_id = str(served_id(None, self.feature.pk)), str(served_id(None, self.point.pk))
+        serving = {
+            collection_id: ServingCollection(oapif.collections[collection_id].model)
+            for collection_id in ("tests.point_2056_10fields", "tests.layerwithforeignkey")
+        }
+
+        with patch.dict(oapif.collections, serving):
+            features = self.items("tests.layerwithforeignkey", filter=f"point = '{point_id}'")
+            by_key = self.items("tests.layerwithforeignkey", filter=f"point = '{self.point.pk}'")
+
+        self.assertEqual(list(features), [feature_id])
+        self.assertEqual(features[feature_id]["properties"], {"id": feature_id, "point": point_id})
+        self.assertEqual(by_key, {})
+
+    def test_a_row_of_a_collection_serving_the_keys_is_served_as_it_is(self):
+        request = RequestFactory().get("/")
+        collection = oapif.collections["tests.layerwithforeignkey_point"]
+        references = {"point": oapif.collections["tests.point_2056_10fields_subset"]}
+
+        self.assertIs(collection._as_served(request, references)(self.feature), self.feature)
 
     def test_writes_take_the_ids(self):
         url = f"{collections_url}/tests.layerwithforeignkey/items"
@@ -3400,6 +3440,15 @@ class TestFilter(TestCase):
         self.assertEqual(page["numberMatched"], 3)
         self.assertEqual(next_page["numberMatched"], 3)
         self.assertEqual(len(next_page["features"]), 1)
+
+    def test_the_keys_of_a_collection_serving_them_take_any_literal(self):
+        # as Django takes them: 1.0 for 1
+        row = LayerWithOrdering.objects.create(name="row")
+
+        response = self.get(f"id = {row.pk}.0", "tests.layerwithordering")
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual([feature["id"] for feature in response.json()["features"]], [str(row.pk)])
 
     def test_foreign_key(self):
         point = Point_2056_10fields.objects.get(field_str_9="a")

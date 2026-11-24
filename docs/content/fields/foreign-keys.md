@@ -1,6 +1,7 @@
 # Foreign keys
 
-A foreign key is served as the primary key of the row it references.
+A foreign key is served as the primary key of the row it references, by default: see
+[`serve_item_id()`](../usage/collections.md#hooks).
 
 Given two models:
 

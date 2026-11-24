@@ -238,10 +238,9 @@ def reprojected(geometry: GEOSGeometry, srid: int) -> GEOSGeometry | Transform:
 class ServedIds:
     """
     A row as its properties are served, with the ids of its keys, by attname, given by the collections they are the
-    keys of: ninja reads the properties with getattr, a foreign key by its attname. Its `pk` stays the key.
+    keys of: ninja reads the properties with getattr, a foreign key by its attname. Its `pk` stays the key. An id is
+    kept once served, so that the feature id and the property of the key take one call of `serve_item_id()`.
     """
-
-    __slots__ = ("_ids", "_request", "_row")
 
     def __init__(self, row: Model, request: HttpRequest, ids: dict[str, "OapifCollection"]) -> None:
         self._row = row
@@ -253,12 +252,23 @@ class ServedIds:
         collection = self._ids.get(name)
         if collection is None or value is None:
             return value
-        return collection.serve_item_id(self._request, value)
+        served = self.__dict__[name] = collection.serve_item_id(self._request, value)
+        return served
 
 
-def maps_ids(collection: "OapifCollection") -> bool:
-    """Whether a collection serves its rows under other ids than their keys, by its own `serve_item_id()`."""
-    return getattr(collection.serve_item_id, "__func__", None) is not OapifCollection.serve_item_id
+def overrides(collection: "OapifCollection", hook: str) -> bool:
+    """Whether a collection has its own `hook`, such as `serve_item_id`, rather than the one of `OapifCollection`."""
+    return getattr(getattr(collection, hook), "__func__", None) is not getattr(OapifCollection, hook)
+
+
+def primary_keys(collection: "OapifCollection") -> dict[str, ModelField]:
+    """
+    The primary key of the model, and those of the models it inherits from, by name and by attname: they hold the
+    same key. An item to replace or update is the one of the URL: taking its key from the payload would save another
+    row, even a copy of it, as the input schema gives a key with a default a fresh value.
+    """
+    keys = [collection.opts.pk, *(parent._meta.pk for parent in collection.opts.get_parent_list())]
+    return {name: key for key in keys for name in (key.name, key.attname)}
 
 
 def without(fields: tuple[str, ...], *excluded: tuple[str, ...]) -> tuple[str, ...]:
@@ -421,14 +431,18 @@ class OapifCollection[M: Model]:
         """
         Hook for mapping an item id sent by a client to the primary key of the row it stands for.
 
-        The id comes from an item URL (`/items/{itemId}`) or from a foreign key referencing this collection in a
-        write. By default it is returned unchanged.
+        The id comes from an item URL (`/items/{itemId}`), from a foreign key referencing this collection in a
+        write, or from a filter comparing the primary key, or such a foreign key, with `=`, `<>` or `IN`, once for
+        each literal. By default it is returned unchanged. An id that stands for no row, or that is malformed, such
+        as a literal of a filter, is returned unchanged too, rather than raising: the lookup then finds no row, or
+        refuses the id.
 
         A collection whose rows get replaced, such as versions, can return the key of the current row for the id
         of a replaced one: a client like QGIS keeps sending the id it read, even after a newer version replaced
         that row.
 
-        A collection that overrides `serve_item_id()` resolves the ids it serves back to their keys here.
+        A collection that overrides `serve_item_id()` resolves the ids it serves back to their keys here: one id to
+        one key. As it runs for each id of a request, a collection that looks them up keeps them on the request.
         """
         return item_id
 
@@ -437,8 +451,15 @@ class OapifCollection[M: Model]:
         Hook for the id a row is served under, from its primary key: the key itself by default.
 
         It is the id of the feature, its primary key property, and a foreign key referencing this collection, as
-        the features of the collection and those of the others serve them. `resolve_item_id()` takes it back to
-        the key.
+        the features of the collection and those of the others serve them. `resolve_item_id()` is its inverse,
+        which takes it back to the key, in a URL, a foreign key written or a filter: an id stands for one key only,
+        among all the keys served, those of the features as those of the foreign keys.
+
+        The id has the type of the key, as its properties are validated as the key is: one that does not validate,
+        such as a string that is no UUID for a UUID key, answers a server error on a read, and a 422 written back.
+
+        It runs for each row served, and each foreign key of a row referencing this collection: a collection that
+        looks the ids up keeps them on the request, rather than querying for each row.
 
         A collection whose rows get replaced, such as versions, can serve a row under the id of the row it
         replaced: a client like QGIS then keeps the feature it read, and its open forms, across the change.
@@ -794,7 +815,8 @@ class OapifCollection[M: Model]:
         default a JSON-FG one when it has curves, which GeoJSON cannot carry: they are left out of GeoJSON, unless
         `linearize()` made lines of them. `number_matched` defaults to the number of features returned, for a
         queryset that is not a page of a larger one. `references` are the collections whose ids foreign keys are
-        served as, by the name of the key.
+        served as, by the name of the key: without them, the keys of the rows are served as the ids this collection
+        serves, and the foreign keys as the keys they hold. The router passes them: an override has to take them.
         """
         # JSON-FG as asked for, or for a column of curves, and for a column of any geometry from its first curve
         as_jsonfg = profile is Profile.JSONFG if profile else self.curved
@@ -826,9 +848,9 @@ class OapifCollection[M: Model]:
                     )
                 curves = True
             if as_jsonfg:
-                features.append(self._jsonfg_feature(request, FeatureSchema, as_served(obj), geometry, crs))
+                features.append(self._jsonfg_feature(FeatureSchema, as_served(obj), geometry, crs))
             else:
-                features.append(self._feature(request, FeatureSchema, as_served(obj), geometry))
+                features.append(self._feature(FeatureSchema, as_served(obj), geometry))
         bbox = None
         if boxes:
             xmins, ymins, xmaxs, ymaxs = zip(*boxes)
@@ -883,7 +905,8 @@ class OapifCollection[M: Model]:
     ):
         """
         Convert a queryset (as produced by `query()`) to a pyarrow Table with a GeoArrow-WKB geometry column, the
-        foreign keys of `references` served as the ids of the collections they reference.
+        foreign keys of `references` served as the ids of the collections they reference: without them, as the keys
+        they hold. The router passes them: an override has to take them.
         """
 
         PropertiesSchema = self.get_feature_properties_schema(request)
@@ -930,15 +953,16 @@ class OapifCollection[M: Model]:
     ) -> Feature:
         """
         Convert a row (as produced by `query()`, in `crs`) to a Feature in a GeoJSON `profile`, by default a JSON-FG
-        one for a curve, the foreign keys of `references` served as the ids of the collections they reference.
+        one for a curve, the foreign keys of `references` served as the ids of the collections they reference:
+        without them, as the keys they hold. The router passes them: an override has to take them.
         """
         geometry = self._geometry_of(obj)
         served = self._as_served(request, references)(obj)
         if self._is_jsonfg([geometry], profile):
             schema = self.get_jsonfg_feature_output_schema(request, root=True)
             members = self._jsonfg_document(self._has_curves([geometry]), crs)
-            return self._jsonfg_feature(request, schema, served, geometry, crs, **members)
-        return self._feature(request, self.get_feature_output_schema(request), served, geometry)
+            return self._jsonfg_feature(schema, served, geometry, crs, **members)
+        return self._feature(self.get_feature_output_schema(request), served, geometry)
 
     def _as_served(self, request: HttpRequest, references: dict[str, "OapifCollection"] | None) -> Callable[[M], Any]:
         """
@@ -946,11 +970,10 @@ class OapifCollection[M: Model]:
         ids this collection serves, and the foreign keys of `references` under those of the collections they
         reference. The row itself when none of them serves other ids, which a proxy would only slow down.
         """
-        keys = [self.opts.pk, *(parent._meta.pk for parent in self.opts.get_parent_list())]
-        ids = {key.attname: self for key in keys}
+        ids = {key.attname: self for key in primary_keys(self).values()}
         for name, collection in (references or {}).items():
             ids[self.opts.get_field(name).attname] = collection
-        ids = {attname: collection for attname, collection in ids.items() if maps_ids(collection)}
+        ids = {attname: collection for attname, collection in ids.items() if overrides(collection, "serve_item_id")}
         if not ids:
             return lambda row: row
         return lambda row: ServedIds(row, request, ids)
@@ -978,15 +1001,15 @@ class OapifCollection[M: Model]:
         conforms_to = [jsonfg.CORE, jsonfg.CIRCULAR_ARCS] if curves else [jsonfg.CORE]
         return {"conformsTo": conforms_to, "coordRefSys": crs.uri()}
 
-    def _feature(self, request: HttpRequest, schema: type[Feature], obj: Any, geometry: dict | None) -> Feature:
+    def _feature(self, schema: type[Feature], obj: Any, geometry: dict | None) -> Feature:
         """A feature of GeoJSON, of a row as `_as_served()` gives it."""
         # a GeoJSON reader gets no geometry rather than a curve it does not know
         if geometry is not None and not jsonfg.is_geojson(geometry):
             geometry = None
-        return schema(type="Feature", id=str(self.serve_item_id(request, obj.pk)), geometry=geometry, properties=obj)
+        return schema(type="Feature", id=self._feature_id(obj), geometry=geometry, properties=obj)
 
     def _jsonfg_feature(
-        self, request: HttpRequest, schema: type[JsonFgFeature], obj: Any, geometry: dict | None, crs: CRS, **members
+        self, schema: type[JsonFgFeature], obj: Any, geometry: dict | None, crs: CRS, **members
     ) -> JsonFgFeature:
         """
         A feature of JSON-FG, of a row as `_as_served()` gives it, which gives a geometry that GeoJSON has, in CRS84,
@@ -996,8 +1019,13 @@ class OapifCollection[M: Model]:
             place = None
         else:
             geometry, place = None, geometry
-        feature_id = str(self.serve_item_id(request, obj.pk))
-        return schema(type="Feature", id=feature_id, geometry=geometry, place=place, properties=obj, **members)
+        return schema(
+            type="Feature", id=self._feature_id(obj), geometry=geometry, place=place, properties=obj, **members
+        )
+
+    def _feature_id(self, obj: Any) -> str:
+        """The id of the feature of a row as `_as_served()` gives it: its primary key, served."""
+        return str(getattr(obj, self.opts.pk.attname))
 
     def validate_feature_input_or_raise(self, request: HttpRequest, feature: Feature) -> Feature:
         schema = self.get_feature_input_schema(request)
