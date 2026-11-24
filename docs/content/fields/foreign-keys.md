@@ -62,7 +62,9 @@ queryset of `formfield_for_foreignkey()` does in the Django admin. Either way, t
 `limit_choices_to` of the key, as the admin and `full_clean()` require.
 
 A key with the role is the id of a feature, which the collections it references resolve with
-[`resolve_item_id()`](../usage/collections.md#hooks), as they do the id of a URL.
+[`resolve_item_id()`](../usage/collections.md#hooks), as they do the id of a URL. It is served as the id that the first
+of them serves the row under, with [`serve_item_id()`](../usage/collections.md#hooks): the primary key by default. A
+key written back as it was read is the one served.
 
 The reverse relations, the children of a parent here, are not served.
 

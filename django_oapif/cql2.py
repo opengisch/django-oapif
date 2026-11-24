@@ -9,6 +9,7 @@ match the null values, which neither CQL2 nor QGIS do.
 import os
 import re
 import struct
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from functools import cache, reduce
@@ -138,11 +139,15 @@ def describe(operand) -> str:
 
 
 class Translator:
-    """Translates a parsed filter to Django lookups, on the given fields, its geometries being in the given SRID."""
+    """
+    Translates a parsed filter to Django lookups, on the given fields, its geometries being in the given SRID. The
+    properties of `ids` are ids, which each resolves to the key it stands for.
+    """
 
-    def __init__(self, fields: dict[str, Field], srid: int) -> None:
+    def __init__(self, fields: dict[str, Field], srid: int, ids: dict[str, Callable[[str], object]]) -> None:
         self.fields = fields
         self.srid = srid
+        self.ids = ids
 
     def condition(self, node, negated: bool = False) -> Q:
         """
@@ -195,7 +200,11 @@ class Translator:
             if prop.field.get_internal_type() != other.field.get_internal_type():
                 raise FilterError(f"'{prop.name}' and '{other.name}' are not of the same type")
             return Q(**{f"{prop.name}__{lookup}": F(other.name)}), [prop, other]
-        return Q(**{f"{prop.name}__{lookup}": self.literal(rhs)}), [prop]
+        value = self.literal(rhs)
+        # = and <>: the other comparisons compare the keys, which ids need not follow the order of
+        if lookup == "exact":
+            value = self.key(prop, value)
+        return Q(**{f"{prop.name}__{lookup}": value}), [prop]
 
     def like(self, lhs, pattern) -> tuple[Q, list[Property]]:
         nocase = isinstance(lhs, CaseInsensitive) or isinstance(pattern, CaseInsensitive)
@@ -209,7 +218,7 @@ class Translator:
             strings = [self.string(item.value if isinstance(item, CaseInsensitive) else item) for item in items]
             return reduce(or_, (Q(**{f"{prop.name}__iexact": string}) for string in strings)), [prop]
         prop = self.scalar_property(lhs)
-        return Q(**{f"{prop.name}__in": [self.literal(item) for item in items]}), [prop]
+        return Q(**{f"{prop.name}__in": [self.key(prop, self.literal(item)) for item in items]}), [prop]
 
     def spatial(self, lookup: str, lhs, rhs) -> tuple[Q, list[Property]]:
         if not isinstance(lhs, Property):
@@ -281,15 +290,23 @@ class Translator:
             raise FilterError(f"Expected a literal, not {describe(operand)}")
         return operand
 
+    def key(self, prop: Property, value):
+        """A literal compared with a property, or the key it stands for if the property is an id."""
+        resolve = self.ids.get(prop.name)
+        return value if resolve is None else resolve(str(value))
+
     def string(self, operand) -> str:
         if not isinstance(operand, str):
             raise FilterError(f"Expected a string, not {describe(operand)}")
         return operand
 
 
-def to_q(text: str, fields: dict[str, Field], srid: int) -> Q:
-    """The lookups of a CQL2 text filter, on the given fields, its geometries being in the given SRID."""
+def to_q(text: str, fields: dict[str, Field], srid: int, ids: dict[str, Callable[[str], object]] | None = None) -> Q:
+    """
+    The lookups of a CQL2 text filter, on the given fields, its geometries being in the given SRID. `ids` resolves the
+    literals an id property is equal to, or in, to the keys they stand for, by the name of the property.
+    """
     try:
-        return Translator(fields, srid).condition(parse(text))
+        return Translator(fields, srid, ids or {}).condition(parse(text))
     except RecursionError as e:
         raise FilterError("The filter is nested too deeply") from e

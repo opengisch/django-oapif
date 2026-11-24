@@ -675,6 +675,134 @@ class TestBasicAuth(TestCase):
         self.assertIn(feature, items.json()["features"])
 
 
+def served_id(request, pk) -> uuid.UUID:
+    """The id of a key, as a collection serving other ids serves it: the next UUID."""
+    return uuid.UUID(int=(uuid.UUID(str(pk)).int + 1) % 2**128)
+
+
+def resolved_id(request, item_id: str) -> str:
+    """The key of an id that `served_id()` serves."""
+    return str(uuid.UUID(int=(uuid.UUID(item_id).int - 1) % 2**128))
+
+
+class TestServedItemIds(TestCase):
+    """
+    The points, the features referencing them and the points they inherit from serve their rows under other ids than
+    their keys: those of `served_id()`, which they resolve back. The other collections serve the keys.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.point, cls.other = (
+            Point_2056_10fields.objects.create(geom="SRID=2056;POINT(2600000 1200000)", field_str_0=label)
+            for label in ("point", "other")
+        )
+        cls.feature = LayerWithForeignKey.objects.create(point=cls.point)
+        cls.feature_of_other = LayerWithForeignKey.objects.create(point=cls.other)
+        cls.editor = User.objects.create_superuser("editor")
+
+    def setUp(self):
+        for collection_id in ("tests.point_2056_10fields", "tests.layerwithforeignkey", "tests.point_2056_empty"):
+            collection = oapif.collections[collection_id]
+            for hook in (
+                patch.object(collection, "serve_item_id", served_id),
+                patch.object(collection, "resolve_item_id", resolved_id),
+            ):
+                hook.start()
+                self.addCleanup(hook.stop)
+        self.client.force_login(self.editor)
+
+    def items(self, collection_id: str, **params):
+        response = self.client.get(f"{collections_url}/{collection_id}/items", params)
+        self.assertEqual(response.status_code, 200, response.content)
+        return {feature["id"]: feature for feature in response.json()["features"]}
+
+    def test_the_features_are_served_under_the_ids(self):
+        feature_id, point_id = str(served_id(None, self.feature.pk)), str(served_id(None, self.point.pk))
+        url = f"{collections_url}/tests.layerwithforeignkey/items"
+        expected = {"id": feature_id, "point": point_id}
+
+        for profile in ("rfc7946", "jsonfg"):
+            with self.subTest(profile=profile):
+                features = self.items("tests.layerwithforeignkey", profile=profile)
+                item = self.client.get(f"{url}/{feature_id}", {"profile": profile})
+
+                self.assertEqual(features[feature_id]["properties"], expected)
+                self.assertEqual(item.status_code, 200)
+                self.assertEqual((item.json()["id"], item.json()["properties"]), (feature_id, expected))
+        self.assertEqual(self.items("tests.point_2056_10fields")[point_id]["properties"]["id"], point_id)
+        # a collection serving the keys, whose foreign key references the points
+        feature = self.items("tests.layerwithforeignkey_point")[str(self.feature.pk)]
+        self.assertEqual(feature["properties"], {"id": str(self.feature.pk), "point": point_id})
+        self.assertIn(str(self.point.pk), self.items("tests.point_2056_10fields_subset"))
+        self.assertEqual(self.client.get(f"{url}/{self.feature.pk}").status_code, 404)
+
+    def test_the_keys_inherited_are_served_under_the_ids(self):
+        inheriting = Point_2056_Empty.objects.create(geom="SRID=2056;POINT(2600000 1200000)")
+        inheriting_id = str(served_id(None, inheriting.pk))
+
+        properties = self.items("tests.point_2056_empty")[inheriting_id]["properties"]
+
+        self.assertEqual((properties["id"], properties["point_2056_10fields_ptr"]), (inheriting_id, inheriting_id))
+
+    @requires_arrow
+    def test_geoarrow_serves_the_ids(self):
+        response = self.client.get(
+            f"{collections_url}/tests.layerwithforeignkey/items",
+            headers={"Accept": "application/vnd.apache.arrow.stream"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        rows = pa.ipc.open_stream(response.content).read_all().to_pylist()
+        self.assertIn({"id": str(served_id(None, self.feature.pk)), "point": str(served_id(None, self.point.pk))}, rows)
+
+    def test_a_filter_takes_the_ids(self):
+        feature_id, point_id = served_id(None, self.feature.pk), served_id(None, self.point.pk)
+        for filter_expr, expected in (
+            (f"id = '{feature_id}'", [feature_id]),
+            (f"id IN ('{feature_id}')", [feature_id]),
+            (f"id = '{self.feature.pk}'", []),
+            (f"point = '{point_id}'", [feature_id]),
+            (f"point IN ('{point_id}', '{uuid.uuid4()}')", [feature_id]),
+            (f"point <> '{point_id}'", [served_id(None, self.feature_of_other.pk)]),
+        ):
+            with self.subTest(filter=filter_expr):
+                features = self.items("tests.layerwithforeignkey", filter=filter_expr)
+
+                self.assertEqual(list(features), [str(feature) for feature in expected])
+
+    def test_writes_take_the_ids(self):
+        url = f"{collections_url}/tests.layerwithforeignkey/items"
+        feature_id, other_id = served_id(None, self.feature.pk), str(served_id(None, self.other.pk))
+        read = self.client.get(f"{url}/{feature_id}").json()
+
+        created = self.client.post(
+            url,
+            {"type": "Feature", "geometry": None, "properties": {"point": other_id}},
+            headers=headers,
+            content_type="application/json",
+        )
+        # written back as read, though the point is served no more
+        with serving("tests.point_2056_10fields"), serving("tests.point_2056_10fields_subset"):
+            kept = self.client.put(f"{url}/{feature_id}", read, headers=headers, content_type="application/json")
+        changed = self.client.patch(
+            f"{url}/{feature_id}",
+            {"type": "Feature", "properties": {"point": other_id}},
+            headers=headers,
+            content_type="application/json",
+        )
+
+        self.assertEqual(created.status_code, 201, created.content)
+        new = LayerWithForeignKey.objects.get(pk=resolved_id(None, created.json()["id"]))
+        self.assertEqual(new.point, self.other)
+        self.assertEqual(created["Location"], f"http://testserver{url}/{created.json()['id']}")
+        self.assertEqual(created.json()["properties"]["point"], other_id)
+        self.assertEqual((kept.status_code, changed.status_code), (200, 200))
+        self.assertEqual(changed.json()["properties"]["point"], other_id)
+        self.feature.refresh_from_db()
+        self.assertEqual(self.feature.point, self.other)
+
+
 class TestSessionCsrf(TestCase):
     """The CSRF checks of Django, which the test client skips unless asked to."""
 
