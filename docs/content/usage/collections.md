@@ -71,7 +71,8 @@ Django's `ModelAdmin` are:
 | `get_exclude(request, obj=None)`                                                | The fields not served, `exclude` by default.                                                                  |
 | `get_readonly_fields(request, obj=None)`                                        | The fields not accepted in writes: `readonly_fields`, generated fields and files.                             |
 | `get_ordering(request)`                                                         | The order of the features.                                                                                    |
-| `resolve_item_id(request, item_id)`                                             | The key of the row an item id stands for, in a URL or a foreign key, the id itself by default.                |
+| `resolve_item_id(request, item_id)`                                             | The key of the row an item id stands for, in a URL, a foreign key or a filter, the id itself by default.      |
+| `serve_item_id(request, pk)`                                                    | The id a row is served under, as a feature, its primary key and the foreign keys to it, the key by default.   |
 | `get_related_queryset(request, field)`                                          | The rows a [foreign key](../fields/foreign-keys.md) without the reference role may take, all by default.      |
 | `get_queryables(request)`                                                       | The properties the features can be [filtered](filtering.md#queryables) on.                                    |
 | `save_model(request, obj, change)`                                              | Saves a created or changed row.                                                                               |
@@ -94,5 +95,27 @@ class ObservationCollection(OapifCollection):
             obj.author = request.user
         super().save_model(request, obj, change)
 ```
+
+`serve_item_id()` and `resolve_item_id()` go together: a collection that serves its rows under other ids than their
+keys takes them back to the keys. A collection keeping versions, for instance, can serve a new version under the id of
+the one it replaced, which a client like QGIS then keeps as the same feature, with its open forms. The ids are those
+of the features, of the primary key property, of the foreign keys referencing the collection, through the first
+collection they reference, of the `Location` of a feature created, and of the URLs of the items. A filter takes them
+with `=`, `<>` and `IN`, on the primary key or on a foreign key: its other comparisons, such as `<`, `LIKE` or those
+with `CASEI`, and a property compared with another, compare the keys.
+
+- **One id, one key**: an id stands for one key only, among all the keys a collection serves, those of its features
+  as those of the foreign keys referencing it, and `resolve_item_id()` is the inverse of `serve_item_id()`: a filter
+  resolves each id to one key.
+- **The type of the key**: a served id is validated as the key is, so it has its type, such as a UUID for a
+  `UUIDField`. One that does not validate, such as a string that is no UUID, answers a server error on a read, and a
+  `422` when it is written back.
+- **Unknown ids**: a filter passes `resolve_item_id()` each of its literals. An id it raises Django's `Http404` for,
+  as `get_object_or_404()` does, or resolves to `None`, matches no feature; its URL answers a `404`, and a write refuses
+  it as a foreign key not found. One it returns unchanged, such as a malformed one, is compared as it is, as on a
+  collection without the hook.
+- **Each row**: `serve_item_id()` runs for each row served and each foreign key referencing the collection,
+  `resolve_item_id()` for each id of a URL, a write or a filter. A collection that looks them up keeps them on the
+  request, rather than querying for each row.
 
 The [API reference](../api.md#django_oapif.OapifCollection) lists them all.

@@ -1,5 +1,5 @@
 import json
-from functools import cache
+from functools import cache, partial
 from typing import Any, Literal
 from urllib.parse import quote
 
@@ -9,7 +9,7 @@ from django.contrib.gis.geos.libgeos import geos_version_tuple
 from django.core.exceptions import FieldError, ValidationError as DjangoValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import ForeignKey, Model, QuerySet
-from django.http import HttpRequest, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils.cache import patch_vary_headers
 from ninja import Header, Query, Router, Schema
@@ -26,7 +26,15 @@ from django_oapif.geojson import (
     GenericFeaturePatch,
     JsonFgDocument,
 )
-from django_oapif.handler import ARROW_AVAILABLE, OapifCollection, ReprojectedExtent, parse_box2d
+from django_oapif.handler import (
+    ARROW_AVAILABLE,
+    OapifCollection,
+    ReprojectedExtent,
+    overrides,
+    parse_box2d,
+    primary_keys,
+    without,
+)
 from django_oapif.html import HTML_MEDIA_TYPE, as_text, html_response, schema_properties
 from django_oapif.jsonfg import Profile
 from django_oapif.schema import (
@@ -257,20 +265,54 @@ def validate_crs_or_raise(collection: OapifCollection, crs: CRS, parameter: str)
 
 
 def filter_or_raise(
-    collection: OapifCollection, request: HttpRequest, query: QuerySet, filter_expr: str, filter_crs: CRS
+    collection: OapifCollection,
+    request: HttpRequest,
+    query: QuerySet,
+    filter_expr: str,
+    filter_crs: CRS,
+    references: dict[str, OapifCollection],
 ) -> QuerySet:
     """
     The items matching a CQL2 filter. A filter that cannot be applied is a client error: one naming what is not a
     queryable, but also one comparing a property with a value of another type, which Django finds out as it builds
-    the lookups.
+    the lookups. The ids of the features, and those the foreign keys of `references` are served as, are resolved to
+    the keys they stand for by the collection that serves them, when it has its own `resolve_item_id()`: the other
+    literals are compared as they are.
     """
     fields = collection.queryable_fields(request, query)
+    ids = dict.fromkeys(primary_keys(collection), collection) | references
+    resolvers = {
+        name: partial(filter_key, other, request) for name, other in ids.items() if overrides(other, "resolve_item_id")
+    }
     try:
-        return query.filter(cql2.to_q(filter_expr, fields, filter_crs.srid))
+        return query.filter(cql2.to_q(filter_expr, fields, filter_crs.srid, resolvers))
     except DjangoValidationError as e:
         raise HttpError(400, f"Invalid filter: {' '.join(e.messages)}")
     except (cql2.FilterError, FieldError, ValueError, TypeError) as e:
         raise HttpError(400, f"Invalid filter: {e}")
+
+
+def resolved_key(collection: OapifCollection, request: HttpRequest, item_id: str) -> Any:
+    """
+    The key an id stands for, by the `resolve_item_id()` of `collection`. None for an id that stands for no row, one
+    it raises `Http404` for, as a hook written for the URLs may: its URL answers a 404, a write refuses it as a foreign
+    key not found, and a filter matches no feature with it.
+    """
+    try:
+        return collection.resolve_item_id(request, item_id)
+    except Http404:
+        return None
+
+
+def filter_key(collection: OapifCollection, request: HttpRequest, literal: Any) -> Any:
+    """
+    The key a literal of a filter stands for, compared with an id that `collection` serves, as `resolved_key()` gives
+    it for the id of a URL: None for an id that stands for no row. An id resolved unchanged is the literal, of its
+    type, which Django converts as it does on any collection: 1.0 for 1.
+    """
+    item_id = str(literal)
+    key = resolved_key(collection, request, item_id)
+    return literal if key == item_id else key
 
 
 def take_jsonfg_members_or_raise(feature: GenericFeatureInput | GenericFeaturePatch, crs: CRS) -> None:
@@ -304,6 +346,35 @@ def referenced_collections(
     return [other for other in collections.values() if other.model is model and other.has_view_permission(request)]
 
 
+def get_references(
+    request: HttpRequest, collection: OapifCollection, collections: dict[str, OapifCollection]
+) -> dict[str, OapifCollection]:
+    """
+    The collection each foreign key a collection serves is served as the id of a feature of, by the name of the key:
+    the first it references. Worked out once a response, as `referenced_collections()` checks the permission of each.
+    """
+    served = without(collection.get_fields(request), collection.get_exclude(request))
+    return {
+        name: others[0]
+        for name in collection.foreign_key_fields
+        if name in served and (others := referenced_collections(request, collection.opts.get_field(name), collections))
+    }
+
+
+def written_back(
+    request: HttpRequest, item: Model, field: ForeignKey, value: Any, references: dict[str, OapifCollection]
+) -> bool:
+    """
+    Whether a foreign key of a written feature is the one of the row, as its collection serves it: compared as the
+    ids are, as strings, when the collection serves other ids than the keys, and as the key otherwise.
+    """
+    key = getattr(item, field.attname)
+    other = references.get(field.name)
+    if key is None or other is None or not overrides(other, "serve_item_id"):
+        return value == key
+    return str(value) == str(other.serve_item_id(request, key))
+
+
 def add_references(
     request: HttpRequest, collection: OapifCollection, collections: dict[str, OapifCollection], schema: dict
 ) -> None:
@@ -322,17 +393,7 @@ def get_item_or_404(collection: OapifCollection, request: HttpRequest, item_id: 
     query = collection.get_queryset(request)
     if geom_field := collection.geometry_field:
         query = query.defer(geom_field)
-    return get_object_or_404(query, pk=collection.resolve_item_id(request, item_id))
-
-
-def primary_keys(collection: OapifCollection) -> set[str]:
-    """
-    The primary key of the model, and those of the models it inherits from. An item to replace or update is
-    the one of the URL: taking its key from the payload would save another row, even a copy of it, as the
-    input schema gives a key with a default a fresh value.
-    """
-    keys = [collection.opts.pk, *(parent._meta.pk for parent in collection.opts.get_parent_list())]
-    return {name for key in keys for name in (key.name, key.attname)}
+    return get_object_or_404(query, pk=resolved_key(collection, request, item_id))
 
 
 def validate_new_key_or_raise(collection: OapifCollection, item: Model) -> None:
@@ -385,20 +446,27 @@ def get_related_object_or_raise(
     field: ForeignKey,
     value: Any,
     collections: dict[str, OapifCollection],
+    references: dict[str, OapifCollection],
 ):
     """
     The row a foreign key of the collection references, by the value of the field it references, which the key is
     served as. A reference has to be to a feature that its collections serve the user: any row would let them link to
     one hidden from them, such as someone else's, and tell which exist. It is the id of that feature, which its
-    collection resolves as it does the id of a URL. Another key takes a row the collection gives it, any row of its
-    model unless `get_related_queryset` keeps fewer. Either way, the row has to meet the `limit_choices_to` of the
-    key, which the Django admin applies on top of its queryset too.
+    collection resolves as it does the id of a URL: the collection of `references` that serves it, when that one
+    serves other ids than the keys, as another would take the id for a key. Another key takes a row the collection
+    gives it, any row of its model unless `get_related_queryset` keeps fewer. Either way, the row has to meet the
+    `limit_choices_to` of the key, which the Django admin applies on top of its queryset too.
     """
     limit = field.get_limit_choices_to()
-    others = referenced_collections(request, field, collections)
+    served_by = references.get(field.name)
+    if served_by is not None and overrides(served_by, "serve_item_id"):
+        others = [served_by]
+    else:
+        others = referenced_collections(request, field, collections)
     for other in others:
-        rows = other.get_queryset(request).complex_filter(limit)
-        row = rows.filter(pk=other.resolve_item_id(request, str(value))).first()
+        if (key := resolved_key(other, request, str(value))) is None:
+            continue
+        row = other.get_queryset(request).complex_filter(limit).filter(pk=key).first()
         if row is not None:
             return row
     if not others:
@@ -607,9 +675,10 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         if asks_geojson and not linearize and collection.curved:
             return curves_not_acceptable(request)
 
+        references = get_references(request, collection, collections)
         query = collection.query(request, crs, bbox, bbox_crs)
         if filter_expr is not None:
-            query = filter_or_raise(collection, request, query, filter_expr, filter_crs)
+            query = filter_or_raise(collection, request, query, filter_expr, filter_crs, references)
         if asks_geojson and linearize:
             query = collection.linearize(query, crs)
         paginated_query = query[offset : offset + limit]
@@ -617,7 +686,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         total_count = query.count()
 
         if arrow:
-            stream = collection.queryset_to_arrow_stream(request, paginated_query, crs)
+            stream = collection.queryset_to_arrow_stream(request, paginated_query, crs, references=references)
             response = arrow_response(stream, crs)
             # an Arrow stream has nowhere to put them, and the row count is the only one a client
             # cannot work out from the table itself
@@ -632,6 +701,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
             links=get_page_links(request, limit, offset, total_count, profile=profile),
             crs=crs,
             profile=encoding,
+            references=references,
         )
         if html:
             geojson = json.loads(feature_collection.model_dump_json())
@@ -701,7 +771,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
     ):
         collection = get_collection_by_id(collection_id, request)
         validate_crs_or_raise(collection, crs, "crs")
-        item_id = collection.resolve_item_id(request, item_id)
+        item_id = resolved_key(collection, request, item_id)
         html = accepts_html(request)
         arrow = not html and accepts_geoarrow(request)
         profile = None if html or arrow else requested_profile(request, profile)
@@ -713,10 +783,11 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         item = get_object_or_404(query, pk=item_id)
         if not collection.has_view_permission(request, item):
             raise AuthorizationError()
+        references = get_references(request, collection, collections)
         if arrow:
-            stream = collection.queryset_to_arrow_stream(request, query.filter(pk=item_id), crs)
+            stream = collection.queryset_to_arrow_stream(request, query.filter(pk=item_id), crs, references=references)
             return arrow_response(stream, crs)
-        feature = collection.model_to_feature(request, item, crs=crs, profile=encoding)
+        feature = collection.model_to_feature(request, item, crs=crs, profile=encoding, references=references)
         if html:
             geojson = json.loads(feature.model_dump_json())
             context = {
@@ -746,12 +817,13 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         validate_crs_or_raise(collection, crs, "Content-Crs")
         take_jsonfg_members_or_raise(feature, crs)
         feature = collection.validate_feature_input_or_raise(request, feature)
+        references = get_references(request, collection, collections)
         item_properties = feature.properties.model_dump() or {}
         for field, value in item_properties.items():
             if value is not None and field in collection.foreign_key_fields:
                 foreign_key = collection.opts.get_field(field)
                 item_properties[field] = get_related_object_or_raise(
-                    request, collection, foreign_key, value, collections
+                    request, collection, foreign_key, value, collections, references
                 )
         if (geom_field := collection.geometry_field) and feature.geometry:
             item_properties[geom_field] = geometry_to_save(feature.geometry, crs)
@@ -760,7 +832,9 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
             raise AuthorizationError()
         validate_new_key_or_raise(collection, item)
         collection.save_model(request, item, False)
-        location = request.build_absolute_uri(f"items/{item.pk}")
+        location = request.build_absolute_uri(
+            f"items/{quote(str(collection.serve_item_id(request, item.pk)), safe='')}"
+        )
         item = collection.query(request, DEFAULT_CRS).filter(pk=item.pk).first()
         if item is None:
             # saved out of the rows the collection serves, such as out of the area of the user: Part 4 lets the
@@ -768,7 +842,8 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
             response = HttpResponse(status=201)
         else:
             # in JSON-FG for a curve, which ninja would take for GeoJSON
-            response = geojson_response(collection.model_to_feature(request, item), DEFAULT_CRS)
+            feature = collection.model_to_feature(request, item, references=references)
+            response = geojson_response(feature, DEFAULT_CRS)
             response.status_code = 201
         response["Location"] = location
         return response
@@ -815,15 +890,16 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         if not collection.has_change_permission(request, item):
             raise AuthorizationError()
         feature = collection.validate_feature_input_or_raise(request, feature)
+        references = get_references(request, collection, collections)
         for field, value in feature.properties.model_dump().items():
             if field in primary_keys(collection):
                 continue
             if value is not None and field in collection.foreign_key_fields:
                 foreign_key = collection.opts.get_field(field)
                 # written back as it was read, a key is kept: its row may have left those the user is served since
-                if value == getattr(item, foreign_key.attname):
+                if written_back(request, item, foreign_key, value, references):
                     continue
-                value = get_related_object_or_raise(request, collection, foreign_key, value, collections)
+                value = get_related_object_or_raise(request, collection, foreign_key, value, collections, references)
             setattr(item, field, value)
         if geom_field := collection.geometry_field:
             setattr(item, geom_field, geometry_to_save(feature.geometry, crs))
@@ -833,7 +909,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         if item is None:
             # the change took it out of the rows the collection serves
             return HttpResponse(status=204)
-        return geojson_response(collection.model_to_feature(request, item), DEFAULT_CRS)
+        return geojson_response(collection.model_to_feature(request, item, references=references), DEFAULT_CRS)
 
     @router.patch(
         "/{collection_id}/items/{item_id}",
@@ -854,6 +930,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         if not collection.has_change_permission(request, item):
             raise AuthorizationError()
         feature = collection.validate_feature_patch_or_raise(request, feature)
+        references = get_references(request, collection, collections)
         if feature.properties is not None:
             for field, value in feature.properties.model_dump(exclude_unset=True).items():
                 if field in primary_keys(collection):
@@ -861,9 +938,11 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
                 if value is not None and field in collection.foreign_key_fields:
                     foreign_key = collection.opts.get_field(field)
                     # written back as it was read, a key is kept: its row may have left those the user is served since
-                    if value == getattr(item, foreign_key.attname):
+                    if written_back(request, item, foreign_key, value, references):
                         continue
-                    value = get_related_object_or_raise(request, collection, foreign_key, value, collections)
+                    value = get_related_object_or_raise(
+                        request, collection, foreign_key, value, collections, references
+                    )
                 setattr(item, field, value)
         if (geom_field := collection.geometry_field) and "geometry" in feature.model_fields_set:
             setattr(item, geom_field, geometry_to_save(feature.geometry, crs))
@@ -873,7 +952,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         if item is None:
             # the change took it out of the rows the collection serves
             return HttpResponse(status=204)
-        return geojson_response(collection.model_to_feature(request, item), DEFAULT_CRS)
+        return geojson_response(collection.model_to_feature(request, item, references=references), DEFAULT_CRS)
 
     @router.delete("/{collection_id}/items/{item_id}", operation_id="delete_collection_item")
     def delete_item(
