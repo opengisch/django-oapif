@@ -54,6 +54,7 @@ Please report anything that breaks in the [issues](https://github.com/opengisch/
 - The CRS a collection offers now come from two new hooks, `storage_crs()` and `supported_crs()`.
 - `get_queryset()` also gives the extent of a collection, so `/collections` calls it too, for every collection the user may view: one that fails for a user, an anonymous one for instance, now fails their list of collections too, and not only the items of that collection.
 - `get_queryset()` also limits the rows a foreign key to its model may reference, so `POST`, `PUT` and `PATCH` call it too, for the collections the key references: one that fails for a user now fails their writes of such a key too, and not only the items of that collection.
+- `has_view_permission()` also gives the collections whose ids a served foreign key is: every read and write of items calls it for the collections of the models their foreign keys reference, as the schema does. One that fails for a user now fails their reads of the features referencing it too.
 
 ### New
 

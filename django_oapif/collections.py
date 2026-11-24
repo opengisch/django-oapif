@@ -33,6 +33,7 @@ from django_oapif.handler import (
     overrides,
     parse_box2d,
     primary_keys,
+    without,
 )
 from django_oapif.html import HTML_MEDIA_TYPE, as_text, html_response, schema_properties
 from django_oapif.jsonfg import Profile
@@ -328,13 +329,14 @@ def get_references(
     request: HttpRequest, collection: OapifCollection, collections: dict[str, OapifCollection]
 ) -> dict[str, OapifCollection]:
     """
-    The collection each foreign key of a collection is served as the id of a feature of, by the name of the key: the
-    first it references. Worked out once a response, as `referenced_collections()` checks the permission of each.
+    The collection each foreign key a collection serves is served as the id of a feature of, by the name of the key:
+    the first it references. Worked out once a response, as `referenced_collections()` checks the permission of each.
     """
+    served = without(collection.get_fields(request), collection.get_exclude(request))
     return {
         name: others[0]
         for name in collection.foreign_key_fields
-        if (others := referenced_collections(request, collection.opts.get_field(name), collections))
+        if name in served and (others := referenced_collections(request, collection.opts.get_field(name), collections))
     }
 
 
@@ -423,17 +425,23 @@ def get_related_object_or_raise(
     field: ForeignKey,
     value: Any,
     collections: dict[str, OapifCollection],
+    references: dict[str, OapifCollection],
 ):
     """
     The row a foreign key of the collection references, by the value of the field it references, which the key is
     served as. A reference has to be to a feature that its collections serve the user: any row would let them link to
     one hidden from them, such as someone else's, and tell which exist. It is the id of that feature, which its
-    collection resolves as it does the id of a URL. Another key takes a row the collection gives it, any row of its
-    model unless `get_related_queryset` keeps fewer. Either way, the row has to meet the `limit_choices_to` of the
-    key, which the Django admin applies on top of its queryset too.
+    collection resolves as it does the id of a URL: the collection of `references` that serves it, when that one
+    serves other ids than the keys, as another would take the id for a key. Another key takes a row the collection
+    gives it, any row of its model unless `get_related_queryset` keeps fewer. Either way, the row has to meet the
+    `limit_choices_to` of the key, which the Django admin applies on top of its queryset too.
     """
     limit = field.get_limit_choices_to()
-    others = referenced_collections(request, field, collections)
+    served_by = references.get(field.name)
+    if served_by is not None and overrides(served_by, "serve_item_id"):
+        others = [served_by]
+    else:
+        others = referenced_collections(request, field, collections)
     for other in others:
         rows = other.get_queryset(request).complex_filter(limit)
         row = rows.filter(pk=other.resolve_item_id(request, str(value))).first()
@@ -787,12 +795,13 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
         validate_crs_or_raise(collection, crs, "Content-Crs")
         take_jsonfg_members_or_raise(feature, crs)
         feature = collection.validate_feature_input_or_raise(request, feature)
+        references = get_references(request, collection, collections)
         item_properties = feature.properties.model_dump() or {}
         for field, value in item_properties.items():
             if value is not None and field in collection.foreign_key_fields:
                 foreign_key = collection.opts.get_field(field)
                 item_properties[field] = get_related_object_or_raise(
-                    request, collection, foreign_key, value, collections
+                    request, collection, foreign_key, value, collections, references
                 )
         if (geom_field := collection.geometry_field) and feature.geometry:
             item_properties[geom_field] = geometry_to_save(feature.geometry, crs)
@@ -811,7 +820,6 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
             response = HttpResponse(status=201)
         else:
             # in JSON-FG for a curve, which ninja would take for GeoJSON
-            references = get_references(request, collection, collections)
             feature = collection.model_to_feature(request, item, references=references)
             response = geojson_response(feature, DEFAULT_CRS)
             response.status_code = 201
@@ -869,7 +877,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
                 # written back as it was read, a key is kept: its row may have left those the user is served since
                 if written_back(request, item, foreign_key, value, references):
                     continue
-                value = get_related_object_or_raise(request, collection, foreign_key, value, collections)
+                value = get_related_object_or_raise(request, collection, foreign_key, value, collections, references)
             setattr(item, field, value)
         if geom_field := collection.geometry_field:
             setattr(item, geom_field, geometry_to_save(feature.geometry, crs))
@@ -910,7 +918,9 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
                     # written back as it was read, a key is kept: its row may have left those the user is served since
                     if written_back(request, item, foreign_key, value, references):
                         continue
-                    value = get_related_object_or_raise(request, collection, foreign_key, value, collections)
+                    value = get_related_object_or_raise(
+                        request, collection, foreign_key, value, collections, references
+                    )
                 setattr(item, field, value)
         if (geom_field := collection.geometry_field) and "geometry" in feature.model_fields_set:
             setattr(item, geom_field, geometry_to_save(feature.geometry, crs))

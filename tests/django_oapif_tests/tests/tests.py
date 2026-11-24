@@ -804,12 +804,21 @@ class TestServedItemIds(TestCase):
         self.assertEqual(features[feature_id]["properties"], {"id": feature_id, "point": point_id})
         self.assertEqual(by_key, {})
 
-    def test_a_row_of_a_collection_serving_the_keys_is_served_as_it_is(self):
-        request = RequestFactory().get("/")
-        collection = oapif.collections["tests.layerwithforeignkey_point"]
-        references = {"point": oapif.collections["tests.point_2056_10fields_subset"]}
+    def test_a_reference_is_resolved_by_the_collection_serving_it(self):
+        # the subset of the points serves their keys: the id of a point that the points hide, which they serve the
+        # foreign keys as, is the key of another point there
+        shifted = Point_2056_10fields.objects.create(
+            id=served_id(None, self.other.pk), geom="SRID=2056;POINT(2600000 1200000)"
+        )
+        url = f"{collections_url}/tests.layerwithforeignkey/items/{served_id(None, self.feature.pk)}"
+        patched = {"type": "Feature", "properties": {"point": str(served_id(None, self.other.pk))}}
 
-        self.assertIs(collection._as_served(request, references)(self.feature), self.feature)
+        with serving("tests.point_2056_10fields", self.point), serving("tests.point_2056_10fields_subset", shifted):
+            response = self.client.patch(url, patched, headers=headers, content_type="application/json")
+
+        self.assertEqual(response.status_code, 422, response.content)
+        self.feature.refresh_from_db()
+        self.assertEqual(self.feature.point, self.point)
 
     def test_writes_take_the_ids(self):
         url = f"{collections_url}/tests.layerwithforeignkey/items"
