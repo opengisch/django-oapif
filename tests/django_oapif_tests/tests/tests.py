@@ -790,31 +790,46 @@ class TestServedItemIds(TestCase):
                 self.assertEqual(list(features), [str(feature) for feature in expected])
 
     def test_a_filter_matches_no_feature_with_an_id_of_no_row(self):
-        # as a hook written for the URLs answers it: by a 404, a DoesNotExist, or None
+        # as a hook written for the URLs answers it, by an Http404
         feature_id, other_id = str(served_id(None, self.feature.pk)), str(served_id(None, self.feature_of_other.pk))
         collection = oapif.collections["tests.layerwithforeignkey"]
-        for unknown in (Http404(), LayerWithForeignKey.DoesNotExist(), None):
 
-            def resolve_item_id(request, item_id, unknown=unknown):
-                if item_id != "unknown":
-                    return resolved_id(request, item_id)
-                if unknown is None:
-                    return None
-                raise unknown
+        def resolve_item_id(request, item_id):
+            if item_id == "unknown":
+                raise Http404
+            return resolved_id(request, item_id)
 
-            for filter_expr, expected in (
-                ("id = 'unknown'", set()),
-                (f"id IN ('{feature_id}', 'unknown')", {feature_id}),
-                ("id <> 'unknown'", {feature_id, other_id}),
-            ):
-                with self.subTest(unknown=unknown, filter=filter_expr):
-                    with patch.object(collection, "resolve_item_id", resolve_item_id):
-                        features = self.items("tests.layerwithforeignkey", filter=filter_expr)
+        for filter_expr, expected in (
+            ("id = 'unknown'", set()),
+            (f"id IN ('{feature_id}', 'unknown')", {feature_id}),
+            ("id <> 'unknown'", {feature_id, other_id}),
+        ):
+            with self.subTest(filter=filter_expr):
+                with patch.object(collection, "resolve_item_id", resolve_item_id):
+                    features = self.items("tests.layerwithforeignkey", filter=filter_expr)
 
-                    self.assertEqual(set(features), expected)
+                self.assertEqual(set(features), expected)
+
+    def test_a_write_refuses_a_foreign_key_of_no_row(self):
+        # as a hook written for the URLs answers it, by an Http404, rather than a 404 of the whole write
+        unknown = str(uuid.uuid4())
+        points = oapif.collections["tests.point_2056_10fields"]
+        url = f"{collections_url}/tests.layerwithforeignkey/items"
+
+        def resolve_item_id(request, item_id):
+            if item_id == unknown:
+                raise Http404
+            return resolved_id(request, item_id)
+
+        feature = {"type": "Feature", "geometry": None, "properties": {"point": unknown}}
+        with patch.object(points, "resolve_item_id", resolve_item_id):
+            response = self.client.post(url, feature, headers=headers, content_type="application/json")
+
+        self.assertEqual(response.status_code, 422, response.content)
+        self.assertEqual(response.json()["detail"][0]["msg"], "Foreign key not found")
 
     def test_an_id_of_no_row_is_no_null_key(self):
-        # = NULL would match the features without a key
+        # an id of no row, resolved to None, is an empty IN, not = NULL
         point = LayerWithForeignKey._meta.get_field("point")
 
         q = cql2.to_q("point = 'unknown'", {"point": point}, CRS84_SRID, {"point": lambda literal: None})

@@ -6,7 +6,7 @@ from urllib.parse import quote
 from django.contrib.gis.db.models import Extent
 from django.contrib.gis.geos import GEOSException, GEOSGeometry
 from django.contrib.gis.geos.libgeos import geos_version_tuple
-from django.core.exceptions import FieldError, ObjectDoesNotExist, ValidationError as DjangoValidationError
+from django.core.exceptions import FieldError, ValidationError as DjangoValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import ForeignKey, Model, QuerySet
 from django.http import Http404, HttpRequest, HttpResponse
@@ -292,18 +292,26 @@ def filter_or_raise(
         raise HttpError(400, f"Invalid filter: {e}")
 
 
+def resolved_key(collection: OapifCollection, request: HttpRequest, item_id: str) -> Any:
+    """
+    The key an id stands for, by the `resolve_item_id()` of `collection`. None for an id that stands for no row, one
+    it raises `Http404` for, as a hook written for the URLs may: its URL answers a 404, a write refuses it as a foreign
+    key not found, and a filter matches no feature with it.
+    """
+    try:
+        return collection.resolve_item_id(request, item_id)
+    except Http404:
+        return None
+
+
 def filter_key(collection: OapifCollection, request: HttpRequest, literal: Any) -> Any:
     """
-    The key a literal of a filter stands for, compared with an id that `collection` serves, by its
-    `resolve_item_id()`, as the id of a URL. None for an id that stands for no row: one it raises a 404 or a
-    `DoesNotExist` for, as one written for the URLs may, or resolves to None. An id it returns unchanged is the
-    literal, of its type, which Django converts as it does on any collection: 1.0 for 1.
+    The key a literal of a filter stands for, compared with an id that `collection` serves, as `resolved_key()` gives
+    it for the id of a URL: None for an id that stands for no row. An id resolved unchanged is the literal, of its
+    type, which Django converts as it does on any collection: 1.0 for 1.
     """
     item_id = str(literal)
-    try:
-        key = collection.resolve_item_id(request, item_id)
-    except (Http404, ObjectDoesNotExist):
-        return None
+    key = resolved_key(collection, request, item_id)
     return literal if key == item_id else key
 
 
@@ -385,7 +393,7 @@ def get_item_or_404(collection: OapifCollection, request: HttpRequest, item_id: 
     query = collection.get_queryset(request)
     if geom_field := collection.geometry_field:
         query = query.defer(geom_field)
-    return get_object_or_404(query, pk=collection.resolve_item_id(request, item_id))
+    return get_object_or_404(query, pk=resolved_key(collection, request, item_id))
 
 
 def validate_new_key_or_raise(collection: OapifCollection, item: Model) -> None:
@@ -456,8 +464,9 @@ def get_related_object_or_raise(
     else:
         others = referenced_collections(request, field, collections)
     for other in others:
-        rows = other.get_queryset(request).complex_filter(limit)
-        row = rows.filter(pk=other.resolve_item_id(request, str(value))).first()
+        if (key := resolved_key(other, request, str(value))) is None:
+            continue
+        row = other.get_queryset(request).complex_filter(limit).filter(pk=key).first()
         if row is not None:
             return row
     if not others:
@@ -762,7 +771,7 @@ def create_collections_router(collections: dict[str, OapifCollection], *, title:
     ):
         collection = get_collection_by_id(collection_id, request)
         validate_crs_or_raise(collection, crs, "crs")
-        item_id = collection.resolve_item_id(request, item_id)
+        item_id = resolved_key(collection, request, item_id)
         html = accepts_html(request)
         arrow = not html and accepts_geoarrow(request)
         profile = None if html or arrow else requested_profile(request, profile)
